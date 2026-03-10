@@ -1,7 +1,4 @@
-  // ============================================================
-  //  PABLO MOD 2.0 — Script completo
-  // ============================================================
-
+(async function() {
 console.log('PABLO: carregando eventemitter...');
   await new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -7322,3 +7319,4 @@ dsk.once('postPacket:accepted', () => {
   dsk.localMsg('Pablo Mod Load, type /cmd for commands', 'pink');
 });
 
+})();
