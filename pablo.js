@@ -6667,64 +6667,19 @@ dsk.setCmd('/zoom', () => {
     const rootSprite = myself.body_sprite ?? myself.spr;
     const world = rootSprite.parent.parent.parent;
 
-    const skillBar = jv.stage.children.find(c =>
-        c !== ui_container && c !== world && c.children !== undefined
-    );
+    world.scale.x = (1 / xZoom);
+    world.scale.y = (1 / xZoom);
+    world.position.x = 380 * (1 - (1 / xZoom));
+    world.position.y = 230 * (1 - (1 / xZoom));
 
-    if (dsk.zoom.enabled) {
-        // Salva estado original antes de mexer
-        dsk.zoom._orig = {
-            worldScaleX: world.scale.x,
-            worldScaleY: world.scale.y,
-            worldX: world.position.x,
-            worldY: world.position.y,
-            uiScaleX: ui_container.scale.x,
-            uiScaleY: ui_container.scale.y,
-            uiX: ui_container.position.x,
-            uiY: ui_container.position.y,
-            sbScaleX: skillBar?.scale.x,
-            sbScaleY: skillBar?.scale.y,
-            sbX: skillBar?.x,
-            sbY: skillBar?.y,
-        };
+    ui_container.scale.x = xZoom;
+    ui_container.scale.y = xZoom;
+    ui_container.position.x = (xZoom - 1) * -380;
+    ui_container.position.y = (xZoom - 1) * -230;
 
-        world.scale.x = (1 / xZoom);
-        world.scale.y = (1 / xZoom);
-        world.position.x = 380 * (1 - (1 / xZoom));
-        world.position.y = 230 * (1 - (1 / xZoom));
-
-        ui_container.scale.x = xZoom;
-        ui_container.scale.y = xZoom;
-        ui_container.position.x = (xZoom - 1) * -380;
-        ui_container.position.y = (xZoom - 1) * -230;
-
-        if (skillBar) {
-            skillBar.scale.x = xZoom;
-            skillBar.scale.y = xZoom;
-            skillBar.x = -380 * (xZoom - 1);
-            skillBar.y = -230 * (xZoom - 1);
-        }
-
-    } else {
-        // Restaura estado original exato
-        if (dsk.zoom._orig) {
-            world.scale.x = dsk.zoom._orig.worldScaleX;
-            world.scale.y = dsk.zoom._orig.worldScaleY;
-            world.position.x = dsk.zoom._orig.worldX;
-            world.position.y = dsk.zoom._orig.worldY;
-
-            ui_container.scale.x = dsk.zoom._orig.uiScaleX;
-            ui_container.scale.y = dsk.zoom._orig.uiScaleY;
-            ui_container.position.x = dsk.zoom._orig.uiX;
-            ui_container.position.y = dsk.zoom._orig.uiY;
-
-            if (skillBar && dsk.zoom._orig.sbScaleX !== undefined) {
-                skillBar.scale.x = dsk.zoom._orig.sbScaleX;
-                skillBar.scale.y = dsk.zoom._orig.sbScaleY;
-                skillBar.x = dsk.zoom._orig.sbX;
-                skillBar.y = dsk.zoom._orig.sbY;
-            }
-        }
+    // Move a skill bar para o ui_container — funciona em desktop e mobile
+    if (jv.ability?.[0]?.parent) {
+        jv.ability[0].parent.setParent(ui_container);
     }
 
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
