@@ -6667,70 +6667,47 @@ dsk.setCmd('/zoom', () => {
     const rootSprite = myself.body_sprite ?? myself.spr;
     const world = rootSprite.parent.parent.parent;
 
-    const skillBar = jv.stage.children.find(c =>
-        c !== ui_container && c !== world && c.children !== undefined
-    );
-
     if (dsk.zoom.enabled) {
-        // Salva estado original antes de mexer
-        dsk.zoom._orig = {
-            worldScaleX: world.scale.x,
-            worldScaleY: world.scale.y,
-            worldX: world.position.x,
-            worldY: world.position.y,
-            uiScaleX: ui_container.scale.x,
-            uiScaleY: ui_container.scale.y,
-            uiX: ui_container.position.x,
-            uiY: ui_container.position.y,
-            sbScaleX: skillBar?.scale.x,
-            sbScaleY: skillBar?.scale.y,
-            sbX: skillBar?.x,
-            sbY: skillBar?.y,
+        // Salva estado original de tudo
+        dsk.zoom._origWorld = {
+            sx: world.scale.x, sy: world.scale.y,
+            x: world.position.x, y: world.position.y
         };
+        dsk.zoom._others = [];
+        jv.stage.children.forEach(c => {
+            if (c === world) return;
+            dsk.zoom._others.push({ c, sx: c.scale.x, sy: c.scale.y, x: c.x, y: c.y });
+            c.scale.x = xZoom;
+            c.scale.y = xZoom;
+            c.x = -380 * (xZoom - 1);
+            c.y = -230 * (xZoom - 1);
+        });
 
-        world.scale.x = (1 / xZoom);
-        world.scale.y = (1 / xZoom);
+        world.scale.x = 1 / xZoom;
+        world.scale.y = 1 / xZoom;
         world.position.x = 380 * (1 - (1 / xZoom));
         world.position.y = 230 * (1 - (1 / xZoom));
 
-        ui_container.scale.x = xZoom;
-        ui_container.scale.y = xZoom;
-        ui_container.position.x = (xZoom - 1) * -380;
-        ui_container.position.y = (xZoom - 1) * -230;
-
-        if (skillBar) {
-            skillBar.scale.x = xZoom;
-            skillBar.scale.y = xZoom;
-            skillBar.x = -380 * (xZoom - 1);
-            skillBar.y = -230 * (xZoom - 1);
-        }
-
     } else {
-        // Restaura estado original exato
-        if (dsk.zoom._orig) {
-            world.scale.x = dsk.zoom._orig.worldScaleX;
-            world.scale.y = dsk.zoom._orig.worldScaleY;
-            world.position.x = dsk.zoom._orig.worldX;
-            world.position.y = dsk.zoom._orig.worldY;
-
-            ui_container.scale.x = dsk.zoom._orig.uiScaleX;
-            ui_container.scale.y = dsk.zoom._orig.uiScaleY;
-            ui_container.position.x = dsk.zoom._orig.uiX;
-            ui_container.position.y = dsk.zoom._orig.uiY;
-
-            if (skillBar && dsk.zoom._orig.sbScaleX !== undefined) {
-                skillBar.scale.x = dsk.zoom._orig.sbScaleX;
-                skillBar.scale.y = dsk.zoom._orig.sbScaleY;
-                skillBar.x = dsk.zoom._orig.sbX;
-                skillBar.y = dsk.zoom._orig.sbY;
-            }
+        // Restaura tudo exatamente como estava
+        if (dsk.zoom._origWorld) {
+            world.scale.x = dsk.zoom._origWorld.sx;
+            world.scale.y = dsk.zoom._origWorld.sy;
+            world.position.x = dsk.zoom._origWorld.x;
+            world.position.y = dsk.zoom._origWorld.y;
+        }
+        if (dsk.zoom._others) {
+            dsk.zoom._others.forEach(({ c, sx, sy, x, y }) => {
+                c.scale.x = sx;
+                c.scale.y = sy;
+                c.x = x;
+                c.y = y;
+            });
         }
     }
 
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
 });
-
-
 //heal bot //
 
 dsk.healbot = { enabled: false };
