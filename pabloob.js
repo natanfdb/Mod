@@ -6681,15 +6681,18 @@ dsk.setCmd('/zoom', () => {
     ui_container.position.x = (xZoom - 1) * -380;
     ui_container.position.y = (xZoom - 1) * -230;
 
-	// Contra-escala de todos os filhos do stage exceto world e ui_container
-    jv.stage.children.forEach(c => {
-        if (c === ui_container) return;
-        if (c === world) return;
-        c.scale.x = xZoom;
-        c.scale.y = xZoom;
-        c.x = -380 * (xZoom - 1);
-        c.y = -230 * (xZoom - 1);
-    });
+	// Contra-escala da skill bar (dinâmico)
+    const skillBar = jv.stage.children.find(c =>
+        c !== ui_container &&
+        c !== world &&
+        c.children !== undefined
+    );
+    if (skillBar) {
+        skillBar.scale.x = xZoom;
+        skillBar.scale.y = xZoom;
+        skillBar.x = -380 * (xZoom - 1);
+        skillBar.y = -230 * (xZoom - 1);
+    }
     
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
 });
