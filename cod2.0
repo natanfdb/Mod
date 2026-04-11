@@ -806,6 +806,16 @@ async function xDoMove(ex, wy) {
             }
         }
     }
+	// ── Paredes do mapa ──────────────────────────────────────────
+	for (j = 0; j < 46; j++) {
+		for (k = 0; k < 16; k++) {
+			if (xSolids[j][k] !== undefined) continue; // já marcado
+			const wall = xGetWallByPos((j + xSolidsPos[0]), (k + xSolidsPos[1]));
+			if (wall && wall.can_block === 1) {
+				xSolids[j][k] = wall.name;
+			}
+		}
+	}
     xTemp[88] = 0;
     for (k = 0; k < 16; k++) {
         for (j = 0; j < 46; j++) {
@@ -939,41 +949,51 @@ async function xCheck(ex, wy) {
             }
         }
     }
-    xTemp[98] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < 46; j++) {
-            if (xSolidsCH[j][k] != undefined) {
-                xTemp[98] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[98] >= 4) {
-        xTemp[98] = 4;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < xTemp[98]; j++) {
-            xSolidsCH[j][k] = "Void";
-        }
-    }
+	// ── Paredes do mapa ──────────────────────────────────────────
+	for (j = 0; j < 46; j++) {
+		for (k = 0; k < 16; k++) {
+			if (xSolidsCH[j][k] !== undefined) continue; // já marcado
+			const wall = xGetWallByPos((j + xSolidsPosCH[0]), (k + xSolidsPosCH[1]));
+			if (wall && wall.can_block === 1) {
+				xSolidsCH[j][k] = wall.name;
+			}
+		}
+	}
+    let _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < 46; j++) {
+			if (xSolidsCH[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound >= 4) {
+		_bound = 4;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < _bound; j++) {
+			xSolidsCH[j][k] = "Void";
+		}
+	}
 
-    xTemp[98] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 45; j > 0; j--) {
-            if (xSolidsCH[j][k] != undefined) {
-                xTemp[98] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[98] <= 42) {
-        xTemp[98] = 42;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = xTemp[98]; j < 46; j++) {
-            xSolidsCH[j][k] = "Void";
-        }
-    }
+    _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 45; j > 0; j--) {
+			if (xSolidsCH[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound <= 42) {
+		_bound = 42;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = _bound; j < 46; j++) {
+			xSolidsCH[j][k] = "Void";
+		}
+	}
 
     for (i in mobs.items) {
         if (mobs.items[i] != undefined) {
@@ -5117,8 +5137,12 @@ async function xGetShiny() {
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    await xGetCanMove(obj.x, obj.y);
-    if (!xCanMov) continue;
+    let canReach = false;
+	for (let s = 0; s < exList.length; s++) {
+	  await xGetCanMove(exList[s], wyList[s]);
+	  if (xCanMov) { canReach = true; break; }
+	}
+	if (!canReach) continue;
     if (!xTemp[170] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[170].x, xTemp[170].y, myself.x, myself.y)) {
@@ -5141,8 +5165,12 @@ async function xGetSSDStone() {
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    await xGetCanMove(obj.x, obj.y);
-    if (!xCanMov) continue;
+    let canReach = false;
+	for (let s = 0; s < exList.length; s++) {
+	  await xGetCanMove(exList[s], wyList[s]);
+	  if (xCanMov) { canReach = true; break; }
+	}
+	if (!canReach) continue;
     if (!xTemp[172] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[172].x, xTemp[172].y, myself.x, myself.y)) {
