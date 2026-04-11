@@ -5192,8 +5192,12 @@ async function xGetChest() {
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    await xGetCanMove(obj.x, obj.y);
-    if (!xCanMov) continue;
+    let canReach = false;
+	for (let s = 0; s < exList.length; s++) {
+		await xGetCanMove(exList[s], wyList[s]);
+		if (xCanMov) { canReach = true; break; }
+	}
+	if (!canReach) continue;
     if (!xTemp[171] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y)) {
