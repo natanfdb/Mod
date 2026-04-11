@@ -816,41 +816,41 @@ async function xDoMove(ex, wy) {
 			}
 		}
 	}
-    xTemp[88] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < 46; j++) {
-            if (xSolids[j][k] != undefined) {
-                xTemp[88] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[88] >= 4) {
-        xTemp[88] = 4;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < xTemp[88]; j++) {
-            xSolids[j][k] = "Void";
-        }
-    }
+    let _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < 46; j++) {
+			if (xSolids[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound >= 4) {
+		_bound = 4;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < _bound; j++) {
+			xSolids[j][k] = "Void";
+		}
+	}
 
-    xTemp[88] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 45; j > 0; j--) {
-            if (xSolids[j][k] != undefined) {
-                xTemp[88] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[88] <= 42) {
-        xTemp[88] = 42;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = xTemp[88]; j < 46; j++) {
-            xSolids[j][k] = "Void";
-        }
-    }
+    _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 45; j > 0; j--) {
+			if (xSolids[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound <= 42) {
+		_bound = 42;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = _bound; j < 46; j++) {
+			xSolids[j][k] = "Void";
+		}
+	}
 
     for (i in mobs.items) {
         if (mobs.items[i] != undefined) {
