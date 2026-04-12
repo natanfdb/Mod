@@ -5365,7 +5365,7 @@ dsk.setCmd('/ssd', () => {
           xGoing[110] = false;
           xMovingNow = false;
         }
-        await xDelay(800);
+        await xDelay(500);
       }
     })();
 
