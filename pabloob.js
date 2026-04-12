@@ -215,8 +215,13 @@ setInterval(() => {
 
 // ── LOOP PRÓPRIO ─────────────────────────────────────────────
 
+let _lastLoop = 0;
 (function loop() {
-  dsk.emit('postLoop');
+  const now = performance.now();
+  if (now - _lastLoop >= 16) {
+    dsk.emit('postLoop');
+    _lastLoop = now;
+  }
   requestAnimationFrame(loop);
 })();
 
@@ -5168,6 +5173,7 @@ async function xGetShiny() {
   if (!myself || game_state !== 2) return;
   xTemp[170] = undefined;
   for (let i in objects.items) {
+	await xDelay(0);
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0 || obj.name !== 'Shiny Rock') continue;
 	if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
@@ -5195,6 +5201,7 @@ async function xGetSSDStone() {
   xTemp[172] = undefined;
   const rockSprites = [-261, -618];
   for (let i in objects.items) {
+	await xDelay(0);
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0) continue;
     // verifica por nome OU por sprite
@@ -5358,7 +5365,7 @@ dsk.setCmd('/ssd', () => {
           xGoing[110] = false;
           xMovingNow = false;
         }
-        await xDelay(500);
+        await xDelay(800);
       }
     })();
 
