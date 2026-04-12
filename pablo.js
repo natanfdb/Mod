@@ -468,39 +468,48 @@ dsk.setCmd('/speed', (context) => {
     dsk.speed.stop();
   }
 });
+
 dsk.follow = {
   enabled: false,
   targetName: null
 };
-dsk.setCmd('/follow', (context) => {
 
-  // Se digitou nome → ativa
+dsk.setCmd('/follow', (context) => {
+  // Se digitou nome → atualiza e ativa
   if (context) {
     dsk.follow.targetName = context.trim();
     dsk.follow.enabled = true;
-
-    dsk.localMsg(
-      `Follow: ${dsk.follow.targetName}`,
-      '#5f5'
-    );
+    dsk.localMsg(`Follow: ${dsk.follow.targetName}`, '#5f5');
     return;
   }
 
-  // Se digitou só /follow → desliga
-  dsk.follow.enabled = false;
-  dsk.localMsg('Follow: Desativado', '#f55');
+  // Se digitou só /follow → toggle, mantendo o nome salvo
+  if (dsk.follow.enabled) {
+    dsk.follow.enabled = false;
+    dsk.localMsg(
+      `Follow: Desativado (último: ${dsk.follow.targetName ?? 'nenhum'})`,
+      '#f55'
+    );
+  } else {
+    if (!dsk.follow.targetName) {
+      dsk.localMsg('Follow: Nenhum alvo salvo. Use /follow <nome>', '#fa5');
+      return;
+    }
+    dsk.follow.enabled = true;
+    dsk.localMsg(`Follow: ${dsk.follow.targetName}`, '#5f5');
+  }
 });
 
 // ── compass ────────────────────────────────────────────────────
 
 dsk.ginfo = new EventEmitter3();
 dsk.ginfo.directions = ['North', 'East', 'South', 'West'];
-dsk.ginfo.showTime = true;
-dsk.ginfo.showSessionTime = true;
+dsk.ginfo.showTime = false;
+dsk.ginfo.showSessionTime = false;
 dsk.ginfo.sessionStartTime = Date.now();
 
 dsk.ginfo.label = jv.text('Ginfo label', {
-  font: '10px Verdana',
+  font: '14px Verdana',
   fill: '0xFFFFFF',
   stroke: jv.color_medium,
   strokeThickness: 4,
@@ -529,7 +538,7 @@ dsk
   .on('postLoop', () => {
     if (!myself) return;
     const { x, y, location, direction } = dsk.ginfo.getData();
-    let text = `@${location.replaceAll(' ', '')}(${x}, ${y})[${direction}]`;
+    let text = `${location.replaceAll(' ', '')} (${x}, ${y})[${direction}]`;
     if (dsk.ginfo.showTime)        text += ` [${dsk.timestamp()}]`;
     if (dsk.ginfo.showSessionTime) text += ` [${dsk.formatTime(Date.now() - dsk.ginfo.sessionStartTime)}]`;
     dsk.ginfo.label.text = text;
@@ -834,41 +843,51 @@ async function xDoMove(ex, wy) {
             }
         }
     }
-    xTemp[88] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < 46; j++) {
-            if (xSolids[j][k] != undefined) {
-                xTemp[88] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[88] >= 4) {
-        xTemp[88] = 4;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < xTemp[88]; j++) {
-            xSolids[j][k] = "Void";
-        }
-    }
+	// ── Paredes do mapa ──────────────────────────────────────────
+	for (j = 0; j < 46; j++) {
+		for (k = 0; k < 16; k++) {
+			if (xSolids[j][k] !== undefined) continue; // já marcado
+			const wall = xGetWallByPos((j + xSolidsPos[0]), (k + xSolidsPos[1]));
+			if (wall && wall.can_block === 1) {
+				xSolids[j][k] = wall.name;
+			}
+		}
+	}
+    let _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < 46; j++) {
+			if (xSolids[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound >= 4) {
+		_bound = 4;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < _bound; j++) {
+			xSolids[j][k] = "Void";
+		}
+	}
 
-    xTemp[88] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 45; j > 0; j--) {
-            if (xSolids[j][k] != undefined) {
-                xTemp[88] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[88] <= 42) {
-        xTemp[88] = 42;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = xTemp[88]; j < 46; j++) {
-            xSolids[j][k] = "Void";
-        }
-    }
+    _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 45; j > 0; j--) {
+			if (xSolids[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound <= 42) {
+		_bound = 42;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = _bound; j < 46; j++) {
+			xSolids[j][k] = "Void";
+		}
+	}
 
     for (i in mobs.items) {
         if (mobs.items[i] != undefined) {
@@ -967,41 +986,51 @@ async function xCheck(ex, wy) {
             }
         }
     }
-    xTemp[98] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < 46; j++) {
-            if (xSolidsCH[j][k] != undefined) {
-                xTemp[98] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[98] >= 4) {
-        xTemp[98] = 4;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = 0; j < xTemp[98]; j++) {
-            xSolidsCH[j][k] = "Void";
-        }
-    }
+	// ── Paredes do mapa ──────────────────────────────────────────
+	for (j = 0; j < 46; j++) {
+		for (k = 0; k < 16; k++) {
+			if (xSolidsCH[j][k] !== undefined) continue; // já marcado
+			const wall = xGetWallByPos((j + xSolidsPosCH[0]), (k + xSolidsPosCH[1]));
+			if (wall && wall.can_block === 1) {
+				xSolidsCH[j][k] = wall.name;
+			}
+		}
+	}
+    let _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < 46; j++) {
+			if (xSolidsCH[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound >= 4) {
+		_bound = 4;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = 0; j < _bound; j++) {
+			xSolidsCH[j][k] = "Void";
+		}
+	}
 
-    xTemp[98] = 0;
-    for (k = 0; k < 16; k++) {
-        for (j = 45; j > 0; j--) {
-            if (xSolidsCH[j][k] != undefined) {
-                xTemp[98] = k - 1;
-                break;
-            }
-        }
-    }
-    if (xTemp[98] <= 42) {
-        xTemp[98] = 42;
-    }
-    for (k = 0; k < 16; k++) {
-        for (j = xTemp[98]; j < 46; j++) {
-            xSolidsCH[j][k] = "Void";
-        }
-    }
+    _bound = 0;
+	for (k = 0; k < 16; k++) {
+		for (j = 45; j > 0; j--) {
+			if (xSolidsCH[j][k] != undefined) {
+				_bound = k - 1;
+				break;
+			}
+		}
+	}
+	if (_bound <= 42) {
+		_bound = 42;
+	}
+	for (k = 0; k < 16; k++) {
+		for (j = _bound; j < 46; j++) {
+			xSolidsCH[j][k] = "Void";
+		}
+	}
 
     for (i in mobs.items) {
         if (mobs.items[i] != undefined) {
@@ -2536,13 +2565,45 @@ dsk.on('postLoop', () => {
   acm.lblSkillLvl.text     = `nivel: ${skillLevel ?? 0}`;
 });
 // ── Botões +/- para nivel alvo ──
-const btnLevelDown = jv.Button.create(0, 0, 20, '-', acm, 20);
-btnLevelDown.x = 130; btnLevelDown.y = 38;
-btnLevelDown.on_click = () => { if (currentLevel > 0) currentLevel--; acm.refresh(); };
+const baseX = 130;
+const y = 38;
+const spacing = 25;
 
+// 🔻 -10
+const btnLevelDown10 = jv.Button.create(0, 0, 30, '-10', acm, 20);
+btnLevelDown10.x = baseX;
+btnLevelDown10.y = y;
+btnLevelDown10.on_click = () => { 
+  currentLevel = Math.max(0, currentLevel - 10); 
+  acm.refresh(); 
+};
+
+// 🔻 -1
+const btnLevelDown = jv.Button.create(0, 0, 20, '-', acm, 20);
+btnLevelDown.x = baseX + spacing;
+btnLevelDown.y = y;
+btnLevelDown.on_click = () => { 
+  if (currentLevel > 0) currentLevel--; 
+  acm.refresh(); 
+};
+
+// 🔺 +1
 const btnLevelUp = jv.Button.create(0, 0, 20, '+', acm, 20);
-btnLevelUp.x = 155; btnLevelUp.y = 38;
-btnLevelUp.on_click = () => { currentLevel++; acm.refresh(); };
+btnLevelUp.x = baseX + spacing * 2;
+btnLevelUp.y = y;
+btnLevelUp.on_click = () => { 
+  currentLevel++; 
+  acm.refresh(); 
+};
+
+// 🔺 +10
+const btnLevelUp10 = jv.Button.create(0, 0, 30, '+10', acm, 20);
+btnLevelUp10.x = baseX + spacing * 3;
+btnLevelUp10.y = y;
+btnLevelUp10.on_click = () => { 
+  currentLevel = Math.min(100, currentLevel + 10); 
+  acm.refresh(); 
+};
 
 // ── Botões +/- para slot inicial ──
 const btnSlotDown = jv.Button.create(0, 0, 20, '-', acm, 20);
@@ -2565,6 +2626,24 @@ btnSkill.on_click = () => {
   btnSkill.label.text = skillName;
   acm.refresh();
 };
+
+// ── Botão skip water no painel skill config ───────────────────
+const btnSkipWater = jv.Button.create(0, 0, 150, 'Ignorar Água [OFF]', acm, 20);
+btnSkipWater.x = 100;
+btnSkipWater.y = 148; // abaixo dos botões existentes
+
+btnSkipWater.on_click = () => {
+  dsk.farm.skipWater = !dsk.farm.skipWater;
+  btnSkipWater.title.text = `Ignorar Água [${dsk.farm.skipWater ? 'ON' : 'OFF'}]`;
+  btnSkipWater.style.fill = dsk.farm.skipWater ? 0x44bb44 : 0xbb4444;
+  dsk.localMsg(`Farm skipWater: ${dsk.farm.skipWater ? 'ON' : 'OFF'}`, dsk.farm.skipWater ? '#5f5' : '#f55');
+};
+
+// Atualiza cor em tempo real
+dsk.on('postLoop', () => {
+  if (!acm.visible) return;
+  btnSkipWater.tint = dsk.farm.skipWater ? 0x44bb44 : 0xbb4444;
+});
 
 // ── Comando ──
 dsk.setCmd('/skillconfig', () => {
@@ -2636,6 +2715,15 @@ async function xLookDown() {
 async function Armas() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
+  
+  // ← 687 precisa ser checado ANTES do lock
+  if (inv[0]?.sprite === 687) {
+    dsk.armas.enabled = false;
+    xGoing[0] = false;
+    xDoKeyUp(6);
+    dsk.localMsg('Armas Bot: Desativado', '#f55');
+    return;
+  }
 
   if (skillLevel >= currentLevel && currentLevel > 0 && skillName !== 'repairing' && !emTroca) {
     emTroca = true;
@@ -2653,10 +2741,6 @@ async function Armas() {
     slotAtual++;
     await xDelay(1000);
     return;
-  }
-  
-  if (inv[0]?.sprite === 687) {
-    dsk.armas.enabled = false;
   }
 
   if (xIfChatHas("Disconnected (Packet Spamming)")) {
@@ -2690,17 +2774,17 @@ async function Armas() {
 		await xDoKeyUp(6);
 	    await xDelay(630);
         await xDoMove(myself.x - 1, myself.y);
-        await xDelay(620);
+        await xDelay(820);
         await xDoDropSlot(1, 1);
         await xDelay(610);
         await xDoMove(myself.x + 2, myself.y);
-        await xDelay(625);
+        await xDelay(1205);
         await xDoPickUp();
         await xDelay(550);
         await xDoUseSlot(0);
         await xDelay(510);
         await xDoMove(myself.x - 1, myself.y);
-        await xDelay(605);
+        await xDelay(805);
         await xDoChangeDir(0);
         await xDelay(604);
 		await xDoKeyUp(6);
@@ -2709,11 +2793,11 @@ async function Armas() {
 		await xDoKeyUp(6);
 	    await xDelay(630);
         await xDoMove(myself.x - 2, myself.y);
-        await xDelay(605);
+        await xDelay(1205);
         await xDoDropSlot(1, 1);
         await xDelay(620);
         await xDoMove(myself.x + 2, myself.y);
-        await xDelay(510);
+        await xDelay(1210);
         await xDoPickUp();
         await xDelay(503);
         await xDoUseSlot(0);
@@ -3116,10 +3200,11 @@ async function xCook() {
     await xDoMove(myself.x - 1, myself.y);
     await cook();
 
-	if (xGetWallByPos(myself.x - 1, myself.y)?.name == 'Stone Wall') {
-    await xDoMove(cookPositionX, cookPositionY);
-	await xDelay(400);
-    }
+	const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
+	if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
+		await xDoMove(cookPositionX, cookPositionY);
+		await xDelay(400);
+	}
 
     xGoing[1] = false;
   }
@@ -3216,10 +3301,12 @@ async function xSmelt() {
     await xDoMove(myself.x - 1, myself.y);
     await smelt();
 
-	if (xGetWallByPos(myself.x - 1, myself.y)?.name == 'Stone Wall') {
-    await xDoMove(smeltPositionX, smeltPositionY);
-	await xDelay(400);
-    }
+	const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
+
+	if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
+		await xDoMove(smeltPositionX, smeltPositionY);
+		await xDelay(400);
+	}
 
     xGoing[2] = false;
   }
@@ -3361,7 +3448,6 @@ jv.bottom(dsk.menu.pageLabel, 8);
 dsk.menu.addChild(dsk.menu.pageLabel);
 
 dsk.menu.rebuild = () => {
-  // Remove botões antigos
   dsk.menu.btns.forEach(b => dsk.menu.removeChild(b));
   dsk.menu.btns = [];
 
@@ -3374,6 +3460,7 @@ dsk.menu.rebuild = () => {
     btn.x = 20;
     btn.y = 35 + i * 26;
 
+    // label do nome (branco fixo)
     const lbl = jv.text(item.label, {
       font: '11px Verdana',
       fill: 0xffffff,
@@ -3384,8 +3471,20 @@ dsk.menu.rebuild = () => {
     lbl.y = 4;
     btn.addChild(lbl);
     btn.lbl = lbl;
-    btn.item = item;
 
+    // label do status (ON/OFF colorido)
+    const status = jv.text('OFF', {
+      font: '11px Verdana',
+      fill: 0xff4444,
+      stroke: 0x000000,
+      strokeThickness: 2,
+    });
+    status.x = 120;
+    status.y = 4;
+    btn.addChild(status);
+    btn.status = status;
+
+    btn.item = item;
     btn.on_click = () => {
       item.toggle();
       dsk.menu.refresh();
@@ -3400,8 +3499,10 @@ dsk.menu.rebuild = () => {
 dsk.menu.refresh = () => {
   dsk.menu.btns.forEach(btn => {
     const on = btn.item.state();
-    btn.lbl.text = `${btn.item.label}: ${on ? 'ON' : 'OFF'}`;
-    btn.tint = on ? 0x44bb44 : 0xbb4444;
+    btn.lbl.text    = btn.item.label;           // nome sempre branco
+    btn.status.text = on ? 'ON' : 'OFF';        // só o status muda
+    btn.status.style.fill = on ? 0x00ff00 : 0xff4444; // verde ou vermelho
+    btn.tint = on ? 0x44bb44 : 0xbb4444;        // fundo do botão
   });
 };
 
@@ -3419,8 +3520,9 @@ dsk.on('postLoop', () => {
 
 // Botão flutuante para abrir/fechar o menu
 dsk.menu.toggleBtn = jv.Button.create(0, 0, 60, '☰ Menu', ui_container, 22);
-dsk.menu.toggleBtn.x = 4;
-dsk.menu.toggleBtn.y = 360;
+dsk.menu.toggleBtn.x = 1;
+dsk.menu.toggleBtn.y = 385;
+dsk.menu.toggleBtn.title.style.fill = 0xFFD700;
 dsk.menu.toggleBtn.visible = false;
 dsk.menu.toggleBtn.on_click = () => {
   dsk.menu.visible = !dsk.menu.visible;
@@ -3770,9 +3872,11 @@ async function xGetMobByName(...names) {
   for (let i in mobs.items) {
     const mob = mobs.items[i];
     if (!mob || mob === myself) continue;
-    if (xPlyrTest(mob)) continue; // ignora jogadores
+    if (xPlyrTest(mob)) continue;
 
-    // checa nome nos dois sentidos (evita bug do indexOf invertido)
+    // ← Ignora mobs na blacklist
+    if (xTemp[100]?.[mob.id] && xTemp[100][mob.id] > Date.now()) continue;
+
     const mobName = mob.name.toLowerCase().replace(/ /g, '');
     const nameMatch = names.some(n => {
       const search = n.toLowerCase().replace(/ /g, '');
@@ -3782,7 +3886,7 @@ async function xGetMobByName(...names) {
     if (!nameMatch) continue;
 
     const dist = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
-	if (dist > 7) continue; // ← ignora mobs além de 6 sqm
+    if (dist > 7) continue;
     if (dist < bestDist) {
       bestDist = dist;
       xTemp[15] = mob;
@@ -4284,9 +4388,9 @@ async function xWw() {
   xGoing[230] = true;
 
   if (xGetSpellByID(911) !== undefined) {
-    for (let dx = -3; dx <= 3; dx++) {
-      for (let dy = -3; dy <= 3; dy++) {
-        if (Math.abs(dx) + Math.abs(dy) > 3) continue;
+    for (let dx = -2; dx <= 2; dx++) {
+      for (let dy = -2; dy <= 2; dy++) {
+        if (Math.abs(dx) + Math.abs(dy) > 2) continue;
         if (dx === 0 && dy === 0) continue;
         if (xGetPlayerByPos(myself.x + dx, myself.y + dy) !== undefined) {
           await xDelay(25);
@@ -4362,6 +4466,15 @@ dsk.setCmd('/farm', () => {
     dsk.localMsg('Farm Bot: Desativado', '#f55');
   }
 });
+// ── FARM: opção de pular água raza ────────────────────────────
+dsk.farm.skipWater = false;
+
+// Wrapper: se skipWater, agua raza (0) vira 1 (bloqueado)
+function farmOcc(x, y) {
+  const v = occupied(x, y);
+  if (dsk.farm.skipWater && v === 0) return 1;
+  return v;
+}
 
 async function FarmBot() {
 
@@ -4423,13 +4536,8 @@ async function FarmBot() {
   }
 
   async function digTile(){
-    await xDoUseSlot(shovelSlot);
-    await xDelay(339);
     await xDoKeyPress(6, 211);
-    await xDelay(341);
-    await xDoUseSlot(0);
-    await xDelay(341);
-    await xDoUseSlot(1);
+    await xDelay(441);
   }
 
   // ✅ NOVO: cava até o tile mudar de estado (ou atingir limite de tentativas)
@@ -4459,10 +4567,16 @@ async function FarmBot() {
   if (myself.dir === 1 && hasWallRight){
 
     // 1) cavar em cima
-    if (occupied(myself.x, myself.y - 1) === 0){
+    if (farmOcc(myself.x, myself.y - 1) === 0){
       await xDelay(515);
       await xDoChangeDir(0);
+	  await xDelay(418);
+	  await xDoUseSlot(shovelSlot);
       await digUntilReady(myself.x, myself.y - 1);
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1);
     }
 
     // 2) só depois limpar o bush
@@ -4478,11 +4592,17 @@ async function FarmBot() {
     await plantSeed();
 
 	// 4) cavar embaixo (tile destino) antes do bush
-    if (occupied(myself.x, myself.y + 1) === 0){
+    if (farmOcc(myself.x, myself.y + 1) === 0){
       await xDelay(423);
       await xDoChangeDir(2);
       await xDelay(418);
+	  await xDoUseSlot(shovelSlot);
+	  await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1);
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1);
     }
 
     // virar esquerda
@@ -4498,10 +4618,17 @@ async function FarmBot() {
   if (myself.dir === 3 && hasWallLeft){
 
     // 1) cavar embaixo
-    if (occupied(myself.x, myself.y + 1) === 0){
+    if (farmOcc(myself.x, myself.y + 1) === 0){
       await xDelay(549);
       await xDoChangeDir(2);
+	  await xDelay(418);
+	  await xDoUseSlot(shovelSlot);
+	  await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1);
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1);
     }
 
     // 2) só depois limpar o bush
@@ -4517,11 +4644,17 @@ async function FarmBot() {
     await plantSeed();
 
 	// 4) cavar em cima (tile destino) antes do bush
-    if (occupied(myself.x, myself.y - 1) === 0){
+    if (farmOcc(myself.x, myself.y - 1) === 0){
       await xDelay(348);
       await xDoChangeDir(0);
       await xDelay(357);
+	  await xDoUseSlot(shovelSlot);
+	  await xDelay(418);
       await digUntilReady(myself.x, myself.y - 1);
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1);
     }
 
     // virar direita
@@ -4535,22 +4668,42 @@ async function FarmBot() {
   // Movimento normal lateral
   // =========================
   if (myself.dir === 1){ // indo para a direita >
-    if (occupied(myself.x, myself.y - 1) === 0){
+    if (farmOcc(myself.x, myself.y - 1) === 0){
       await xDoChangeDir(0);
+	  await xDelay(357);
+	  await xDoUseSlot(shovelSlot);
+	  await xDelay(418);
       await digUntilReady(myself.x, myself.y - 1); // ✅
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1)
       await xDoChangeDir(1);
     }
   }
   else if (myself.dir === 3){ // indo para a esquerda <
-    if (occupied(myself.x, myself.y + 1) === 0){
+    if (farmOcc(myself.x, myself.y + 1) === 0){
       await xDoChangeDir(2);
+	  await xDelay(418);
+	  await xDoUseSlot(shovelSlot);
+	  await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1); // ✅
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1)
       await xDoChangeDir(3);
     }
   }
   else { // subindo ou descendo
-    if (occupied(front.x, front.y) === 0){
+    if (farmOcc(front.x, front.y) === 0){
+	  await xDelay(418);
+	  await xDoUseSlot(shovelSlot);
       await digUntilReady(front.x, front.y); // ✅
+	  await xDelay(341);
+      await xDoUseSlot(0);
+      await xDelay(341);
+      await xDoUseSlot(1)
     }
   }
 
@@ -5017,11 +5170,16 @@ async function xGetShiny() {
   for (let i in objects.items) {
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0 || obj.name !== 'Shiny Rock') continue;
+	if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    await xGetCanMove(obj.x, obj.y);
-    if (!xCanMov) continue;
+    let canReach = false;
+	for (let s = 0; s < exList.length; s++) {
+	  await xGetCanMove(exList[s], wyList[s]);
+	  if (xCanMov) { canReach = true; break; }
+	}
+	if (!canReach) continue;
     if (!xTemp[170] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[170].x, xTemp[170].y, myself.x, myself.y)) {
@@ -5029,6 +5187,35 @@ async function xGetShiny() {
     }
   }
   return xTemp[170];
+}
+
+async function xGetSSDStone() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  xTemp[172] = undefined;
+  const rockSprites = [-261, -618];
+  for (let i in objects.items) {
+    const obj = objects.items[i];
+    if (!obj || obj.can_pickup !== 0) continue;
+    // verifica por nome OU por sprite
+    if (obj.name !== 'Rock' && !rockSprites.includes(obj.sprite)) continue;
+	if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
+    const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
+    const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
+    if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
+    let canReach = false;
+	for (let s = 0; s < exList.length; s++) {
+	  await xGetCanMove(exList[s], wyList[s]);
+	  if (xCanMov) { canReach = true; break; }
+	}
+	if (!canReach) continue;
+    if (!xTemp[172] ||
+        xGetDistance(obj.x, obj.y, myself.x, myself.y) <
+        xGetDistance(xTemp[172].x, xTemp[172].y, myself.x, myself.y)) {
+      xTemp[172] = obj;
+    }
+  }
+  return xTemp[172];
 }
 
 // Encontra Baú (Odd/Treasure) acessível mais próximo → xTemp[171]
@@ -5043,8 +5230,12 @@ async function xGetChest() {
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    await xGetCanMove(obj.x, obj.y);
-    if (!xCanMov) continue;
+    let canReach = false;
+	for (let s = 0; s < exList.length; s++) {
+		await xGetCanMove(exList[s], wyList[s]);
+		if (xCanMov) { canReach = true; break; }
+	}
+	if (!canReach) continue;
     if (!xTemp[171] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y)) {
@@ -5088,7 +5279,7 @@ async function xGetMobByNameMining(nameList) {
     );
     if (!nameMatch) continue;
     const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
-    if (dist > 8) continue;
+    if (dist > 2) continue;
     if (xTemp[15] === myself ||
         dist < xGetDistance(xTemp[15].x, xTemp[15].y, myself.x, myself.y)) {
       xTemp[15] = mob;
@@ -5117,6 +5308,7 @@ async function xEquipSlots() {
   if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(100); }
 }
 
+
 // ── xSSD BOT ──────────────────────────────────────────────────
 
 dsk.ssd = { enabled: false };
@@ -5128,126 +5320,197 @@ dsk.setCmd('/ssd', () => {
     xWCID1 = inv[0]?.sprite;
     xWCID2 = inv[1]?.sprite;
     xWCID3 = inv[2]?.sprite;
+	xWCID4 = inv[3]?.sprite; // ← adiciona isso
     repItem = xGetItemNameBySlot(0) ?? '';
+	dsk.ssd.targetMode    = dsk.ssd.targetMode    ?? 'shiny'; // 'shiny' | 'stone' | 'both'
+	dsk.ssd.repairInPlace = dsk.ssd.repairInPlace ?? false;
 
-    if (!xWCID1 || !xWCID2 || !xWCID3) {
-      dsk.localMsg('SSD: coloque itens nos slots 0, 1 e 2 primeiro!', '#f55');
+    if (!xWCID1 || !xWCID2 || !xWCID3 || !xWCID4) {
+      dsk.localMsg('SSD: coloque itens nos slots 0, 1, 2 e 3 primeiro!', '#f55'); // ← atualiza mensagem
       dsk.ssd.enabled = false;
       return;
     }
 
-    xTemp[70] = undefined; // força reinit dos waypoints
+    // ── Reset completo ao ligar ──────────────────────────────
+    xGoing[110] = false;
+    xMovingNow = false;
+    xNeedsRep = false;
+    RepTimer = 0;
+	xTemp[13] = myself; // ← reseta mob alvo
+	xTemp[170] = undefined; // ← reseta shiny
+	xTemp[171] = undefined; // ← reseta chest
+	xTemp[172] = undefined; // reseta stone
+    xTemp[70] = undefined; // força reinit waypoints
+    xTemp[90] = undefined; // cache mob X
+    xTemp[91] = undefined; // cache mob Y
+    xTemp[92] = undefined; // cache wp X
+    xTemp[93] = undefined; // cache wp Y
+    target.id = me;
+
     dsk.localMsg(`SSD Bot: Ativado | ID1=${xWCID1} ID2=${xWCID2} ID3=${xWCID3}`, '#5f5');
 
     (async function loop() {
       while (dsk.ssd.enabled) {
-        await xSSD();
+        try {
+          await xSSD();
+        } catch(e) {
+          console.log('[SSD] erro:', e);
+          xGoing[110] = false;
+          xMovingNow = false;
+        }
         await xDelay(500);
       }
     })();
+
   } else {
     xGoing[110] = false;
-    xMovingNow  = false;
-    target.id   = me;
+    xMovingNow = false;
+    xNeedsRep = false;
+	xTemp[13] = myself; // ← reseta mob alvo
+	xTemp[170] = undefined; // ← reseta shiny
+	xTemp[171] = undefined; // ← reseta chest
+	xTemp[172] = undefined; //reseta stone
+    xTemp[90] = undefined;
+    xTemp[91] = undefined;
+    xTemp[92] = undefined;
+    xTemp[93] = undefined;
+    target.id = me;
     dsk.localMsg('SSD Bot: Desativado', '#f55');
   }
 });
 
 async function xSSD() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
-  if (connection?.readyState === 3) xMovingNow = false;
-  else if (!connection) xMovingNow = false;
-  if (xGoing[110] === true) return;
-  xGoing[110] = true;
 
-  // ── REPARO ──────────────────────────────────────────────────
+  if (connection?.readyState === 3) { xMovingNow = false; return; }
+  if (!connection) { xMovingNow = false; return; }
+
+  // Auto-reset se travar por mais de 10s
+  if (xGoing[110] === true) {
+    if (!xGoing._ssdTime) xGoing._ssdTime = Date.now();
+    if (Date.now() - xGoing._ssdTime > 10000) {
+      xGoing[110]     = false;
+      xGoing._ssdTime = undefined;
+      xMovingNow      = false;
+    }
+    return;
+  }
+  xGoing[110]     = true;
+  xGoing._ssdTime = undefined;
+
+  // ── INIT WAYPOINTS ──────────────────────────────────────────
+  if (xTemp[70] === undefined) {
+    xTemp[70] = 0;
+    xTemp[71] = 25;
+    const px = [9,25,30,25,39,26,27,25,27,25,56,56,56,79,79,75,85,69,52,52,52,69,85,75,79,79];
+    const py = [8,15,32,54,56,65,75,39,23,13,12,42,12,14,44,56,76,78,74,57,74,78,76,56,44,12];
+    for (let i = 0; i < px.length; i++) {
+      WCPosListX[i] = px[i];
+      WCPosListY[i] = py[i];
+    }
+    xTemp[92] = undefined;
+    xTemp[93] = undefined;
+    dsk.localMsg('SSD: waypoints iniciados', '#0ff');
+  }
+
+
+// ── MODO REPARO ─────────────────────────────────────────────
   if (xNeedsRep) {
-    if (xGetSlotByID(719) === undefined) {
-      xGoing[110] = false;
-      await xDelay(300);
-      const wc3 = xGetItemByID(xWCID3);
-      if (wc3) { await xDoMove(wc3.x, wc3.y); xDoPickUp(); }
-      else xDoLogOff();
-      return;
-    }
-
-    // Mob próximo durante reparo
-    for (let i in mobs.items) {
-      const mob = mobs.items[i];
-      if (!mob || mob === myself) continue;
-      const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
-      if (dist > 6 && !xPlyrTest(mob)) continue;
-
-      const wc3 = xGetItemByID(xWCID3);
-      if (wc3) { await xDoMove(wc3.x, wc3.y); xDoPickUp(); }
-      await xEquipSlots();
-      await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon');
-      if (xTemp[13] && xTemp[13] !== myself) {
-        if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
-        if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
-      }
-      xGoing[110] = false;
-      return;
-    }
-
-    // Drop itens para reparar
-    if (inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite) {
-      if (myself.x === 94 && myself.y === 93) {
-        if      (inv[3]?.sprite) { xDoDropSlot(0, 4); await xDelay(400); }
-        else if (inv[2]?.sprite) { xDoDropSlot(0, 3); await xDelay(400); }
-        else if (inv[1]?.sprite) { xDoDropSlot(0, 2); await xDelay(400); }
-        else if (inv[0]?.sprite) { xDoDropSlot(0, 1); await xDelay(400); }
-      } else {
-        await xDoMove(94, 93);
-        await xDelay(500);
-      }
+    if (dsk.ssd.repairInPlace) {
+      await xSSDRepairInPlace();
     } else {
-      // Executa reparo
-      if (myself.x === 94 && myself.y === 92 && myself.dir === 2 &&
-          inv[xGetSlotByID(719)]?.equip !== 0) {
-        if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
-          xDoClearChat('The ' + repItem + ' is in perfect condition.');
-          xDoKeyUp(6);
-          const wc3 = xGetItemByID(xWCID3);
-          if (wc3) {
-            await xDoMove(wc3.x, wc3.y);
-            await xDelay(300);
-            for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(150); }
-            await xEquipSlots();
-            xNeedsRep = false;
-            RepTimer  = 0;
-          }
-        } else {
-          xDoKeyDown(6);
-        }
-      } else {
-        await xDoMove(94, 92);
-        await xDoChangeDir(2);
-        await xDoUseSlot(xGetSlotByID(719));
-        await xDelay(300);
-      }
+      await xSSDRepair();
     }
     xGoing[110] = false;
     return;
   }
 
-  // ── SHINY ROCK ──────────────────────────────────────────────
-  let xunhit = false;
-  await xGetShiny();
+  // ── COMIDA ──────────────────────────────────────────────────
+  const foodId = xGetSlotFood();
+  if (foodId !== undefined) {
+    if (hunger_status.val <= 70) {
+      await xDoUseSlotByID(xGetSlotByID(foodId));
+      await xDelay(2000);
+    }
+  } else {
+    xDoLogOff();
+    xGoing[110] = false;
+    return;
+  }
 
-  if (xTemp[170] && xTemp[13] === myself) {
+
+// ── GEAR QUEBRADO ─────────────────────────────────────────────
+  if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2 || inv[3]?.equip === 2) {
+    if (dsk.ssd.repairInPlace) {
+      xNeedsRep   = true;
+      xMovingNow  = false;
+      xDoKeyUp(6);
+      await xDelay(900);
+      xTemp[92]   = undefined;
+      xTemp[93]   = undefined;
+      xTemp[97]   = undefined; // ← reseta cache da pedra
+      xTemp[98]   = 0;
+      xGoing[110] = false;
+      return;
+    } else {
+      xDoLogOff();
+      xGoing[110] = false;
+      return;
+    }
+  }
+
+  // ── HP ────────────────────────────────────────────────────────
+  if (hp_status.val <= 70 && hp_status.val >= 0.1) {
+    await xHeal();
+    if (hp_status.val <= 40) {
+      xDoLogOff();
+      xGoing[110] = false;
+      return;
+    }
+  }
+
+// ── SLOTS VAZIOS ─────────────────────────────────────────────
+  if (!inv[0]?.sprite || !inv[1]?.sprite || !inv[2]?.sprite || !inv[3]?.sprite) {
+    await xPickupAllGear(xWCID4, xWCID3, xWCID1, xWCID2);
+    xDoLogOff();
+    xGoing[110] = false;
+    return;
+  }
+
+// ── SHINY / STONE ROCK ───────────────────────────────────────
+  let xunhit = false;
+  const _ssdMode = dsk.ssd.targetMode ?? 'shiny';
+  const _stoneSprites = [-261, -618];
+
+  if (_ssdMode === 'shiny' || _ssdMode === 'both') await xGetShiny();
+  if (_ssdMode === 'rock'  || _ssdMode === 'both') await xGetSSDStone();
+
+  const _ssdTarget  = xTemp[170] ?? xTemp[172];
+  const _ssdIsShiny = xTemp[170] !== undefined;
+
+  if (_ssdTarget && xTemp[13] === myself) {
     const sides = [
-      { dx: 0, dy: -1, dir: 0 }, { dx: 1,  dy: 0, dir: 1 },
+      { dx: 0, dy: -1, dir: 0 }, { dx: 1, dy:  0, dir: 1 },
       { dx: 0, dy:  1, dir: 2 }, { dx: -1, dy: 0, dir: 3 }
     ];
     for (const c of sides) {
       const wall = xGetWallByPos(myself.x + c.dx, myself.y + c.dy);
-      if (wall?.name === 'Shiny Rock' && myself.dir !== c.dir) {
+      if (!wall) continue;
+
+      const isTarget = _ssdIsShiny
+        ? wall.name === 'Shiny Rock'
+        : (wall.name === 'Rock' || _stoneSprites.includes(wall.sprite)); // ← fix: era rockSprites
+
+      if (isTarget) {
         xunhit = true;
-        xDoChangeDir(c.dir);
-        xDoKeyDown(6);
+        // Vira para a pedra independente de já estar virado
+        if (myself.dir !== c.dir) xDoChangeDir(c.dir);
+        xDoKeyDown(6); // ← fix: não dependia de trocar direção
         if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
+        // Chegou na pedra → reseta contador de tentativas
+        xTemp[97] = undefined;
+        xTemp[98] = 0;
         break;
       }
     }
@@ -5255,63 +5518,91 @@ async function xSSD() {
   } else {
     await xEquipSlots();
   }
-
-  // ── COMIDA ──────────────────────────────────────────────────
-  if (xGetSlotFood() !== undefined) {
-    if (hunger_status.val <= 70) { xDoUseSlotByID(xGetSlotFood()); await xDelay(2000); }
-  } else { xDoLogOff(); }
-
-  // ── HP ───────────────────────────────────────────────────────
-  if (hp_status.val <= 72 && hp_status.val >= 0.1) {
-    xHeal();
-    if (hp_status.val <= 40) { xDoLogOff(); await xDelay(300); }
-  }
-
-  // ── SLOTS VAZIOS ─────────────────────────────────────────────
-  if (!inv[0]?.sprite || !inv[1]?.sprite || !inv[2]?.sprite) {
-    await xPickupAllGear(xWCID3, xWCID1, xWCID2);
-    xDoLogOff();
-  }
-  if (!inv[5]?.sprite) xDoLogOff();
-
-  // ── INIT WAYPOINTS ───────────────────────────────────────────
-  if (xTemp[70] === undefined) {
-    xTemp[70] = 0;
-    xTemp[71] = 25;
-    const px = [9,25,30,25,39,26,27,25,27,25,56,56,56,79,79,75,85,69,52,52,52,69,85,75,79,79];
-    const py = [8,15,32,54,56,65,75,39,23,13,12,42,12,14,44,56,76,78,74,57,74,78,76,56,44,12];
-    for (let i = 0; i < px.length; i++) { WCPosListX[i] = px[i]; WCPosListY[i] = py[i]; }
-  }
-
   // ── PRIORIDADE 1: MOBS ───────────────────────────────────────
+  // Inicializa blacklist de mobs se não existir
+  if (!xTemp[100]) xTemp[100] = {};
+
+  // Limpa entradas expiradas da blacklist
+  const now100 = Date.now();
+  Object.keys(xTemp[100]).forEach(id => {
+    if (xTemp[100][id] < now100) delete xTemp[100][id];
+  });
   await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+
+  // Verifica se mob ainda existe no jogo
   if (xTemp[13] && xTemp[13] !== myself) {
-    const dist = xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y);
-    if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); await xDelay(200); }
-    if (dist > 1) {
-      if (xTemp[90] !== xTemp[13].x || xTemp[91] !== xTemp[13].y) {
-        xTemp[90] = xTemp[13].x; xTemp[91] = xTemp[13].y;
-        xDoMove(xTemp[13].x, xTemp[13].y);
-        await xDelay(300);
-      }
-      if (dist > 2) target.id = me;
+    const mob  = xTemp[13];
+    const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
+
+    if (dist > 7) {
+      xTemp[13] = myself;
+      target.id = me;
+      xGoing[110] = false;
+      return;
     }
+
+    if (target.id !== mob.id) {
+      target.id = mob.id;
+      send({ type: 't', t: target.id });
+    }
+
+    // Inicializa rastreamento por ID do mob
+    if (!xTemp[96] || xTemp[96].id !== mob.id) {
+      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+    }
+
+    if (dist <= 1) {
+      // Chegou — reseta rastreamento
+      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+    } else {
+      // Mob inacessível por muitas tentativas → ignora
+      if (xTemp[96].attempts >= 10) {
+        dsk.localMsg('SSD: mob inacessível, ignorando...', '#ff0');
+        // Blacklista o mob por 60 segundos
+        if (!xTemp[100]) xTemp[100] = {};
+        xTemp[100][mob.id] = Date.now() + 60000;
+        xTemp[13]  = myself;
+        xTemp[96]  = undefined;
+        xTemp[90]  = undefined;
+        xTemp[91]  = undefined;
+        target.id  = me;
+        xMovingNow = false;
+        xGoing[110] = false;
+        return;
+      }
+
+      // Só tenta mover de novo se passou 2s desde a última tentativa
+      const now = Date.now();
+      if (!xMovingNow && now - xTemp[96].lastMove > 2000) {
+        xTemp[96].attempts++;
+        xTemp[96].lastMove = now;
+        xMovingNow = false;
+        xDoMove(mob.x, mob.y);
+      }
+    }
+
     xGoing[110] = false;
     return;
   }
+
+  // Sem mob → reseta tudo e solta tecla
+  target.id  = me;
+  xTemp[13]  = myself;
+  xTemp[90]  = undefined;
+  xTemp[91]  = undefined;
 
   // ── PRIORIDADE 2: CHEST ──────────────────────────────────────
   await xGetChest();
   if (xTemp[171]) {
     const dist = xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y);
     if (dist > 1) {
-      await xDoMove(xTemp[171].x, xTemp[171].y); await xDelay(300);
+      xMovingNow = false;
+      await xDoMove(xTemp[171].x, xTemp[171].y);
     } else {
-      const dx = xTemp[171].x - myself.x, dy = xTemp[171].y - myself.y;
-      if      (dx ===  1) xDoChangeDir(1);
-      else if (dx === -1) xDoChangeDir(3);
-      else if (dy ===  1) xDoChangeDir(2);
-      else if (dy === -1) xDoChangeDir(0);
+      const dx  = xTemp[171].x - myself.x;
+      const dy  = xTemp[171].y - myself.y;
+      const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+      await xDoChangeDir(dir);
       await xDelay(100);
       xDoKeyPress(6, 100);
     }
@@ -5319,38 +5610,301 @@ async function xSSD() {
     return;
   }
 
-  // ── PRIORIDADE 3: DROP ───────────────────────────────────────
-  if (await xPickSpecificDrop()) { xGoing[110] = false; return; }
-
-  // ── PRIORIDADE 4: SHINY ──────────────────────────────────────
-  if (xTemp[170]) {
+  // ── PRIORIDADE 3: DROPS ──────────────────────────────────────
+  if (await xPickSpecificDrop()) {
+    xGoing[110] = false;
+    return;
+  }
+  
+// ── PRIORIDADE 4: SHINY / STONE ──────────────────────────────
+  if (_ssdTarget) {
     if (inv[3]?.equip === 0) { xDoUseSlot(3); await xDelay(400); }
-    xDoMove(xTemp[170].x, xTemp[170].y);
+
+    if (xTemp[97]?.x === _ssdTarget.x && xTemp[97]?.y === _ssdTarget.y) {
+
+      if (!xMovingNow) {
+        // Marca o tempo que parou de mover pela primeira vez
+        if (!xTemp[98]) xTemp[98] = Date.now();
+
+        // Só blacklista se ficou parado sem chegar por mais de 15 segundos
+        if (Date.now() - xTemp[98] > 15000) {
+          dsk.localMsg('SSD: pedra inacessível, ignorando...', '#ff0');
+          xTemp[99]  = { x: _ssdTarget.x, y: _ssdTarget.y, until: Date.now() + 60000 };
+          xTemp[97]  = undefined;
+          xTemp[98]  = 0;
+          xTemp[170] = undefined;
+          xTemp[172] = undefined;
+          xMovingNow = false;
+          xGoing[110] = false;
+          return;
+        }
+
+        // Tenta mover de novo
+        xDoMove(_ssdTarget.x, _ssdTarget.y);
+      } else {
+        // Ainda andando → reseta o timer (não está travado)
+        xTemp[98] = 0;
+      }
+
+    } else {
+      // Novo alvo → reseta tudo
+      xTemp[97] = { x: _ssdTarget.x, y: _ssdTarget.y };
+      xTemp[98] = 0;
+      xMovingNow = false;
+      xDoMove(_ssdTarget.x, _ssdTarget.y);
+    }
+
     xGoing[110] = false;
     return;
   }
 
-  // ── PRIORIDADE 5: EQUIPA PICKAXE / WAYPOINT ──────────────────
-  if (inv[3]?.equip !== 0) {
-    if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(300); }
-    if (inv[1]?.equip === 0 && inv[0]?.equip !== 0) { xDoUseSlot(1); await xDelay(700); }
+  // ── PRIORIDADE 5: WAYPOINTS ──────────────────────────────────
+  const wpX    = WCPosListX[xTemp[70]];
+  const wpY    = WCPosListY[xTemp[70]];
+  const distWP = xGetDistance(myself.x, myself.y, wpX, wpY);
+
+  if (distWP <= 2) {
+    if (xTemp[70] >= xTemp[71]) {
+      xTemp[70] = 0;
+      RepTimer++;
+      dsk.localMsg(`SSD: volta ${RepTimer}/${wcaveRepVoltas}`, '#0ff');
+    } else {
+      xTemp[70]++;
+    }
+
+if (RepTimer >= wcaveRepVoltas) {
+      dsk.localMsg('SSD: indo reparar...', '#ff0');
+      xNeedsRep  = true;
+      RepTimer   = 0;
+      xTemp[92]  = undefined;
+      xTemp[93]  = undefined;
+      xMovingNow = false;
+      if (!dsk.ssd.repairInPlace) await xDoMove(94, 93); // ← só move fixo se não for in-place
+    }
+
+    xGoing[110] = false;
+    return;
   }
 
-  const distWP = xGetDistance(myself.x, myself.y, WCPosListX[xTemp[70]], WCPosListY[xTemp[70]]);
-  if (distWP <= 2) {
-    if (xTemp[70] >= xTemp[71]) { xTemp[70] = 0; RepTimer++; }
-    else {
-      xTemp[70]++;
-      if (RepTimer >= wcaveRepVoltas && xTemp[70] === 5) { xNeedsRep = true; await xDoMove(94, 93); }
-    }
-  } else {
-    if (xTemp[92] !== WCPosListX[xTemp[70]] || xTemp[93] !== WCPosListY[xTemp[70]]) {
-      xTemp[92] = WCPosListX[xTemp[70]]; xTemp[93] = WCPosListY[xTemp[70]];
-      xDoMove(xTemp[92], xTemp[93]);
-    }
+  // Move para waypoint
+  if (xTemp[92] !== wpX || xTemp[93] !== wpY) {
+    xTemp[92]  = wpX;
+    xTemp[93]  = wpY;
+    xMovingNow = false; // ← força mover mesmo se travado
+    await xDoMove(wpX, wpY); // ← await para garantir que iniciou
+  } else if (!xMovingNow) {
+    // Se parou no meio do caminho, tenta de novo
+    xDoMove(wpX, wpY);
   }
 
   xGoing[110] = false;
+}
+
+async function xSSDRepairInPlace() {
+  // ── Mob check ────────────────────────────────────────────────
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (xPlyrTest(mob)) continue;
+    if (xGetDistance(myself.x, myself.y, mob.x, mob.y) > 6) continue;
+    await xEquipSlots();
+    await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+    if (xTemp[13] && xTemp[13] !== myself) {
+      if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+      if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
+    }
+    xNeedsRep = false; RepTimer = 0;
+    return;
+  }
+
+  // ── FASE 1: ainda tem gear → dropa tudo ──────────────────────
+  const hasGear = inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite || inv[3]?.sprite;
+  if (hasGear) {
+	xMovingNow = false;  // ← garante parado antes de dropa
+	xDoKeyUp(6);
+    await xDelay(900);   // ← aguarda parar completamente
+    xTemp[94]  = myself.x;
+    xTemp[95]  = myself.y;
+    xTemp[104] = undefined; // ← reseta cache do tile alvo
+    xTemp[105] = undefined;
+    if (inv[3]?.sprite) { xDoDropSlot(0, 4); await xDelay(300); }
+    if (inv[2]?.sprite) { xDoDropSlot(0, 3); await xDelay(300); }
+    if (inv[1]?.sprite) { xDoDropSlot(0, 2); await xDelay(300); }
+    if (inv[0]?.sprite) { xDoDropSlot(0, 1); await xDelay(300); }
+    return;
+  }
+
+  // ── FASE 2: move para tile adjacente livre ───────────────────
+  const kitSlot = xGetSlotByID(719);
+  if (kitSlot === undefined) {
+    dsk.localMsg('SSD in-place: sem Repair Kit no inventário!', '#f55');
+    xNeedsRep = false; RepTimer = 0;
+    return;
+  }
+
+  const dropX = xTemp[94] ?? myself.x;
+  const dropY = xTemp[95] ?? myself.y;
+
+  // Calcula o tile adjacente UMA VEZ e guarda no cache
+  if (xTemp[104] === undefined || xTemp[105] === undefined) {
+    const adjFree = [
+      { x: dropX + 1, y: dropY },
+      { x: dropX - 1, y: dropY },
+      { x: dropX,     y: dropY + 1 },
+      { x: dropX,     y: dropY - 1 },
+    ].find(t => !xGetSolidByID(t.x, t.y));
+
+    if (!adjFree) {
+      dsk.localMsg('SSD in-place: sem tile livre adjacente!', '#f55');
+      xNeedsRep = false; RepTimer = 0;
+      return;
+    }
+    xTemp[104] = adjFree.x; // ← cacheia para não recalcular
+    xTemp[105] = adjFree.y;
+  }
+
+  // Move para o tile cacheado, só se ainda não chegou
+  if (myself.x !== xTemp[104] || myself.y !== xTemp[105]) {
+    if (!xMovingNow) {
+      await xDoMove(xTemp[104], xTemp[105]);
+    }
+    return; // aguarda chegada sem recalcular
+  }
+
+  // ── FASE 3: equipa kit ───────────────────────────────────────
+  if (inv[kitSlot]?.equip === 0) {
+    await xDoUseSlot(kitSlot);
+    await xDelay(400);
+    return;
+  }
+
+  // ── FASE 4: vira para os itens dropados ─────────────────────
+  const dx = dropX - myself.x;
+  const dy = dropY - myself.y;
+  const facingDir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+
+  if (myself.dir !== facingDir) {
+    await xDoChangeDir(facingDir);
+    await xDelay(300);
+    return;
+  }
+
+  // ── FASE 5: repara ───────────────────────────────────────────
+  if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
+      xDoClearChat('The ' + repItem + ' is in perfect condition.');
+    xDoKeyUp(6);
+    await xDelay(400);
+    xMovingNow = false;
+    await xDoMove(dropX, dropY);
+    await xDelay(500);
+    for (let p = 0; p < 8; p++) { xDoPickUp(); await xDelay(180); }
+    await xEquipSlots();
+    xNeedsRep  = false;
+    RepTimer   = 0;
+    xTemp[92]  = undefined; xTemp[93]  = undefined;
+    xTemp[94]  = undefined; xTemp[95]  = undefined;
+    xTemp[104] = undefined; xTemp[105] = undefined; // ← limpa cache
+    dsk.localMsg('SSD: reparo in-place concluído!', '#5f5');
+  } else {
+    xDoKeyDown(6);
+  }
+}
+
+// ── REPARO ────────────────────────────────────────────────────
+async function xSSDRepair() {
+  if (dsk.ssd.repairInPlace) { await xSSDRepairInPlace(); return; }
+  if (xGetSlotByID(719) === undefined) {
+    const wc3 = xGetItemByID(xWCID3);
+    if (wc3) {
+      xMovingNow = false;
+      await xDoMove(wc3.x, wc3.y);
+      await xDelay(300);
+      for (let p = 0; p < 4; p++) { xDoPickUp(); await xDelay(150); }
+    } else {
+      dsk.localMsg('SSD: sem repair kit, saindo...', '#f55');
+      xDoLogOff();
+    }
+    return;
+  }
+
+  // Verifica mobs durante reparo
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (xPlyrTest(mob)) continue; // ignora jogadores
+    const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+    if (dist > 6) continue;
+
+    const wc3 = xGetItemByID(xWCID3);
+    if (wc3) {
+      xMovingNow = false;
+      await xDoMove(wc3.x, wc3.y);
+      await xDelay(200);
+      for (let p = 0; p < 3; p++) { xDoPickUp(); await xDelay(100); }
+    }
+    await xEquipSlots();
+
+    await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon');
+    if (xTemp[13] && xTemp[13] !== myself) {
+      if (target.id !== xTemp[13].id) {
+        target.id = xTemp[13].id;
+        send({ type: 't', t: target.id });
+      }
+      if (dist > 2) target.id = me;
+    }
+    return;
+  }
+
+  // Drop gear para reparar
+  if (inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite) {
+    if (myself.x === 94 && myself.y === 93) {
+      if      (inv[2]?.sprite) { await xDelay(200); xDoDropSlot(0, 3); await xDelay(300); }
+      else if (inv[1]?.sprite) { xDoDropSlot(0, 2); await xDelay(300); }
+      else if (inv[0]?.sprite) { xDoDropSlot(0, 1); await xDelay(300); }
+    } else {
+      xMovingNow = false;
+      xDoKeyUp(6);
+      await xDoMove(94, 93);
+    }
+    return;
+  }
+
+  // Executa reparo
+  if (myself.x === 94 && myself.y === 92 && myself.dir === 2) {
+    if (inv[xGetSlotByID(719)]?.equip === 0) {
+      await xDoUseSlot(xGetSlotByID(719));
+      await xDelay(300);
+      return;
+    }
+    if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
+      xDoClearChat('The ' + repItem + ' is in perfect condition.');
+      xDoKeyUp(6);
+      await xDelay(300);
+
+      const wc3 = xGetItemByID(xWCID3);
+      if (wc3) {
+        xMovingNow = false;
+        await xDoMove(wc3.x, wc3.y);
+        await xDelay(300);
+        for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(150); }
+      }
+      await xEquipSlots();
+
+      xNeedsRep = false;
+      RepTimer  = 0;
+      xTemp[92] = undefined;
+      xTemp[93] = undefined;
+      dsk.localMsg('SSD: reparo concluído!', '#5f5');
+    } else {
+      xDoKeyDown(6);
+    }
+  } else {
+    xMovingNow = false;
+    await xDoMove(94, 92);
+    await xDelay(400);
+    await xDoChangeDir(2);
+    await xDelay(200);
+  }
 }
 
 // ── MINING BOT ────────────────────────────────────────────────
@@ -5539,22 +6093,51 @@ async function uMining() {
     for (let i = 0; i < mx.length; i++) { WCMiningListX[i] = mx[i]; WCMiningListY[i] = my[i]; }
   }
 
-  // ── BUSCA MOB ────────────────────────────────────────────────
-  await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
+	// ── BUSCA MOB ────────────────────────────────────────────────
+	await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
 
-  if (xTemp[13] && xTemp[13] !== myself) {
-    if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
-    const distMob = xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y);
-    if (distMob >= 1) {
-      if (distMob === 1) {
-        await xDoMove(xTemp[13].x, myself.y <= xTemp[13].y - 1 ? xTemp[13].y + 1 : xTemp[13].y - 1);
-      } else {
-        await xDoMove(xTemp[13].x, xTemp[13].y);
-      }
-      await xDelay(300);
-      if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
-    }
-  }
+	if (xTemp[13] && xTemp[13] !== myself) {
+	  const mob = xTemp[13];
+	  const distMob = xGetDistance(mob.x, mob.y, myself.x, myself.y);
+
+	  // Seleciona alvo
+	  if (target.id !== mob.id) {
+		target.id = mob.id;
+		send({ type: 't', t: mob.id });
+	  }
+
+	  if (distMob === 0) {
+		// Mesmo tile — tenta sair para adjacente livre
+		const escapes = [
+		  { x: myself.x + 1, y: myself.y, dir: 1 },
+		  { x: myself.x - 1, y: myself.y, dir: 3 },
+		  { x: myself.x,     y: myself.y - 1, dir: 0 },
+		  { x: myself.x,     y: myself.y + 1, dir: 2 },
+		];
+		const free = escapes.find(t => !xGetSolidByID(t.x, t.y));
+		if (free) { await xDoMove(free.x, free.y); await xDelay(300); }
+
+	  } else if (distMob === 1) {
+		// Adjacente — vira para o mob e ataca
+		const dx = mob.x - myself.x;
+		const dy = mob.y - myself.y;
+		const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === -1 ? 0 : 2;
+		if (myself.dir !== dir) { await xDoChangeDir(dir); await xDelay(150); }
+		await xDelay(200);
+
+	  } else if (distMob <= 3) {
+		// Longe — move até o mob
+		await xDoMove(mob.x, mob.y);
+		await xDelay(400);
+		// Confirma chegada — desiste se ainda longe
+		if (xGetDistance(mob.x, mob.y, myself.x, myself.y) > 3) {
+		  target.id = me;
+		}
+	  } else {
+		// Muito longe — desiste
+		target.id = me;
+	  }
+	}
 
   // ── SOLTA TECLA SE TEM MOB ───────────────────────────────────
   if (xTemp[13] && xTemp[13] !== myself && keySpace.isDown) {
@@ -5569,7 +6152,6 @@ async function uMining() {
   // ── MINERAÇÃO ────────────────────────────────────────────────
   if ((!xTemp[13] || xTemp[13] === myself) && xTemp[19] !== undefined) {
     if (xTemp[80] !== xTemp[19]) { xTemp[80] = xTemp[19]; await xDoKeyUp(6); }
-    dsk.localMsg('Indo para pedra...', '#0ff');
     xDoMoveToID(xTemp[19]);
 
     if (isRockNextToMe()) {
@@ -5644,7 +6226,7 @@ async function uMining() {
 
 // ── CONFIG PANEL COMPARTILHADO (SSD + Mining) ─────────────────
 
-dsk.miningManager = jv.Dialog.create(260, 210);
+dsk.miningManager = jv.Dialog.create(260, 260);
 const minm = dsk.miningManager;
 minm.visible = false;
 
@@ -5714,6 +6296,35 @@ const btnForceRepMin = jv.Button.create(0, 0, 115, 'Forçar Reparo', minm, 20);
 btnForceRepMin.x = 130; btnForceRepMin.y = 162;
 btnForceRepMin.on_click = () => { xNeedsRep = true; dsk.localMsg('Mining: reparo forçado!', '#ff0'); };
 
+// ── SSD: Modo de alvo ─────────────────────────────────────────
+minLbl('── SSD Config ──', 182);
+
+minLbl('Alvo:', 200);
+const _ssdModes = ['shiny', 'stone', 'both'];
+const btnSsdTarget = jv.Button.create(60, 196, 80, dsk.ssd?.targetMode ?? 'shiny', minm, 20);
+btnSsdTarget.on_click = () => {
+  const idx = _ssdModes.indexOf(dsk.ssd.targetMode ?? 'shiny');
+  dsk.ssd.targetMode = _ssdModes[(idx + 1) % _ssdModes.length];
+  btnSsdTarget.title.text = dsk.ssd.targetMode;
+  dsk.localMsg(`SSD alvo: ${dsk.ssd.targetMode}`, '#0ff');
+};
+
+// ── SSD: Modo de reparo ───────────────────────────────────────
+minLbl('Reparo:', 224);
+const btnRepairMode = jv.Button.create(65, 222, 100, 'fixo', minm, 20);
+btnRepairMode.on_click = () => {
+  dsk.ssd.repairInPlace = !dsk.ssd.repairInPlace;
+  btnRepairMode.title.text = dsk.ssd.repairInPlace ? 'in-place' : 'fixo';
+  dsk.localMsg(`SSD reparo: ${dsk.ssd.repairInPlace ? 'in-place' : 'fixo'}`, '#0ff');
+};
+
+// Atualiza botões em tempo real
+dsk.on('postLoop', () => {
+  if (!minm.visible) return;
+  if (btnSsdTarget) btnSsdTarget.title.text = dsk.ssd?.targetMode ?? 'shiny';
+  if (btnRepairMode) btnRepairMode.title.text = dsk.ssd?.repairInPlace ? 'in-place' : 'fixo';
+});
+
 dsk.setCmd('/miningconfig', () => {
   minm.visible = !minm.visible;
   dsk.localMsg(`Mining Config: ${minm.visible ? 'Aberto' : 'Fechado'}`, minm.visible ? '#5f5' : '#f55');
@@ -5722,12 +6333,12 @@ dsk.setCmd('/miningconfig', () => {
 // ── SKILL ROTATION BOT ────────────────────────────────────────
 
 window.rotationConfig = window.rotationConfig ?? {
-  cookLevel:   10,
-  smeltLevel:  10,
-  swordLevel:  10,
-  hammerLevel: 10,
-  armasLevel:  10,
-  destruLevel: 10,
+  cookLevel:   30,
+  smeltLevel:  30,
+  swordLevel:  30,
+  hammerLevel: 30,
+  armasLevel:  30,
+  destruLevel: 30,
   skipCook:    false,
   skipSmelt:   false,
   skipSword:   false,
@@ -5794,13 +6405,13 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo para Cook...', '#0ff');
-    await rotMoveTo(112, 266);
+    await rotMoveTo(112, 278);
 
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.cookLevel;
     skillName    = 'cooking';
     cookPositionX = 112;
-    cookPositionY = 266;
+    cookPositionY = 278;
     dsk.cooking.enabled = true;
     dsk.localMsg(`Rotation → Cook até nível ${currentLevel}`, '#5f5');
 
@@ -5833,7 +6444,7 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo para Smelt...', '#0ff');
-    await rotMoveTo(112, 263);
+    await rotMoveTo(112, 275);
 
     for (const id of [539, 538]) {
       if (xGetSlotByID(id) !== undefined) {
@@ -5847,7 +6458,7 @@ async function rotRun() {
     currentLevel  = rotationConfig.smeltLevel;
     skillName     = 'smelting';
     smeltPositionX = 112;
-    smeltPositionY = 263;
+    smeltPositionY = 275;
 	skillLevel = 0;
     dsk.smelting.enabled = true;
     dsk.localMsg(`Rotation → Smelt até nível ${currentLevel}`, '#5f5');
@@ -5881,7 +6492,7 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo buscar espada...', '#0ff');
-    await rotMoveTo(136, 276);
+    await rotMoveTo(115, 279);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
@@ -5923,7 +6534,7 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo buscar martelo...', '#0ff');
-    await rotMoveTo(140, 277);
+    await rotMoveTo(119, 280);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
@@ -5965,11 +6576,10 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo buscar armas...', '#0ff');
-    await rotMoveTo(121, 271);
-    await rotMoveTo(132, 279);
+    await rotMoveTo(117, 280);
     for (let p = 0; p < 6; p++) { await xDoPickUp(); await xDelay(200); }
     if (inv[0]?.sprite && inv[0].equip === 0) { await xDoUseSlot(0); await xDelay(500); }
-    await rotMoveTo(131, 277);
+    await rotMoveTo(114, 280);
     await xDelay(500);
     await xDoChangeDir(0);
     await xDelay(500);
@@ -6014,7 +6624,7 @@ async function rotRun() {
     dsk.rotation.step  = 'destru';
     dsk.rotation.phase = 'nav';
 
-    await rotMoveTo(128, 276);
+    await rotMoveTo(124, 281);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
@@ -6025,10 +6635,18 @@ async function rotRun() {
     }
 
     _originalSend({ type: 'chat', data: '/pvp' });
+	await xDelay(800); // ← espera o servidor responder
+
+	if (xIfChatHas("PVP Off")) {
+	  await xDoClearChat("PVP Off");
+	  await xDelay(300);
+	  _originalSend({ type: 'chat', data: '/pvp' }); // ← manda de novo pra ligar
+	  await xDelay(500);
+	}
     await xDelay(500);
 
-    destructPosX = 128;
-    destructPosY = 276;
+    destructPosX = 124;
+    destructPosY = 281;
 
     dsk.rotation.phase = 'bot';
     skillName    = 'destruction';
@@ -6236,11 +6854,11 @@ async function Hammer() {
 		await xDoKeyUp(6);
 		await xDelay(520);
         await xDoMove(myself.x, myself.y + 3);
-        await xDelay(500);
+        await xDelay(700);
         await xDoDropSlot(1, 1);
         await xDelay(500);
         await xDoMove(myself.x, myself.y - 1);
-        await xDelay(500);
+        await xDelay(700);
         await xDoPickUp();
         await xDelay(300);
         await xDoUseSlot(0);
@@ -6252,11 +6870,11 @@ async function Hammer() {
 		await xDoKeyUp(6);
 		await xDelay(520);
         await xDoMove(myself.x, myself.y + 2);
-        await xDelay(500);
+        await xDelay(800);
         await xDoDropSlot(1, 1);
         await xDelay(500);
         await xDoMove(myself.x, myself.y - 1);
-        await xDelay(500);
+        await xDelay(800);
         await xDoPickUp();
         await xDelay(300);
         await xDoUseSlot(0);
@@ -6289,9 +6907,9 @@ async function Hammer() {
       }
 
       await xDoChangeDir(1);
-	  await xDelay(222);
+	  await xDelay(422);
       await xDoKeyPress(6, 182); await xDelay(510);
-      while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
+      while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
         await xDoKeyPress(6, 183);
         await xDelay(531);
       }
@@ -6299,7 +6917,7 @@ async function Hammer() {
       await xDoChangeDir(3);
 	  await xDelay(412);
       await xDoKeyPress(6, 181); await xDelay(523);
-      while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
+      while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
         await xDoKeyPress(6, 182);
         await xDelay(521);
       }
@@ -6486,24 +7104,24 @@ async function Sword() {
 
       await xDoChangeDir(0);
 	  await xDelay(550);
-      await xDoKeyPress(6, 184); await xDelay(500);
+      await xDoKeyPress(6, 184); await xDelay(550);
       while (xGetWallHp(myself.x, myself.y - 1) < 90 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
         await xDoKeyPress(6, 185);
         await xDelay(515);
       }
 
       await xDoChangeDir(1);
-	  await xDelay(530);
-      await xDoKeyPress(6, 180); await xDelay(500);
-      while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
+	  await xDelay(560);
+      await xDoKeyPress(6, 180); await xDelay(550);
+      while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
         await xDoKeyPress(6, 186);
         await xDelay(518);
       }
 
       await xDoChangeDir(3);
-	  await xDelay(540);
-      await xDoKeyPress(6, 183); await xDelay(500);
-      while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
+	  await xDelay(555);
+      await xDoKeyPress(6, 183); await xDelay(550);
+      while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
         await xDoKeyPress(6, 187);
         await xDelay(514);
       }
@@ -6632,7 +7250,6 @@ dsk.setCmd('/buy', async (context) => {
     dsk.localMsg(`Buy: ${amount}x concluido!`, '#5f5');
 });
 
-
 //dropar paginas
 
 dsk.setCmd('/dropar', async (context) => {
@@ -6662,28 +7279,42 @@ dsk.zoom = { enabled: false };
 
 dsk.setCmd('/zoom', () => {
     dsk.zoom.enabled = !dsk.zoom.enabled;
-
+    
     const xZoom = dsk.zoom.enabled ? 1.5 : 1.0;
+
+    // Pega o sprite correto independente da conta
     const rootSprite = myself.body_sprite ?? myself.spr;
     const world = rootSprite.parent.parent.parent;
-
+    
+    // Escala o mundo do jogo
     world.scale.x = (1 / xZoom);
     world.scale.y = (1 / xZoom);
     world.position.x = 380 * (1 - (1 / xZoom));
     world.position.y = 230 * (1 - (1 / xZoom));
 
-    ui_container.scale.x = xZoom;
-    ui_container.scale.y = xZoom;
+    // Escala o UI
+    ui_container.scale.x = 1 / (1 / xZoom);
+    ui_container.scale.y = 1 / (1 / xZoom);
     ui_container.position.x = (xZoom - 1) * -380;
     ui_container.position.y = (xZoom - 1) * -230;
 
-    // Move a skill bar para o ui_container — funciona em desktop e mobile
-    if (jv.ability?.[0]?.parent) {
-        jv.ability[0].parent.setParent(ui_container);
+    // Contra-escala da skill bar (dinâmico)
+    const skillBar = jv.stage.children.find(c =>
+        c !== ui_container &&
+        c.children?.length >= 5 &&
+        c.children?.some(child => child.y >= 350 && child.y <= 400)
+    );
+    if (skillBar) {
+        skillBar.scale.x = xZoom;
+        skillBar.scale.y = xZoom;
+        skillBar.x = -380 * (xZoom - 1);
+        skillBar.y = -230 * (xZoom - 1);
     }
-
+    
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
 });
+
+
 //heal bot //
 
 dsk.healbot = { enabled: false };
@@ -6736,177 +7367,6 @@ async function HealBot() {
 
   xGoing[115] = false;
 }
-
-// ── AUTO EXPLO ─────────────────────────────────────────────────
-
-dsk.explo = {
-  enabled: false,
-  wpIndex: 0,
-  waypoints: [
-    { x: 465, y: 363 }, { x: 465, y: 190 }, { x: 455, y: 190 }, { x: 455, y: 363 },
-    { x: 445, y: 363 }, { x: 445, y: 190 }, { x: 435, y: 190 }, { x: 435, y: 363 },
-    { x: 425, y: 363 }, { x: 425, y: 190 }, { x: 415, y: 190 }, { x: 415, y: 363 },
-    { x: 405, y: 363 }, { x: 405, y: 190 }, { x: 395, y: 190 }, { x: 395, y: 363 },
-    { x: 385, y: 363 }, { x: 385, y: 190 }, { x: 375, y: 190 }, { x: 375, y: 363 },
-    { x: 365, y: 363 }, { x: 365, y: 190 }, { x: 355, y: 190 }, { x: 355, y: 363 },
-    { x: 345, y: 363 }, { x: 345, y: 190 }, { x: 335, y: 190 }, { x: 335, y: 363 },
-    { x: 325, y: 363 }, { x: 325, y: 190 }, { x: 315, y: 190 }, { x: 315, y: 363 },
-    { x: 305, y: 363 }, { x: 305, y: 190 }, { x: 295, y: 190 }, { x: 295, y: 191 },
-    { x: 295, y: 363 }, { x: 465, y: 363 },
-  ],
-};
-
-async function xExplo() {
-  if (dskPaused) return;
-  if (!myself || game_state !== 2) return;
-  if (xGoing[121] === true) return;
-  xGoing[121] = true;
-
-  const wp = dsk.explo.waypoints[dsk.explo.wpIndex];
-  if (!wp) {
-    dsk.explo.wpIndex = 0;
-    xGoing[121] = false;
-    return;
-  }
-
-  const dist = Math.abs(myself.x - wp.x) + Math.abs(myself.y - wp.y);
-
-  // Ativa speed quando longe, desativa quando perto
-  if (dist > 10 && !dsk.speed.interval) {
-    dsk.speed.value = 160;
-    dsk.speed.start();
-  } else if (dist <= 10 && dsk.speed.interval) {
-    dsk.speed.stop();
-  }
-
-  if (dist <= 2) {
-    // Chegou no waypoint → próximo
-    dsk.speed.stop();
-    dsk.explo.wpIndex++;
-
-    if (dsk.explo.wpIndex >= dsk.explo.waypoints.length) {
-      dsk.explo.wpIndex = 0;
-      dsk.localMsg('Explo: ciclo completo, reiniciando...', '#0ff');
-    }
-
-    xMovingNow = false;
-    xGoing[121] = false;
-    return;
-  }
-
-  // Move para o waypoint
-  if (!xMovingNow) {
-    await xDoMove(wp.x, wp.y);
-  }
-
-  xGoing[121] = false;
-}
-
-dsk.setCmd('/explo', () => {
-  dsk.explo.enabled = !dsk.explo.enabled;
-
-  if (dsk.explo.enabled) {
-    dsk.explo.wpIndex = 0;
-    dsk.localMsg('Auto Explo: Ativado', '#5f5');
-    (async function loop() {
-      while (dsk.explo.enabled) {
-        await xExplo();
-        await xDelay(500);
-      }
-      // Desliga speed ao parar
-      dsk.speed.stop();
-      xMovingNow = false;
-      xGoing[121] = false;
-    })();
-  } else {
-    dsk.explo.enabled = false;
-    dsk.speed.stop();
-    xMovingNow = false;
-    xGoing[121] = false;
-    dsk.localMsg('Auto Explo: Desativado', '#f55');
-  }
-});
-
-
-// ── AUTO KILL ─────────────────────────────────────────────────
-
-function xGetMobByPos(x, y) {
-  for (let i in mobs.items) {
-    const mob = mobs.items[i];
-    if (mob && mob.x === x && mob.y === y) return mob;
-  }
-  return undefined;
-}
-
-async function KillMobsNearMe() {
-  if (dskPaused) return;
-  if (!myself || game_state !== 2) return;
-  if (xGoing[120] === true) return;
-  xGoing[120] = true;
-
-  const originalDir = myself.dir;
-
-  const adjacentes = [
-    { x: myself.x,     y: myself.y - 1, dir: 0 }, // cima
-    { x: myself.x,     y: myself.y + 1, dir: 2 }, // baixo
-    { x: myself.x + 1, y: myself.y,     dir: 1 }, // direita
-    { x: myself.x - 1, y: myself.y,     dir: 3 }, // esquerda
-  ];
-
-  for (const { x, y, dir } of adjacentes) {
-    const mob = xGetMobByPos(x, y);
-    if (!mob || mob === myself || xPlyrTest(mob)) continue;
-
-    mobNearMe = true;
-
-    // Seleciona o mob como alvo
-    if (target.id !== mob.id) {
-      target.id = mob.id;
-      send({ type: 't', t: mob.id });
-    }
-
-    // Vira para o mob e ataca
-    await xDoChangeDir(dir);
-    await xDoKeyPress(6, 200);
-    await xDelay(300);
-
-    // Volta para a direção original
-    if (myself.dir !== originalDir) {
-      await xDoChangeDir(originalDir);
-    }
-
-    // Deseleciona o alvo
-    target.id = me;
-
-    xGoing[120] = false;
-    return; // ataca 1 mob por tick
-  }
-
-  mobNearMe = false;
-  xGoing[120] = false;
-}
-
-dsk.autokill = { enabled: false };
-
-dsk.setCmd('/autokill', () => {
-  dsk.autokill.enabled = !dsk.autokill.enabled;
-
-  if (dsk.autokill.enabled) {
-    dsk.localMsg('AutoKill: Ativado', '#5f5');
-    (async function loop() {
-      while (dsk.autokill.enabled) {
-        await KillMobsNearMe();
-        await xDelay(1500);
-      }
-    })();
-  } else {
-    xGoing[120] = false;
-    target.id = me;
-    mobNearMe = false;
-    dsk.localMsg('AutoKill: Desativado', '#f55');
-  }
-});
-
 
 // ── CLAY BOT ─────────────────────────────────────────────────
 
@@ -7062,7 +7522,9 @@ dsk.setCmd('/clay', () => {
 
 dsk.baseRepair = {
   enabled: false,
-  waypoints: [
+  kitSlot: 2,
+  wpIndex: 0,
+  waypointsGalebrook: [
     // Corredor de cima → repara cima e baixo
     { x: 102, y: 254, dirs: [0, 3] },
     { x: 104, y: 254, dirs: [0, 2] },
@@ -7136,8 +7598,95 @@ dsk.baseRepair = {
 	{ x: 102,  y: 258, dirs: [1, 3] },
 	{ x: 102,  y: 255, dirs: [1, 3] },
   ],
-  wpIndex: 0,
+  
+    waypointsUnderground: [
+    // Corredor de cima → repara cima e baixo
+    { x: 129, y: 252, dirs: [0, 2] },
+    { x: 126, y: 252, dirs: [0, 2] },
+	{ x: 123, y: 252, dirs: [0, 2] },
+	{ x: 120, y: 252, dirs: [0, 2] },
+	{ x: 117, y: 252, dirs: [0, 2] },
+	{ x: 114, y: 252, dirs: [0, 2] },
+	{ x: 111, y: 252, dirs: [0, 2] },
+	{ x: 108, y: 252, dirs: [0, 2] },
+	{ x: 105, y: 252, dirs: [0, 2] },
+	{ x: 102, y: 252, dirs: [0, 3] },
+
+    // Corredor esqerdo → repara direita e esquerda
+    { x: 102, y: 254, dirs: [1, 3] },
+    { x: 102, y: 257, dirs: [1, 3] },
+	{ x: 102, y: 260, dirs: [1, 3] },
+	{ x: 102, y: 263, dirs: [1, 3] },
+	{ x: 102, y: 266, dirs: [1, 3] },
+	{ x: 102, y: 269, dirs: [1, 3] },
+	{ x: 102, y: 272, dirs: [1, 3] },
+	{ x: 102, y: 275, dirs: [1, 3] },
+	{ x: 102, y: 278, dirs: [1, 3] },
+	{ x: 102, y: 281, dirs: [1, 3] },
+	{ x: 102, y: 284, dirs: [1, 3] },
+	{ x: 102, y: 285, dirs: [2, 3] },
+
+    // Corredor de baixo → repara cima e baixo
+    { x: 105, y: 285, dirs: [0, 2] },
+    { x: 108, y: 285, dirs: [0, 2] },
+	{ x: 111, y: 285, dirs: [0, 2] },
+	{ x: 114, y: 285, dirs: [0, 2] },
+	{ x: 117, y: 285, dirs: [0, 2] },
+	{ x: 120, y: 285, dirs: [0, 2] },
+	{ x: 123, y: 285, dirs: [0, 2] },
+	{ x: 126, y: 285, dirs: [0, 2] },
+	{ x: 129, y: 285, dirs: [0, 2] },
+	{ x: 132, y: 285, dirs: [0, 2] },
+	{ x: 135, y: 285, dirs: [0, 2] },
+	{ x: 138, y: 285, dirs: [0, 2] },
+	{ x: 141, y: 285, dirs: [0, 2] },
+	{ x: 144, y: 285, dirs: [0, 2] },
+	{ x: 147, y: 285, dirs: [0, 2] },
+	{ x: 150, y: 285, dirs: [0, 2] },
+	{ x: 153, y: 285, dirs: [0, 2] },
+	{ x: 156, y: 285, dirs: [0, 2] },
+	{ x: 158, y: 285, dirs: [1, 2] },
+
+    // Corredor direito → repara direita e esquerda
+    { x: 158,  y: 282, dirs: [1, 3] },
+    { x: 158,  y: 279, dirs: [1, 3] },
+	{ x: 158,  y: 276, dirs: [1, 3] },
+	{ x: 158,  y: 273, dirs: [1, 3] },
+	{ x: 158,  y: 270, dirs: [1, 3] },
+	{ x: 158,  y: 267, dirs: [1, 3] },
+	{ x: 158,  y: 264, dirs: [1, 3] },
+	{ x: 158,  y: 261, dirs: [1, 3] },
+	{ x: 158,  y: 258, dirs: [1, 3] },
+	{ x: 158,  y: 255, dirs: [1, 3] },
+	{ x: 158,  y: 252, dirs: [0, 1] },
+	// Corredor cima → repara cima e baixo
+	{ x: 156, y: 252, dirs: [0, 2] },
+	{ x: 153, y: 252, dirs: [0, 2] },
+	{ x: 150, y: 252, dirs: [0, 2] },
+	{ x: 147, y: 252, dirs: [0, 2] },
+	{ x: 144, y: 252, dirs: [0, 2] },
+	{ x: 141, y: 252, dirs: [0, 2] },
+	{ x: 138, y: 252, dirs: [0, 2] },
+	{ x: 135, y: 252, dirs: [0, 2] },
+	{ x: 132, y: 252, dirs: [0, 2] },
+  ],
+  
+  get waypoints() {                                    // ← aqui, dentro do {}
+    const map = jv.map_title?.text ?? '';
+    if (map.includes('Underground')) return this.waypointsUnderground;
+    if (map.includes('Galebrook'))   return this.waypointsGalebrook;
+    return this.waypointsGalebrook;
+  },
 };
+
+// ← aqui fora, logo abaixo do objeto
+function xGetWallHpByDir(dir) {
+  if (dir === 0) return xGetWallHp(myself.x,     myself.y - 1);
+  if (dir === 1) return xGetWallHp(myself.x + 1, myself.y    );
+  if (dir === 2) return xGetWallHp(myself.x,     myself.y + 1);
+  if (dir === 3) return xGetWallHp(myself.x - 1, myself.y    );
+  return -1;
+}
 
 async function BaseRepairBot() {
   if (dskPaused) return;
@@ -7147,20 +7696,23 @@ async function BaseRepairBot() {
 
   // ── Troca kit quebrado ────────────────────────────────────────
   if (inv[0]?.equip === 2) {
-    await xDoKeyUp(6);
-    await xDelay(400);
+  await xDoKeyUp(6);
+  await xDelay(400);
 
-    const slot = xGetSlotByID(719);
-    if (slot !== undefined && slot !== 0) {
-      await xDoUseSlot(slot);
-      await xDelay(600);
-    } else {
-      dsk.localMsg('Base Repair: sem kit no inventário!', '#f55');
-      dsk.baseRepair.enabled = false;
-      xGoing[117] = false;
-      return;
-    }
+  // Verifica se ainda tem kit no slot alvo
+  if (inv[dsk.baseRepair.kitSlot - 1]?.sprite === 719) {
+    await xDoSwapSlot(1, dsk.baseRepair.kitSlot); // traz pro slot 0
+    await xDelay(400);
+    await xDoUseSlot(0); // equipa
+    await xDelay(600);
+    dsk.baseRepair.kitSlot++; // próxima vez usa o slot seguinte
+  } else {
+    dsk.localMsg('Base Repair: sem kits restantes!', '#f55');
+    dsk.baseRepair.enabled = false;
+    xGoing[117] = false;
+    return;
   }
+}
 
   // ── Move para o waypoint atual ────────────────────────────────
   const wp = dsk.baseRepair.waypoints[dsk.baseRepair.wpIndex];
@@ -7180,19 +7732,24 @@ async function BaseRepairBot() {
 
   // ── Repara nas direções definidas no waypoint ─────────────────
   // dirs: 0=cima, 1=direita, 2=baixo, 3=esquerda
-  for (const dir of wp.dirs) {
-    await xDoChangeDir(dir);
-    await xDelay(350);
+	for (const dir of wp.dirs) {
+	  await xDoChangeDir(dir);
+	  await xDelay(350);
 
-    for (let i = 0; i < 3; i++) {
-      if (inv[0]?.equip === 2) {
-        xGoing[117] = false;
-        return; // kit quebrou, reinicia o loop para trocar
-      }
-      await xDoKeyPress(6, 200);
-      await xDelay(400);
-    }
-  }
+	  // primeiro toque para revelar o HP
+	  await xDoKeyPress(6, 200);
+	  await xDelay(600);
+
+	  // continua reparando até 95% ou sumir
+	  while (xGetWallHpByDir(dir) < 99 && xGetWallHpByDir(dir) !== -1) {
+		if (inv[0]?.equip === 2) {
+		  xGoing[117] = false;
+		  return; // kit quebrou, sai para trocar
+		}
+		await xDoKeyPress(6, 200);
+		await xDelay(400);
+	  }
+	}
 
   // ── Próximo waypoint ──────────────────────────────────────────
   dsk.baseRepair.wpIndex++;
@@ -7209,6 +7766,7 @@ dsk.setCmd('/baserepair', () => {
 
   if (dsk.baseRepair.enabled) {
     dsk.baseRepair.wpIndex = 0;
+	dsk.baseRepair.kitSlot = 2;
     dsk.localMsg(`Base Repair: Ativado (${dsk.baseRepair.waypoints.length} waypoints)`, '#5f5');
     (async function loop() {
       while (dsk.baseRepair.enabled) {
@@ -7222,6 +7780,98 @@ dsk.setCmd('/baserepair', () => {
     dsk.localMsg('Base Repair: Desativado', '#f55');
   }
 });
+
+
+// ── AUTO EXPLO ─────────────────────────────────────────────────
+
+dsk.explo = {
+  enabled: false,
+  wpIndex: 0,
+  waypoints: [
+    { x: 465, y: 363 }, { x: 465, y: 190 }, { x: 455, y: 190 }, { x: 455, y: 363 },
+    { x: 445, y: 363 }, { x: 445, y: 190 }, { x: 435, y: 190 }, { x: 435, y: 363 },
+    { x: 425, y: 363 }, { x: 425, y: 190 }, { x: 415, y: 190 }, { x: 415, y: 363 },
+    { x: 405, y: 363 }, { x: 405, y: 190 }, { x: 395, y: 190 }, { x: 395, y: 363 },
+    { x: 385, y: 363 }, { x: 385, y: 190 }, { x: 375, y: 190 }, { x: 375, y: 363 },
+    { x: 365, y: 363 }, { x: 365, y: 190 }, { x: 355, y: 190 }, { x: 355, y: 363 },
+    { x: 345, y: 363 }, { x: 345, y: 190 }, { x: 335, y: 190 }, { x: 335, y: 363 },
+    { x: 325, y: 363 }, { x: 325, y: 190 }, { x: 315, y: 190 }, { x: 315, y: 363 },
+    { x: 305, y: 363 }, { x: 305, y: 190 }, { x: 295, y: 190 }, { x: 295, y: 191 },
+    { x: 295, y: 363 }, { x: 465, y: 363 },
+  ],
+};
+
+async function xExplo() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[121] === true) return;
+  xGoing[121] = true;
+
+  const wp = dsk.explo.waypoints[dsk.explo.wpIndex];
+  if (!wp) {
+    dsk.explo.wpIndex = 0;
+    xGoing[121] = false;
+    return;
+  }
+
+  const dist = Math.abs(myself.x - wp.x) + Math.abs(myself.y - wp.y);
+
+  // Ativa speed quando longe, desativa quando perto
+  if (dist > 10 && !dsk.speed.interval) {
+    dsk.speed.value = 170;
+    dsk.speed.start();
+  } else if (dist <= 10 && dsk.speed.interval) {
+    dsk.speed.stop();
+  }
+
+  if (dist <= 2) {
+    // Chegou no waypoint → próximo
+    dsk.speed.stop();
+    dsk.explo.wpIndex++;
+
+    if (dsk.explo.wpIndex >= dsk.explo.waypoints.length) {
+      dsk.explo.wpIndex = 0;
+      dsk.localMsg('Explo: ciclo completo, reiniciando...', '#0ff');
+    }
+
+    xMovingNow = false;
+    xGoing[121] = false;
+    return;
+  }
+
+  // Move para o waypoint
+  if (!xMovingNow) {
+    await xDoMove(wp.x, wp.y);
+  }
+
+  xGoing[121] = false;
+}
+
+dsk.setCmd('/explo', () => {
+  dsk.explo.enabled = !dsk.explo.enabled;
+
+  if (dsk.explo.enabled) {
+    dsk.explo.wpIndex = 0;
+    dsk.localMsg('Auto Explo: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.explo.enabled) {
+        await xExplo();
+        await xDelay(300);
+      }
+      // Desliga speed ao parar
+      dsk.speed.stop();
+      xMovingNow = false;
+      xGoing[121] = false;
+    })();
+  } else {
+    dsk.explo.enabled = false;
+    dsk.speed.stop();
+    xMovingNow = false;
+    xGoing[121] = false;
+    dsk.localMsg('Auto Explo: Desativado', '#f55');
+  }
+});
+
 
 /*```
 
@@ -7507,19 +8157,6 @@ dsk.setCmd('/topskill', () => {
   }
 });
 
-// ── ADICIONA TODOS OS ITENS EXTRAS AO MENU ─────────────────
-dsk.menu.items.push(
-  { label: 'Zoom 1.5x',    state: () => dsk.zoom?.enabled,       toggle: () => dsk.commands['/zoom']() },
-  { label: 'Buy (via /buy N)', state: () => false,               toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
-  { label: 'Base Repair',  state: () => dsk.baseRepair?.enabled, toggle: () => dsk.commands['/baserepair']() },
-  { label: 'Auto Explo',   state: () => dsk.explo?.enabled,      toggle: () => dsk.commands['/explo']() },
-  { label: 'Top Skill Calc', state: () => tscD?.visible,         toggle: () => dsk.commands['/topskill']() },
-  { label: 'AutoKill',     state: () => dsk.autokill?.enabled,   toggle: () => dsk.commands['/autokill']() },
-  { label: 'Auto Caraway', state: () => dsk.effct?.enabled,      toggle: () => dsk.commands['/effct']() },
-  { label: 'Repair Bot',   state: () => dsk.repair?.enabled,     toggle: () => dsk.commands['/repair']() },
-);
-
-dsk.menu.rebuild(); // ← UMA única vez
 
 // ── REPAIR BOT ─────────────────────────────────────────────────
 // Layout:
@@ -7687,7 +8324,772 @@ dsk.setCmd('/effct', () => {
     }
 });
 
+// ── AUTO KILL ─────────────────────────────────────────────────
 
+function xGetMobByPos(x, y) {
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (mob && mob.x === x && mob.y === y) return mob;
+  }
+  return undefined;
+}
+
+async function KillMobsNearMe() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[120] === true) return;
+  xGoing[120] = true;
+
+  const originalDir = myself.dir;
+
+  const adjacentes = [
+    { x: myself.x,     y: myself.y - 1, dir: 0 }, // cima
+    { x: myself.x,     y: myself.y + 1, dir: 2 }, // baixo
+    { x: myself.x + 1, y: myself.y,     dir: 1 }, // direita
+    { x: myself.x - 1, y: myself.y,     dir: 3 }, // esquerda
+  ];
+
+  for (const { x, y, dir } of adjacentes) {
+    const mob = xGetMobByPos(x, y);
+    if (!mob || mob === myself || xPlyrTest(mob)) continue;
+
+    mobNearMe = true;
+
+    // Seleciona o mob como alvo
+    if (target.id !== mob.id) {
+      target.id = mob.id;
+      send({ type: 't', t: mob.id });
+    }
+
+    // Vira para o mob e ataca
+    await xDoChangeDir(dir);
+    await xDoKeyPress(6, 200);
+    await xDelay(300);
+
+    // Volta para a direção original
+    if (myself.dir !== originalDir) {
+      await xDoChangeDir(originalDir);
+    }
+
+    // Deseleciona o alvo
+    target.id = me;
+
+    xGoing[120] = false;
+    return; // ataca 1 mob por tick
+  }
+
+  mobNearMe = false;
+  xGoing[120] = false;
+}
+
+dsk.autokill = { enabled: false };
+
+dsk.setCmd('/autokill', () => {
+  dsk.autokill.enabled = !dsk.autokill.enabled;
+
+  if (dsk.autokill.enabled) {
+    dsk.localMsg('AutoKill: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.autokill.enabled) {
+        await KillMobsNearMe();
+        await xDelay(1500);
+      }
+    })();
+  } else {
+    xGoing[120] = false;
+    target.id = me;
+    mobNearMe = false;
+    dsk.localMsg('AutoKill: Desativado', '#f55');
+  }
+});
+
+
+// ── COLOR PICKER ──────────────────────────────────────────────
+
+dsk.colorPicker = jv.Dialog.create(200, 220);
+const cp = dsk.colorPicker;
+cp.visible = false;
+
+cp.header = jv.text('Color Picker', {
+  font: '14px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
+});
+cp.addChild(cp.header);
+jv.center(cp.header);
+jv.top(cp.header, 4);
+
+cp.close = jv.Button.create(0, 0, 24, 'X', cp, 24);
+jv.top(cp.close, 4); jv.right(cp.close, 4);
+cp.close.on_click = () => (cp.visible = 0);
+
+cp.move = jv.Button.create(0, 0, 24, '@', cp, 24);
+jv.top(cp.move, 4); jv.right(cp.move, 28);
+
+cp._px = 0; cp._py = 0;
+window.addEventListener('mousemove', e => { cp._px = e.clientX; cp._py = e.clientY; });
+window.addEventListener('touchmove', e => { cp._px = e.touches[0].clientX; cp._py = e.touches[0].clientY; });
+
+dsk.on('postLoop', () => {
+  if (!cp.move?.is_pressed) {
+    cp.x = Math.max(0, Math.min(cp.x, jv.game_width  - cp.w));
+    cp.y = Math.max(0, Math.min(cp.y, jv.game_height - cp.h));
+    return;
+  }
+  const canvas = document.querySelector('canvas');
+  const rect = canvas ? canvas.getBoundingClientRect() : { left:0, top:0, width:jv.game_width, height:jv.game_height };
+  cp.x = (cp._px - rect.left) * (jv.game_width / rect.width)  - cp.w / 2;
+  cp.y = (cp._py - rect.top)  * (jv.game_height / rect.height) - 12;
+});
+
+// ── Cores ─────────────────────────────────────────────────────
+
+const cpColors = [
+  { label: '● Rosa',     hex: 'ff4dff' },
+  { label: '● Laranja',  hex: 'ff9900' },
+  { label: '● Verde',    hex: '00FF00' },
+  { label: '● Amarelo',  hex: 'FFFF00' },
+  { label: '● Prata',    hex: 'C0C0C0' },
+  { label: '● Ciano',    hex: '00FFFF' },
+];
+
+cpColors.forEach((c, i) => {
+  const btn = jv.Button.create(20, 35 + i * 26, 160, c.label, cp, 22);
+  btn.title.style.fill = parseInt(c.hex, 16); // ← btn.title
+  btn.on_click = () => {
+    _originalSend({ type: 'chat', data: `/color ${c.hex}` });
+    dsk.localMsg(`Color: ${c.hex}`, `#${c.hex}`);
+  };
+});
+
+// ── Comando ───────────────────────────────────────────────────
+
+dsk.setCmd('/colorpicker', () => {
+  cp.visible = !cp.visible;
+  dsk.localMsg(`Color Picker: ${cp.visible ? 'Aberto' : 'Fechado'}`, cp.visible ? '#5f5' : '#f55');
+});
+
+// ── Menu ──────────────────────────────────────────────────────
+
+dsk.sheep = { enabled: false };
+
+async function SheepRun() {
+  if (dskPaused || !myself || game_state !== 2) return;
+
+  const totalGates = 22;
+  const firstGateX = myself.x + 1; // começa na frente do personagem
+  const gateY      = myself.y;
+  
+  // ← Começa no slot 0, troca para 1, 2... quando quebrar
+  let sheepToolSlot = 0;
+  
+  async function checkAndSwapTool() {
+    if (inv[0]?.equip !== 2) return; // não quebrou, tudo bem
+
+    sheepToolSlot++;
+    if (!inv[sheepToolSlot]?.sprite) {
+      dsk.localMsg('Sheep: sem mais ferramentas!', '#f55');
+      dsk.sheep.enabled = false;
+      return;
+    }
+
+    dsk.localMsg(`Sheep: trocando para slot ${sheepToolSlot + 1}...`, '#ff0');
+    await xDoSwapSlot(1, sheepToolSlot + 1); // traz pro slot 0
+    await xDelay(400);
+    await xDoUseSlot(0); // equipa
+    await xDelay(500);
+  }
+
+  // Equipa item do slot 0
+  if (inv[0]?.equip === 0) {
+    await xDoUseSlot(0);
+    await xDelay(500);
+  }
+
+  dsk.localMsg(`Sheep: iniciando 22 gates a partir de X=${firstGateX}`, '#0ff');
+
+  for (let i = 0; i < totalGates; i++) {
+    if (!dsk.sheep.enabled) return;
+
+    const gateX   = firstGateX + i;
+    const isFirst = i === 0;
+    const isLast  = i === totalGates - 1;
+
+    // Move até a gate
+    await xDoMove(gateX, gateY);
+    await xDelay(600);
+
+    // Abre a gate (vira direita + ataca)
+    await xDoChangeDir(1);
+    await xDelay(300);
+    await xDoKeyPress(6, 190);
+    await xDelay(500);
+
+    // Gates do meio: vira baixo, ataca ovelha 5x, volta pra direita
+    if (!isFirst && !isLast) {
+      await xDoChangeDir(2);
+      await xDelay(400);
+      for (let j = 0; j < 5; j++) {
+        if (!dsk.sheep.enabled) return;
+		await checkAndSwapTool(); // ← checa a cada batida
+        await xDoKeyPress(6, 190);
+        await xDelay(800);
+      }
+      await xDoChangeDir(0);
+      await xDelay(400);
+      for (let j = 0; j < 5; j++) {
+        if (!dsk.sheep.enabled) return;
+		await checkAndSwapTool(); // ← checa a cada batida
+        await xDoKeyPress(6, 190);
+        await xDelay(800);
+      }
+      await xDoChangeDir(1);
+      await xDelay(500);
+    }
+  }
+
+  // Fim: anda 1 para a direita
+  await xDoMove(myself.x + 1, myself.y);
+  await xDelay(500);
+  await xDoMove(151, 289);
+  await xDelay(3000);
+  for (let j = 0; j < 19; j++) {
+    if (!dsk.sheep.enabled) return;
+	await xDoChangeDir(0);
+	await xDelay(500);
+    await xDoKeyPress(6, 180);
+    await xDelay(800);
+	await xDoMove(myself.x - 1, myself.y);
+	await xDelay(800);
+  }
+  await xDoChangeDir(0);
+  await xDelay(500);
+  await xDoKeyPress(6, 180);
+  await xDelay(800);
+  await xDoMove(132, 283);
+  await xDelay(5000);
+  for (let j = 0; j < 19; j++) {
+    if (!dsk.sheep.enabled) return;
+	await xDoChangeDir(2);
+	await xDelay(500);
+    await xDoKeyPress(6, 180);
+    await xDelay(800);
+	await xDoMove(myself.x + 1, myself.y);
+	await xDelay(800);
+  }
+  await xDoChangeDir(2);
+  await xDelay(500);
+  await xDoKeyPress(6, 180);
+  await xDelay(800);
+  await xDoMove(141, 283);
+  await xDelay(5000);
+  await xDoMove(130, 286);
+  await xDelay(5000);
+  await xDoDropByID(0, 984);
+  await xDelay(400);
+  await xDoDropByID(0, 984);
+  await xDelay(400);
+  await xDoUseSlotByID(xGetSlotByID(719));
+  await xDelay(400);
+  await xDoMove(myself.x, myself.y + 1);
+  await xDelay(400);
+  await xDoChangeDir(0);
+  await xDelay(400);
+  for (let j = 0; j < 9; j++) {
+    if (!dsk.sheep.enabled) return;
+    await xDoKeyPress(6, 180);
+    await xDelay(800);
+  }
+  await xDoMove(myself.x, myself.y - 1);
+  await xDelay(400);
+  await xDoPickUp();
+  await xDelay(400);
+  await xDoPickUp();
+  await xDelay(400);
+  await xDoUseSlotByID(xGetSlotByID(984));
+  await xDelay(400);
+  await xDoChangeDir(1);
+  await xDelay(400);
+  await xDoPickUp();
+  await xDelay(400);
+  await xDoDropByID(0, 919);
+  await xDelay(400);
+
+  dsk.localMsg('Sheep: ciclo completo! Aguardando 20min...', '#5f5');
+}
+
+dsk.setCmd('/sheep', () => {
+  dsk.sheep.enabled = !dsk.sheep.enabled;
+  if (dsk.sheep.enabled) {
+    dsk.localMsg('Sheep Bot: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.sheep.enabled) {
+        await SheepRun();
+        if (dsk.sheep.enabled) {
+          // Countdown a cada minuto
+          for (let min = 20; min > 0; min--) {
+            if (!dsk.sheep.enabled) return;
+            dsk.localMsg(`Sheep: próximo ciclo em ${min} min...`, '#ff0');
+            await xDelay(60 * 1000);
+          }
+        }
+      }
+    })();
+  } else {
+    dsk.localMsg('Sheep Bot: Desativado', '#f55');
+  }
+});
+
+
+// ── WOOD FARM BOT ─────────────────────────────────────────────
+// Adaptado de FarmWood + RepairItemX (acao.push → async/await)
+// Usa xGoing[118] para lock
+
+dsk.wood = { enabled: false };
+
+// ── Equivalente ao RepairItemX ────────────────────────────────
+async function xRepairItemWood() {
+  if (!myself || game_state !== 2) return;
+  if (inv[0]?.equip !== 2) return;
+
+  const kitSlot = xGetSlotByID(719); // Repair Kit sprite ID
+  if (kitSlot === undefined) {
+    dsk.localMsg('Wood: Sem Repair Kit!', '#f55');
+    return;
+  }
+
+  const savedDir = myself.dir;
+  const savedY   = myself.y;
+
+  // drop → equipa kit
+  await xDoDropSlot(1, 1);       // slot 1 (1-indexado = slot 0)
+  await xDelay(350);
+  await xDoUseSlotByID(kitSlot);
+  await xDelay(350);
+
+  if (savedDir === 1 || savedDir === 2) {
+    // 'c' sobe, 'vb' vira baixo, repara, 'b' desce, pick
+    await xDoMove(myself.x, savedY - 1);
+    await xDelay(500);
+    await xDoChangeDir(2);
+    await xDelay(300);
+    for (let i = 0; i < 6; i++) {
+      await xDoKeyPress(6, 200);
+      await xDelay(800);
+    }
+    await xDoMove(myself.x, savedY);
+    await xDelay(500);
+    await xDoPickUp();
+    if (savedDir === 1) await xDoChangeDir(1); // 'vd'
+
+  } else {
+    // 'b' desce, 'vc' vira cima, repara, 'c' sobe, pick
+    await xDoMove(myself.x, savedY + 1);
+    await xDelay(500);
+    await xDoChangeDir(0);
+    await xDelay(300);
+    for (let i = 0; i < 6; i++) {
+      await xDoKeyPress(6, 200);
+      await xDelay(800);
+    }
+    await xDoMove(myself.x, savedY);
+    await xDelay(400);
+    await xDoPickUp();
+    if (savedDir === 3) await xDoChangeDir(3); // 've'
+  }
+
+  await xDelay(300);
+  await xDoUseSlot(0); // re-equipa item do slot 0
+  await xDelay(300);
+}
+
+async function xRepairItemX2Wood() {
+  if (!myself || game_state !== 2) return;
+  if (inv[0]?.equip !== 2) return;
+
+  const kitSlot = xGetSlotByID(719);
+  if (kitSlot === undefined) {
+    dsk.localMsg('Wood: Sem Repair Kit (X2)!', '#f55');
+    return;
+  }
+
+  const savedDir = myself.dir;
+  const savedY   = myself.y;
+
+  // drop item no tile atual → equipa kit
+  await xDoDropSlot(1, 1);
+  await xDelay(350);
+  await xDoUseSlotByID(kitSlot);
+  await xDelay(350);
+
+  if (savedDir === 2) {
+    // 'c' sobe, 'vb' face baixo, repara (item ficou abaixo), 'b' desce, pick
+    await xDoMove(myself.x, savedY - 1);
+    await xDelay(500);
+    await xDoChangeDir(2);          // 'vb'
+    await xDelay(300);
+    for (let i = 0; i < 6; i++) {
+      await xDoKeyPress(6, 200);
+      await xDelay(500);
+    }
+    await xDoMove(myself.x, savedY);
+    await xDelay(500);
+    await xDoPickUp();
+    // dir 2: sem virada no fim
+
+  } else {
+    // dir 1, 3 ou 0:
+    // 'b' desce, 'vc' face cima, repara (item ficou acima), 'c' sobe, pick
+    await xDoMove(myself.x, savedY + 1);
+    await xDelay(500);
+    await xDoChangeDir(0);          // 'vc'
+    await xDelay(300);
+    for (let i = 0; i < 6; i++) {
+      await xDoKeyPress(6, 200);
+      await xDelay(800);
+    }
+    await xDoMove(myself.x, savedY);
+    await xDelay(500);
+    await xDoPickUp();
+    if (savedDir === 1) await xDoChangeDir(1); // 'vd' — volta pra porta
+    if (savedDir === 3) await xDoChangeDir(3); // 've'
+    // dir 0: sem virada
+  }
+
+  await xDelay(300);
+  await xDoUseSlot(0);  // re-equipa item
+  await xDelay(300);
+}
+
+// ── Equivalente ao FarmWood ───────────────────────────────────
+async function FarmWood() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[118] === true) return;
+  xGoing[118] = true;
+
+  // Semente adjacente na direção → recém plantada, aguarda
+  const seedR = objects.items.find(el => el?.name?.includes('Seed') && el.x === myself.x + 1 && el.y === myself.y);
+  const seedL = objects.items.find(el => el?.name?.includes('Seed') && el.x === myself.x - 1 && el.y === myself.y);
+  if (seedR && myself.dir === 1) { xGoing[118] = false; return; }
+  if (seedL && myself.dir === 3) { xGoing[118] = false; return; }
+
+  // Item quebrado → repara (se estiver sobre gate, sai primeiro)
+   if (inv[0]?.equip === 2) {
+    const onGate = objects.items.find(el =>
+      el?.name === 'Tribe Gate' && el.x === myself.x && el.y === myself.y
+    );
+    if (onGate) {
+      await xDoMove(myself.x - 1, myself.y); // 'e' — sai da gate primeiro
+      await xDelay(500);
+	  await xDoChangeDir(1);
+	  await xDelay(400);
+      await xRepairItemX2Wood();             // ← X2: item cai fora da gate
+    } else {
+      await xRepairItemWood();               // ← X normal
+    }
+    xGoing[118] = false;
+    return;
+   }
+
+  // Tribe Gate à direita → interage (abre/fecha)
+  const gateRight = objects.items.find(el => el?.name === 'Tribe Gate' && el.x === myself.x + 1 && el.y === myself.y);
+  if (gateRight) {
+    await xDelay(400);
+    await xDoChangeDir(1);   // 'vd'
+	await xDelay(400);
+    await xDoKeyPress(6, 200);
+    await xDelay(200);
+  }
+
+  const pinecone = item_data.find(el => el?.n?.includes('Pinecone'));
+
+  // ── Dir 1 → direita ──────────────────────────────────────────
+  if (myself.dir === 1) {
+    const treeR = objects.items.find(el => el &&
+      (el.name.includes('Tree') || el.name.includes('Bush') || el.name.includes('Rock')) &&
+      el.x === myself.x + 1 && el.y === myself.y
+    );
+    if (treeR) {
+      await xDoKeyPress(6, 200); // 'atk'
+    } else {
+      await xDelay(200);
+      await xDoMove(myself.x + 1, myself.y); // 'd'
+	  await xDelay(400);
+      await xDoPickUp();
+	  await xDelay(300);
+      if (pinecone) await xDoUseSlot(pinecone.slot);
+    }
+  }
+  // ── Dir 3 → esquerda ─────────────────────────────────────────
+  else if (myself.dir === 3) {
+    const gateToRight = objects.items.find(el => el?.name === 'Tribe Gate' && el.x === myself.x + 1 && el.y === myself.y);
+    if (gateToRight) {
+      await xDelay(200);
+      await xDoChangeDir(1); // 'vd'
+    } else {
+      const treeL = objects.items.find(el => el &&
+        (el.name.includes('Tree') || el.name.includes('Bush') || el.name.includes('Rock')) &&
+        el.x === myself.x - 1 && el.y === myself.y
+      );
+      if (treeL) {
+        await xDoKeyPress(6, 200); // 'atk'
+      } else {
+        await xDelay(200);
+        await xDoMove(myself.x - 1, myself.y); // 'e'
+		await xDelay(400);
+        await xDoPickUp();
+		await xDelay(300);
+        if (pinecone) await xDoUseSlot(pinecone.slot);
+      }
+    }
+  }
+
+  // Animal Gate à direita virado para direita → desce
+  const animalGateR = objects.items.find(el => el?.name === 'Animal Gate' && el.x === myself.x + 1 && el.y === myself.y);
+  if (animalGateR && myself.dir === 1) {
+    await xDelay(200);
+    await xDoChangeDir(2); // 'vb'
+	await xDelay(200);
+  }
+
+  // ── Dir 2 → baixo ────────────────────────────────────────────
+  if (myself.dir === 2) {
+    const treeD = objects.items.find(el => el &&
+      (el.name.includes('Tree') || el.name.includes('Bush') || el.name.includes('Rock')) &&
+      el.x === myself.x && el.y === myself.y + 1
+    );
+    if (treeD) {
+      await xDoKeyPress(6, 200); // 'atk'
+      await xDelay(200);
+    } else {
+	  await xDoMove(myself.x, myself.y + 1); // 'b'
+      await xDelay(400);
+      await xDoPickUp();
+	  await xDelay(300);
+      if (pinecone) await xDoUseSlot(pinecone.slot);
+      await xDoChangeDir(3); // 've' = virar esquerda
+    }
+  }
+
+  // Tribe Gate à esquerda, virado esquerda → virada de corredor
+  const gateLeft = objects.items.find(el => el?.name === 'Tribe Gate' && el.x === myself.x - 1 && el.y === myself.y);
+  if (gateLeft && myself.dir === 3) {
+    const wood = item_data.find(el => el?.n?.includes('Wood'));
+    await xDelay(500);
+    await xDoKeyPress(6, 200);                              // 'atk'
+    await xDelay(500);
+    await xDoPickUp(); // 'pick'
+	await xDelay(500);
+    if (wood) await xDoDropByID(0, 249);           // 'drop'
+    await xDelay(500);
+    await xDoChangeDir(0);                                   // 'vc' = virar cima
+    await xDelay(500);
+    await xDoKeyPress(6, 200);                              // 'atk' cima
+    await xDelay(500);
+    await xDoChangeDir(1);                                   // 'vd' = virar direita
+  }
+
+  xGoing[118] = false;
+}
+
+// ── Comando e loop ────────────────────────────────────────────
+dsk.setCmd('/wood', () => {
+  dsk.wood.enabled = !dsk.wood.enabled;
+
+  if (dsk.wood.enabled) {
+    dsk.localMsg('Wood Farm: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.wood.enabled) {
+        await FarmWood();
+        await xDelay(400);
+      }
+    })();
+  } else {
+    xGoing[118] = false;
+    dsk.localMsg('Wood Farm: Desativado', '#f55');
+  }
+});
+
+// ── MINE BOT ──────────────────────────────────────────────────
+
+dsk.mine = { enabled: false, targetName: undefined };
+window.xMiningActive = false;
+
+async function xMineNearby() {
+  if (xMiningActive) return;
+  if (dskPaused || !myself || game_state !== 2) return;
+
+  const targetNames = ['Rock', 'Shiny Rock'];
+  let mineTarget = undefined;
+
+  for (let i in objects.items) {
+    const obj = objects.items[i];
+    if (!obj || obj.can_pickup !== 0) continue;
+    if (!targetNames.includes(obj.name)) continue;
+
+    const dist = xGetDistance(obj.x, obj.y, myself.x, myself.y);
+    if (dist >= 6) continue;
+
+    if (!mineTarget ||
+        dist < xGetDistance(mineTarget.x, mineTarget.y, myself.x, myself.y)) {
+      mineTarget = obj;
+    }
+  }
+
+  if (!mineTarget) return;
+
+  xMiningActive = true;
+
+  dsk.follow.enabled = false;
+  _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
+  await xDelay(500);
+
+  const sides = [
+    { x: mineTarget.x + 1, y: mineTarget.y,     dir: 3 },
+    { x: mineTarget.x - 1, y: mineTarget.y,     dir: 1 },
+    { x: mineTarget.x,     y: mineTarget.y + 1, dir: 0 },
+    { x: mineTarget.x,     y: mineTarget.y - 1, dir: 2 },
+  ];
+
+  let bestSide = undefined;
+  for (const side of sides) {
+    await xGetCanMove(side.x, side.y);
+    if (xCanMov) {
+      if (!bestSide ||
+          xGetDistance(side.x, side.y, myself.x, myself.y) <
+          xGetDistance(bestSide.x, bestSide.y, myself.x, myself.y)) {
+        bestSide = side;
+      }
+    }
+  }
+
+  if (!bestSide) {
+    dsk.localMsg('Mine: sem lado acessível', '#f55');
+    xMiningActive = false;
+    dsk.follow.enabled = true;
+    _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
+    return;
+  }
+
+  await xDelay(800);
+  await xDoMove(bestSide.x, bestSide.y);
+  await xDelay(5000);
+
+  await xDoChangeDir(bestSide.dir);
+  await xDelay(500);
+
+  dsk.localMsg(`Mine: minerando ${mineTarget.name}`, '#0ff');
+  xDoKeyDown(6);
+
+  const tx = mineTarget.x;
+  const ty = mineTarget.y;
+  const tn = mineTarget.name;
+
+  while (true) {
+    await xDelay(500);
+    if (dskPaused || !dsk.mine.enabled) break;
+    var stillExists = false;
+    for (var j in objects.items) {
+      var o = objects.items[j];
+      if (o && o.name === tn && o.x === tx && o.y === ty) {
+        stillExists = true;
+        break;
+      }
+    }
+    if (!stillExists) break;
+  }
+
+  xDoKeyUp(6);
+  await xDelay(500);
+
+  if (dsk.mine.enabled) {
+    dsk.follow.enabled = true;
+    dsk.follow.targetName = dsk.mine.targetName;
+    _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
+    dsk.localMsg(`Mine: concluído, seguindo ${dsk.mine.targetName}`, '#5f5');
+  }
+
+  xMiningActive = false;
+}
+
+dsk.setCmd('/mine', (args) => {
+  // Se passou nome: /mine Mandoka → atualiza o alvo
+  if (args && args.trim() !== '') {
+    dsk.mine.targetName = args.trim();
+  }
+
+  // Se nunca definiu um nome, pede para definir
+  if (!dsk.mine.targetName) {
+    dsk.localMsg('Mine: defina um alvo! Ex: /mine Mandoka', '#f55');
+    return;
+  }
+
+  dsk.mine.enabled = !dsk.mine.enabled;
+
+  if (dsk.mine.enabled) {
+    xMiningActive = false;
+    dsk.follow.enabled = true;
+    dsk.follow.targetName = dsk.mine.targetName;
+    _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
+    dsk.localMsg(`Mine Bot: Ativado | Alvo: ${dsk.mine.targetName}`, '#5f5');
+
+    (async function loop() {
+      while (dsk.mine.enabled) {
+        if (!xMiningActive) await xMineNearby();
+        await xDelay(1000);
+      }
+    })();
+
+  } else {
+    xMiningActive = false;
+    dsk.follow.enabled = false;
+    xDoKeyUp(6);
+    _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
+    dsk.localMsg('Mine Bot: Desativado', '#f55');
+  }
+});
+
+var autoSpeedHack = false;
+var speedHackInterval2 = null;
+var botaoSpeedVisible = false;
+
+jv.botaoMenu2 = jv.Button.create(713, 360, 20, 'SP', ui_container, 20);
+jv.botaoMenu2.visible = false; // ← começa escondido
+
+jv.botaoMenu2.on_click = function () {
+    if (!autoSpeedHack) {
+        autoSpeedHack = true;
+        speedHackInterval2 = setInterval(() => {
+            myself.cur_speed = 130;
+            last_dest = 9e10;
+        }, 5);
+    } else {
+        autoSpeedHack = false;
+        clearInterval(speedHackInterval2);
+        speedHackInterval2 = null;
+    }
+};
+
+dsk.setCmd('/sp', () => {
+    botaoSpeedVisible = !botaoSpeedVisible;
+    jv.botaoMenu2.visible = botaoSpeedVisible;
+    dsk.localMsg(`Speed Button: ${botaoSpeedVisible ? 'Visível' : 'Escondido'}`, botaoSpeedVisible ? '#5f5' : '#f55');
+});
+
+dsk.menu.items.push(
+  { label: 'Mine Bot',      state: () => dsk.mine?.enabled,       toggle: () => dsk.commands['/mine'](dsk.mine?.targetName ?? '') },
+  { label: 'Base Repair',   state: () => dsk.baseRepair?.enabled, toggle: () => dsk.commands['/baserepair']() },
+  { label: 'Auto Explo',    state: () => dsk.explo?.enabled,      toggle: () => dsk.commands['/explo']()      },
+  { label: 'Top Skill Calc',state: () => tscD?.visible,           toggle: () => dsk.commands['/topskill']()   },
+  { label: 'Repair Bot',    state: () => dsk.repair?.enabled,     toggle: () => dsk.commands['/repair']()     },
+  { label: 'AutoKill',      state: () => dsk.autokill?.enabled,   toggle: () => dsk.commands['/autokill']()   },
+  { label: 'Auto Caraway',  state: () => dsk.effct?.enabled,      toggle: () => dsk.commands['/effct']()      },
+  { label: 'Sheep Bot',     state: () => dsk.sheep?.enabled,      toggle: () => dsk.commands['/sheep']()      },
+  { label: 'Wood Farm',     state: () => dsk.wood?.enabled,       toggle: () => dsk.commands['/wood']()       },
+  { label: 'Zoom 1.5x',     state: () => dsk.zoom?.enabled,       toggle: () => dsk.commands['/zoom']()       },
+  { label: 'Color Picker',  state: () => cp?.visible,             toggle: () => dsk.commands['/colorpicker']()},
+  { label: 'Buy (via /buy N)', state: () => false,                toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+);
+dsk.menu.rebuild();
 //check bot para aplicar o delay e não da packet spam
 
 dsk.checkBotActive = () => {
@@ -7699,8 +9101,6 @@ dsk.checkBotActive = () => {
          dsk.destruction?.enabled ||
          dsk.cooking?.enabled     ||
          dsk.smelting?.enabled    ||
-         dsk.mining?.enabled      ||
-         dsk.ssd?.enabled         ||
          dsk.fish?.enabled        ||
          dsk.farm?.enabled        ||
          dsk.knit?.enabled        ||
