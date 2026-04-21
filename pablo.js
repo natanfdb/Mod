@@ -215,13 +215,8 @@ setInterval(() => {
 
 // ── LOOP PRÓPRIO ─────────────────────────────────────────────
 
-let _lastLoop = 0;
 (function loop() {
-  const now = performance.now();
-  if (now - _lastLoop >= 16) {
-    dsk.emit('postLoop');
-    _lastLoop = now;
-  }
+  dsk.emit('postLoop');
   requestAnimationFrame(loop);
 })();
 
@@ -408,6 +403,7 @@ dsk.bars.start = () => {
     hp_status.title.text     = `${hp_status.val.toLocaleString()}%`;
     hunger_status.title.text = `${hunger_status.val.toLocaleString()}%`;
     exp_status.title.text    = `${exp_status.val.toLocaleString()}%`;
+	skill_status.title.text  = `${skill_status.val.toLocaleString()}%`;
 
     dsk.bars.loop = requestAnimationFrame(loop);
   })();
@@ -723,6 +719,7 @@ dsk.dias = {
       }
     } catch(e) { console.log('dsk.dias error:', e); }
   }
+
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
 dsk.discord = {
@@ -733,6 +730,152 @@ dsk.discord = {
   whoUrl:     '',
   enabled:   false,
 };
+
+// ── DISCORD CONFIG MANAGER ────────────────────────────────────
+
+// Carrega webhooks salvos ou usa os padrão
+dsk.discord.loadConfig = () => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dsk_discord_config') || '{}');
+    if (saved.globalUrl)  dsk.discord.globalUrl  = saved.globalUrl;
+    if (saved.tribeUrl)   dsk.discord.tribeUrl   = saved.tribeUrl;
+    if (saved.deathUrl)   dsk.discord.deathUrl   = saved.deathUrl;
+    if (saved.respawnUrl) dsk.discord.respawnUrl  = saved.respawnUrl;
+    if (saved.whoUrl)     dsk.discord.whoUrl      = saved.whoUrl;
+  } catch(e) {}
+};
+
+dsk.discord.saveConfig = () => {
+  try {
+    localStorage.setItem('dsk_discord_config', JSON.stringify({
+      globalUrl:  dsk.discord.globalUrl,
+      tribeUrl:   dsk.discord.tribeUrl,
+      deathUrl:   dsk.discord.deathUrl,
+      respawnUrl: dsk.discord.respawnUrl,
+      whoUrl:     dsk.discord.whoUrl,
+    }));
+    dsk.localMsg('Discord Config: Salvo!', '#5f5');
+  } catch(e) {}
+};
+
+// Carrega ao iniciar
+dsk.discord.loadConfig();
+
+// ── Dialog ────────────────────────────────────────────────────
+
+dsk.discordManager = jv.Dialog.create(400, 260);
+const dcm = dsk.discordManager;
+dcm.visible = false;
+
+dcm.header = jv.text('Discord Webhook Config', {
+  font: '13px Verdana', fill: 0x7289DA, stroke: 0x555555, strokeThickness: 2,
+});
+dcm.addChild(dcm.header);
+jv.center(dcm.header);
+jv.top(dcm.header, 4);
+
+dcm.close = jv.Button.create(0, 0, 24, 'X', dcm, 24);
+jv.top(dcm.close, 4); jv.right(dcm.close, 4);
+dcm.close.on_click = () => (dcm.visible = 0);
+
+dcm.move = jv.Button.create(0, 0, 24, '@', dcm, 24);
+jv.top(dcm.move, 4); jv.right(dcm.move, 28);
+
+dcm._px = 0; dcm._py = 0;
+window.addEventListener('mousemove', e => { dcm._px = e.clientX; dcm._py = e.clientY; });
+window.addEventListener('touchmove', e => { dcm._px = e.touches[0].clientX; dcm._py = e.touches[0].clientY; });
+
+dsk.on('postLoop', () => {
+  if (!dcm.move?.is_pressed) return;
+  const canvas = document.querySelector('canvas');
+  const rect = canvas ? canvas.getBoundingClientRect() : { left:0, top:0, width:jv.game_width, height:jv.game_height };
+  dcm.x = (dcm._px - rect.left) * (jv.game_width / rect.width)  - dcm.w / 2;
+  dcm.y = (dcm._py - rect.top)  * (jv.game_height / rect.height) - 12;
+  dcm.x = Math.max(0, Math.min(dcm.x, jv.game_width  - dcm.w));
+  dcm.y = Math.max(0, Math.min(dcm.y, jv.game_height - dcm.h));
+});
+
+// ── Linhas de campo ───────────────────────────────────────────
+
+const dcmFields = [
+  { label: 'Global',   key: 'globalUrl'  },
+  { label: 'Tribe',    key: 'tribeUrl'   },
+  { label: 'Death',    key: 'deathUrl'   },
+  { label: 'Respawn',  key: 'respawnUrl' },
+  { label: 'Who',      key: 'whoUrl'     },
+];
+
+dcm.inputs = {};
+
+dcmFields.forEach(({ label, key }, i) => {
+  const y = 32 + i * 38;
+
+  // Label
+  const lbl = jv.text(label + ':', {
+    font: '10px Verdana', fill: 0xaaaaaa, stroke: 0x000000, strokeThickness: 2,
+  });
+  lbl.x = 8; lbl.y = y;
+  dcm.addChild(lbl);
+
+  // Valor atual (truncado para caber)
+  const val = jv.text('', {
+    font: '9px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2,
+  });
+  val.x = 8; val.y = y + 13;
+  dcm.addChild(val);
+  dcm.inputs[key] = val;
+
+  // Botão Colar
+  const btnPaste = jv.Button.create(0, 0, 55, 'Colar', dcm, 20);
+  btnPaste.x = dcm.w - 63;
+  btnPaste.y = y + 10;
+  btnPaste.on_click = async () => {
+    try {
+      const text = await navigator.clipboard.readText();
+      if (text.includes('discord.com/api/webhooks/')) {
+        dsk.discord[key] = text.trim();
+        dsk.discordManager.refresh();
+        dsk.localMsg(`Discord ${label}: URL atualizada`, '#5f5');
+      } else {
+        dsk.localMsg('URL inválida! Precisa ser um webhook do Discord.', '#f55');
+      }
+    } catch(e) {
+      dsk.localMsg('Erro ao colar. Tente copiar o link primeiro.', '#f55');
+    }
+  };
+});
+
+// Botão Salvar
+const dcmBtnSave = jv.Button.create(0, 0, 180, '💾 Salvar Config', dcm, 24);
+jv.bottom(dcmBtnSave, 4);
+dcmBtnSave.x = 8;
+dcmBtnSave.on_click = () => dsk.discord.saveConfig();
+
+// Botão Limpar Tudo
+const dcmBtnClear = jv.Button.create(0, 0, 100, '🗑 Limpar', dcm, 24);
+jv.bottom(dcmBtnClear, 4);
+dcmBtnClear.x = 196;
+dcmBtnClear.on_click = () => {
+  localStorage.removeItem('dsk_discord_config');
+  dsk.localMsg('Discord Config: Limpo! Recarregue o mod.', '#ff0');
+};
+
+// Atualiza os valores exibidos
+dsk.discordManager.refresh = () => {
+  dcmFields.forEach(({ key }) => {
+    const url = dsk.discord[key] || '';
+    // Mostra só o ID do webhook (parte final) para não ocupar espaço
+    const short = url ? '.../' + url.split('/').slice(-2).join('/').slice(0, 40) : '(vazio)';
+    dcm.inputs[key].text = short;
+  });
+};
+
+dsk.setCmd('/discordconfig', () => {
+  dcm.visible = !dcm.visible;
+  if (dcm.visible) dsk.discordManager.refresh();
+  dsk.localMsg(`Discord Config: ${dcm.visible ? 'Aberto' : 'Fechado'}`, dcm.visible ? '#5f5' : '#f55');
+});
+
 
 dsk.discord.send = (webhookUrl, username, message) => {
   if (!dsk.discord.enabled) return;
@@ -2482,7 +2625,8 @@ dsk.on('postLoop', () => {
   const name   = skillName  || '---';
   const level  = skillLevel ?? 0;
   const target = currentLevel > 0 ? ` / ${currentLevel}` : '';
-  dsk.skillHud.label.text = `⚔ ${name}: ${level}${target}`;
+  const pct    = skill_status?.val != null ? Math.floor(skill_status.val) : 0;
+  dsk.skillHud.label.text = `⚔ ${name}: ${level}.${pct}${target}`;
 });
 
 dsk.setCmd('/skills', () => {
@@ -3121,13 +3265,60 @@ dsk.setCmd('/destru', () => {
   }
 });
 
-//--COOKING----//
+// ── ECHO MANDOKA ─────────────────────────────────────────────
 
+dsk.echo = {
+  enabled: false,
+  targetName: 'Mandoka'
+};
+
+dsk.setCmd('/echo', (context) => {
+  if (context) {
+    dsk.echo.targetName = context.trim();
+    dsk.echo.enabled = true;
+    dsk.localMsg(`Echo: seguindo ${dsk.echo.targetName}`, '#5f5');
+    return;
+  }
+
+  dsk.echo.enabled = !dsk.echo.enabled;
+  dsk.localMsg(
+    `Echo: ${dsk.echo.enabled ? `Ativado (${dsk.echo.targetName})` : 'Desativado'}`,
+    dsk.echo.enabled ? '#5f5' : '#f55'
+  );
+});
+
+dsk.on('postPacket:pkg', packet => {
+  if (!dsk.echo.enabled) return;
+  if (!packet?.data) return;
+
+  try {
+    const arr = JSON.parse(packet.data);
+    arr.forEach(raw => {
+      const item = JSON.parse(raw);
+      if (item.type !== 'message') return;
+      if (!item.name) return;
+
+      if (item.name.toLowerCase() !== dsk.echo.targetName.toLowerCase()) return;
+
+      const text = dsk.stripHTMLTags(item.text).trim();
+	  if (!text) return;
+
+	  // Remove o prefixo "Nome: " se existir
+	  const cleaned = text.replace(/^.*?:\s*/, '');
+	  if (!cleaned) return;
+
+	  setTimeout(() => {
+	    _originalSend({ type: 'chat', data: `/b ${cleaned}` });
+	  }, 300);
+    });
+  } catch (e) {}
+});
+
+//--COOKING----//
 dsk.cooking = { enabled: false };
 window.cookPositionX = 0;
 window.cookPositionY = 0;
 
-// Retorna o primeiro ID disponível no inventário
 function xGetAvailableID(ids) {
   return ids.find(id => xGetSlotByID(id) != undefined);
 }
@@ -3144,79 +3335,147 @@ function xGetGroundItemByPos(x, y, ids) {
   }
   return null;
 }
-async function cook(){
-	if (dskPaused) return; // ← adiciona isso
-    if (!myself || game_state !== 2) return;
-  await xDelay(500);
-  await xLookUp();
-  await xDoKeyPress(6, 100);
-  await xDelay(100);
-  await xDropAvailable(1, [249, 648]);       // madeira
-  await xDelay(100);
-  await xDoDropByID(1, 941);
-  await xDelay(100);
-  await xDropAvailable(1, [227, 593, 776, 486]); // comida
-  await xDelay(300);
 
-  await xLookDown();
+const WOOD_IDS = [249, 648];
+const FOOD_IDS = [227, 593, 776, 486];
+
+function xHasWood() {
+  return WOOD_IDS.some(id => xGetSlotByID(id) != undefined);
+}
+function xHasFood() {
+  return FOOD_IDS.some(id => xGetSlotByID(id) != undefined);
+}
+
+async function xCollectResources() {
+  // --- Coleta madeira ---
+  if (!xHasWood()) {
+    // Vai até a posição base (em cima da madeira)
+    if (myself.x !== cookPositionX || myself.y !== cookPositionY) {
+      await xDoMove(cookPositionX, cookPositionY);
+      return;
+    }
+    if (myself.x !== cookPositionX || myself.y !== cookPositionY) return;
+    let tries = 0;
+    while (!xHasWood() && tries < 10) {
+      if (xGetGroundItemByPos(myself.x, myself.y, WOOD_IDS)) {
+        await xDoPickUp();
+        await xDelay(500);
+      } else {
+        await xDelay(500);
+      }
+      tries++;
+    }
+  }
+
+  // --- Coleta comida (1 sqm acima do cook position) ---
+  if (!xHasFood()) {
+    if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) {
+      await xDoMove(cookPositionX, cookPositionY - 1);
+      return;
+    }
+	if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) return;
+    let tries = 0;
+    while (!xHasFood() && tries < 10) {
+      await xDoPickUp();
+      await xDelay(500);
+      tries++;
+    }
+    
+    await xDelay(400);
+  }
+}
+
+function xHasFirePit(direction) {
+  const dy = direction === 'up' ? -1 : 1;
+  return objects.items.find(el =>
+    el && el.name && el.name.includes('Fire Pit') &&
+    el.x === myself.x && el.y === myself.y + dy
+  );
+}
+
+async function cook() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
+  await xDelay(500);
+
+  // --- Fogueira de cima ---
+  await xLookUp();
+  if (!xHasFirePit('up')) {
+    dsk.localMsg('Cook: sem fogueira (cima), voltando...', '#fa5');
+    await xDoMove(cookPositionX, cookPositionY);
+    await xDelay(400);
+    return;
+  }
+  await xDelay(100);
   await xDoKeyPress(6, 100);
-  await xDelay(100);
-  await xDropAvailable(1, [249, 648]);
-  await xDelay(100);
+  await xDelay(150);
+  await xDropAvailable(1, WOOD_IDS);
+  await xDelay(150);
   await xDoDropByID(1, 941);
+  await xDelay(150);
+  await xDropAvailable(1, FOOD_IDS);
+  await xDelay(200);
+
+  // --- Fogueira de baixo ---
+  await xLookDown();
+  if (!xHasFirePit('down')) {
+    dsk.localMsg('Cook: sem fogueira (baixo), voltando...', '#fa5');
+    await xDoMove(cookPositionX, cookPositionY);
+    await xDelay(400);
+    return;
+  }
   await xDelay(100);
-  await xDropAvailable(1, [227, 593, 776, 486]);
+  await xDoKeyPress(6, 100);
+  await xDelay(150);
+  await xDropAvailable(1, WOOD_IDS);
+  await xDelay(150);
+  await xDoDropByID(1, 941);
+  await xDelay(150);
+  await xDropAvailable(1, FOOD_IDS);
   await xDelay(300);
 }
 
 async function xCook() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
   if (currentLevel > 0 && skillLevel >= currentLevel && ['cooking'].includes(skillName)) {
     await xDelay(1000);
-	xGoing[1] = false;
-	dsk.cooking.enabled = false;
-	dsk.localMsg('Cook: Desativado', '#f55');
+    xGoing[1] = false;
+    dsk.cooking.enabled = false;
+    dsk.localMsg('Cook: Desativado', '#f55');
     return;
-	}
+  }
+
   if (xGoing[1] != true) {
     xGoing[1] = true;
 
-    // Espera até ter madeira disponível
-	while (xGetSlotByID(249) == undefined && xGetSlotByID(648) == undefined) {
-	  await xDelay(500);
-	  // Só pega se tiver madeira no chão na posição atual
-	  if (xGetGroundItemByPos(myself.x, myself.y, [249, 648])) {
-		await xDelay(700);
-		await xDoPickUp();
-		await xDelay(500);
-	  }
-	}
+    // Verifica e coleta recursos antes de cozinhar
+    await xCollectResources();
 
-    // Pega comida (1 tile acima) — espera respawn se necessário
-    const hasFood = [227, 593, 776, 486].some(id => xGetSlotByID(id) != undefined);
-    if (!hasFood) {
-      await xDoMove(myself.x, myself.y - 1);
-      await xDelay(400);
-      await xDoPickUp();
-      await xDelay(400);
+    // Se mesmo assim não tiver os dois, aborta o ciclo
+    if (!xHasWood() || !xHasFood()) {
+      dsk.localMsg('Cook: sem madeira ou comida, aguardando...', '#fa5');
+      xGoing[1] = false;
+      return;
     }
 
     await xDoMove(myself.x - 1, myself.y);
     await cook();
 
-	const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
-	if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
-		await xDoMove(cookPositionX, cookPositionY);
-		await xDelay(400);
-	}
+    const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
+    if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
+      await xDoMove(cookPositionX, cookPositionY);
+      await xDelay(800);
+    }
 
     xGoing[1] = false;
   }
 }
+
 dsk.setCmd('/cook', () => {
   dsk.cooking.enabled = !dsk.cooking.enabled;
-
   if (dsk.cooking.enabled) {
     cookPositionX = myself.x;
     cookPositionY = myself.y;
@@ -3232,93 +3491,148 @@ dsk.setCmd('/cook', () => {
   }
 });
 
-//SMELTING-//
+//--SMELTING--//
 dsk.smelting = { enabled: false };
 window.smeltPositionX = 0;
 window.smeltPositionY = 0;
 
-async function smelt(){
-  if (dskPaused) return; // ← adiciona isso
-  if (!myself || game_state !== 2) return;
-  await xDelay(300);
-  await xLookUp();
-  await xDoKeyPress(6, 100);
-  await xDelay(450);
-  await xDoDropByID(1, 694); //dropa panela vazia
-  await xDelay(450);
-  await xDropAvailable(1, [539, 538]); // dropa minerio
-  await xDelay(300);
-  await xDoPickUp(); //pega panela cheia
-  await xDelay(450);
-  await xDropAvailable(1, [249, 648]); //dropa madeira
-  await xDelay(400);
-  await xDoDropByID(1, 711);       // dropa panela cheia
-  await xDelay(300);
+const ORE_IDS  = [539, 538];
+// WOOD_IDS já definido no cooking: [249, 648]
 
-  await xLookDown();
-  await xDoKeyPress(6, 100);
-  await xDelay(450);
-  await xDoDropByID(1, 694); //dropa panela vazia
-  await xDelay(450);
-  await xDropAvailable(1, [539, 538]); // dropa minerio
-  await xDelay(450);
-  await xDoPickUp(); //pega panela cheia
-  await xDelay(450);
-  await xDropAvailable(1, [249, 648]); //dropa madeira
-  await xDelay(400);
-  await xDoDropByID(1, 711);       // dropa panela cheia
-  await xDelay(300);
+function xHasOre() {
+  return ORE_IDS.some(id => xGetSlotByID(id) != undefined);
 }
-async function xSmelt() {
-  if (dskPaused) return; // ← adiciona isso
+
+async function xCollectSmeltResources() {
+  // --- Coleta madeira ---
+  if (!xHasWood()) {
+    if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) {
+      await xDoMove(smeltPositionX, smeltPositionY);
+      return;
+    }
+	
+	if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) return;
+	
+    let tries = 0;
+    while (!xHasWood() && tries < 10) {
+      if (xGetGroundItemByPos(myself.x, myself.y, WOOD_IDS)) {
+        await xDoPickUp();
+        await xDelay(500);
+      } else {
+        await xDelay(500);
+      }
+      tries++;
+    }
+  }
+
+  // --- Coleta minério (1 sqm acima do smelt position) ---
+  if (!xHasOre()) {
+	if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) {
+      await xDoMove(smeltPositionX, smeltPositionY - 1);
+      return;
+    }
+	
+	if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) return;
+	
+    let tries = 0;
+    while (!xHasOre() && tries < 10) {
+      await xDoPickUp();
+      await xDelay(500);
+      tries++;
+    }
+    await xDelay(400);
+  }
+}
+
+async function smelt() {
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
+  await xDelay(500);
+
+  // --- Fogueira de cima ---
+  await xLookUp();
+  if (!xHasFirePit('up')) {
+    dsk.localMsg('Smelt: sem fogueira (cima), voltando...', '#fa5');
+    await xDoMove(smeltPositionX, smeltPositionY);
+    await xDelay(400);
+    return;
+  }
+  await xDelay(150);
+  await xDoKeyPress(6, 100);
+  await xDelay(350);
+  await xDoDropByID(1, 694);
+  await xDelay(350);
+  await xDropAvailable(1, ORE_IDS);
+  await xDelay(300);
+  await xDoPickUp();
+  await xDelay(200);
+  await xDropAvailable(1, WOOD_IDS);
+  await xDelay(200);
+  await xDoDropByID(1, 711);
+  await xDelay(200);
+
+  // --- Fogueira de baixo ---
+  await xLookDown();
+  if (!xHasFirePit('down')) {
+    dsk.localMsg('Smelt: sem fogueira (baixo), voltando...', '#fa5');
+    await xDoMove(smeltPositionX, smeltPositionY);
+    await xDelay(400);
+    return;
+  }
+  await xDelay(150);
+  await xDoKeyPress(6, 100);
+  await xDelay(350);
+  await xDoDropByID(1, 694);
+  await xDelay(350);
+  await xDropAvailable(1, ORE_IDS);
+  await xDelay(300);
+  await xDoPickUp();
+  await xDelay(200);
+  await xDropAvailable(1, WOOD_IDS);
+  await xDelay(200);
+  await xDoDropByID(1, 711);
+  await xDelay(200);
+}
+
+async function xSmelt() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
   if (currentLevel > 0 && skillLevel >= currentLevel && ['smelting'].includes(skillName)) {
     await xDelay(1000);
-	xGoing[2] = false;
-	dsk.smelting.enabled = false;
-	dsk.localMsg('Smelt: Desativado', '#f55');
+    xGoing[2] = false;
+    dsk.smelting.enabled = false;
+    dsk.localMsg('Smelt: Desativado', '#f55');
     return;
-	}
+  }
+
   if (xGoing[2] != true) {
     xGoing[2] = true;
 
-    // Espera até ter madeira disponível
-	while (xGetSlotByID(249) == undefined && xGetSlotByID(648) == undefined) {
-	  await xDelay(800);
-	  // Só pega se tiver madeira no chão na posição atual
-	  if (xGetGroundItemByPos(myself.x, myself.y, [249, 648])) {
-		await xDelay(700);
-		await xDoPickUp();
-		await xDelay(500);
-	  }
-	}
+    await xCollectSmeltResources();
 
-    // Pega minerio (1 tile acima)
-    const hasOre = [539, 538].some(id => xGetSlotByID(id) != undefined);
-    if (!hasOre) {
-	  await xDelay(800);
-      await xDoMove(myself.x, myself.y - 1);
-      await xDelay(400);
-      await xDoPickUp();
-      await xDelay(400);
+    if (!xHasWood() || !xHasOre()) {
+      dsk.localMsg('Smelt: sem madeira ou minério, aguardando...', '#fa5');
+      xGoing[2] = false;
+      return;
     }
 
     await xDoMove(myself.x - 1, myself.y);
     await smelt();
 
-	const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
-
-	if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
-		await xDoMove(smeltPositionX, smeltPositionY);
-		await xDelay(400);
-	}
+    const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
+    if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
+      await xDoMove(smeltPositionX, smeltPositionY);
+      await xDelay(800);
+    }
 
     xGoing[2] = false;
   }
 }
+
 dsk.setCmd('/smelt', () => {
   dsk.smelting.enabled = !dsk.smelting.enabled;
-
   if (dsk.smelting.enabled) {
     smeltPositionX = myself.x;
     smeltPositionY = myself.y;
@@ -3333,6 +3647,105 @@ dsk.setCmd('/smelt', () => {
     dsk.localMsg('Smelt Bot: Desativado', '#f55');
   }
 });
+
+// ── TOP LVL HUD ───────────────────────────────────────────────
+
+dsk.topHud = {
+  enabled:    false,
+  dragging:   false,
+  ox:         0,
+  oy:         0,
+  _statObj:   null,
+  _reincObj:  null,
+  _topSkill:  '---',
+  _listening: false,
+  _interval:  null,
+};
+
+dsk.topHud.label = jv.text('🏆 Top Skill: ---', {
+  font:            '13px Verdana',
+  fill:            0xFFD700,
+  stroke:          0x000000,
+  strokeThickness: 3,
+  lineJoin:        'round',
+  align:           'left',
+});
+dsk.topHud.label.x = 8;
+dsk.topHud.label.y = 65;
+dsk.topHud.label.visible = false;
+dsk.topHud.label.interactive = true;
+dsk.topHud.label.buttonMode  = true;
+ui_container.addChild(dsk.topHud.label);
+
+// Drag
+dsk.topHud.label.on('pointerdown', e => {
+  dsk.topHud.dragging = true;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.topHud.ox = pos.x - dsk.topHud.label.x;
+  dsk.topHud.oy = pos.y - dsk.topHud.label.y;
+});
+dsk.topHud.label.on('pointermove', e => {
+  if (!dsk.topHud.dragging) return;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.topHud.label.x = pos.x - dsk.topHud.ox;
+  dsk.topHud.label.y = pos.y - dsk.topHud.oy;
+});
+dsk.topHud.label.on('pointerup',        () => { dsk.topHud.dragging = false; });
+dsk.topHud.label.on('pointerupoutside', () => { dsk.topHud.dragging = false; });
+
+// Listener de mensagem (registrado uma vez só)
+dsk.topHud._onMessage = function(e) {
+  try {
+    const data = JSON.parse(e.data);
+    if (data.type !== 'pkg') return;
+    const parsed = JSON.parse(JSON.parse(data.data)[0]);
+
+    if (parsed.type === 'stat')  dsk.topHud._statObj  = parsed.obj;
+    if (parsed.type === 'reinc') dsk.topHud._reincObj = parsed.obj;
+
+    if (dsk.topHud._statObj && dsk.topHud._reincObj) {
+      dsk.topHud._topSkill = dsk.topHud._reincObj.skill || '---';
+      dsk.topHud._statObj  = null;
+      dsk.topHud._reincObj = null;
+    }
+  } catch (_) {}
+};
+
+// Busca os dados do servidor
+dsk.topHud.fetch = () => {
+  if (!dsk.topHud._listening) {
+    connection.addEventListener('message', dsk.topHud._onMessage);
+    dsk.topHud._listening = true;
+  }
+  send({ type: 'c', r: 'st' });
+  setTimeout(() => send({ type: 'c', r: 'rn' }), 1000);
+};
+
+// Atualiza o label no postLoop
+dsk.on('postLoop', () => {
+  if (!dsk.topHud.enabled) return;
+  dsk.topHud.label.text = `🏆 Top Skill: ${dsk.topHud._topSkill}`;
+});
+
+dsk.setCmd('/top', () => {
+  dsk.topHud.enabled = !dsk.topHud.enabled;
+  dsk.topHud.label.visible = dsk.topHud.enabled;
+
+  if (dsk.topHud.enabled) {
+    // Busca imediata ao ativar
+    dsk.topHud.fetch();
+    // Auto-refresh a cada 1 minuto e meio (90s)
+    dsk.topHud._interval = setInterval(() => {
+      if (dsk.topHud.enabled) dsk.topHud.fetch();
+    }, 90000);
+    dsk.localMsg('Top Skill HUD: Ativado (refresh 90s)', '#5f5');
+  } else {
+    clearInterval(dsk.topHud._interval);
+    dsk.topHud._interval = null;
+    dsk.localMsg('Top Skill HUD: Desativado', '#f55');
+  }
+});
+
 
 // ── MENU PRINCIPAL ─────────────────────────────────────────────
 
@@ -3416,9 +3829,11 @@ dsk.menu.items = [
 	{ label: 'Rotation',       state: () => dsk.rotation?.enabled, toggle: () => dsk.commands['/rotation']() },
 	{ label: 'Hide Name',   state: () => dsk.hide?.enabled,   toggle: () => dsk.commands['/hide']() },
 	{ label: 'Cavar',   state: () => dsk.cavar?.enabled,   toggle: () => dsk.commands['/cavar']() },
+	{ label: 'Discord Config', state: () => dcm?.visible, toggle: () => dsk.commands['/discordconfig']() },
 	{ label: 'Discord',     state: () => dsk.discord?.enabled,     toggle: () => dsk.commands['/discord']() },
 	{ label: 'Clay Bot', state: () => dsk.clay?.enabled, toggle: () => dsk.commands['/clay']() },
 	{ label: 'HealBot', state: () => dsk.healbot?.enabled, toggle: () => dsk.commands['/healbot']() },
+	{ label: 'Aloe Bot', state: () => dsk.aloe?.enabled, toggle: () => dsk.commands['/aloe']() },
 
 ];
 
@@ -3492,6 +3907,14 @@ dsk.menu.rebuild = () => {
     btn.item = item;
     btn.on_click = () => {
       item.toggle();
+      // Fecha o menu se algum dialog de configuração foi aberto
+      const dialogOpen = 
+        dsk.armasManager?.visible ||
+        dsk.ablManager?.visible   ||
+        dsk.invManager?.visible   ||
+        dsk.whoManager?.visible   ||
+        dsk.tribeManager?.visible;
+      if (item.state() || dialogOpen) dsk.menu.visible = false;
       dsk.menu.refresh();
     };
     dsk.menu.btns.push(btn);
@@ -4556,11 +4979,11 @@ async function FarmBot() {
   }
 
   async function plantSeed(){
-    await xDelay(241);
+    await xDelay(150);
     await xDoPickUp();
-    await xDelay(169);
+    await xDelay(100);
     await xDoUseSlot(seedSlot);
-    await xDelay(181);
+    await xDelay(110);
   }
 
   const front = getFrontTile();
@@ -4578,9 +5001,9 @@ async function FarmBot() {
 	  await xDelay(418);
 	  await xDoUseSlot(shovelSlot);
       await digUntilReady(myself.x, myself.y - 1);
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1);
     }
 
@@ -4593,7 +5016,7 @@ async function FarmBot() {
     // 3) descer e plantar
     await xDelay(325);
     await xDoMove(myself.x, myself.y + 1);
-    await xDelay(334);
+    await xDelay(237);
     await plantSeed();
 
 	// 4) cavar embaixo (tile destino) antes do bush
@@ -4604,9 +5027,9 @@ async function FarmBot() {
 	  await xDoUseSlot(shovelSlot);
 	  await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1);
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1);
     }
 
@@ -4630,9 +5053,9 @@ async function FarmBot() {
 	  await xDoUseSlot(shovelSlot);
 	  await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1);
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1);
     }
 
@@ -4645,7 +5068,7 @@ async function FarmBot() {
     // 3) subir e plantar
     await xDelay(361);
     await xDoMove(myself.x, myself.y - 1);
-    await xDelay(362);
+    await xDelay(262);
     await plantSeed();
 
 	// 4) cavar em cima (tile destino) antes do bush
@@ -4656,9 +5079,9 @@ async function FarmBot() {
 	  await xDoUseSlot(shovelSlot);
 	  await xDelay(418);
       await digUntilReady(myself.x, myself.y - 1);
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1);
     }
 
@@ -4679,9 +5102,9 @@ async function FarmBot() {
 	  await xDoUseSlot(shovelSlot);
 	  await xDelay(418);
       await digUntilReady(myself.x, myself.y - 1); // ✅
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1)
       await xDoChangeDir(1);
     }
@@ -4693,9 +5116,9 @@ async function FarmBot() {
 	  await xDoUseSlot(shovelSlot);
 	  await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1); // ✅
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1)
       await xDoChangeDir(3);
     }
@@ -4705,9 +5128,9 @@ async function FarmBot() {
 	  await xDelay(418);
 	  await xDoUseSlot(shovelSlot);
       await digUntilReady(front.x, front.y); // ✅
-	  await xDelay(341);
+	  await xDelay(241);
       await xDoUseSlot(0);
-      await xDelay(341);
+      await xDelay(141);
       await xDoUseSlot(1)
     }
   }
@@ -4723,7 +5146,371 @@ async function FarmBot() {
 
   // mover e plantar normalmente
   await xDoMove(front.x, front.y);
-  await xDelay(357);
+  await xDelay(257);
+  await plantSeed();
+}
+
+// ── ALOE BOT ─────────────────────────────────────────────────
+
+dsk.aloe = { enabled: false };
+
+dsk.setCmd('/aloe', () => {
+  dsk.aloe.enabled = !dsk.aloe.enabled;
+
+  if (dsk.aloe.enabled) {
+    dsk.localMsg('Aloe Bot: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.aloe.enabled) {
+        await AloeBot();
+        await xDelay(200);
+      }
+    })();
+  } else {
+    dsk.localMsg('Aloe Bot: Desativado', '#f55');
+  }
+});
+
+async function AloeBot() {
+
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
+  // Slots
+  const shovelSlot = item_data.find(el => el?.n?.includes('Shovel'))?.slot;
+  const seedSlot   = item_data.find(el => el?.n?.includes('Seed'))?.slot;
+
+  if (shovelSlot === undefined || seedSlot === undefined) return;
+
+  const allowedWalls = ['Animal Gate','Stone Wall','Tribe Gate','Signpost'];
+  const porta = ['Tribe Gate'];
+
+  const hasWallRight = objects.items.find(el =>
+    el && allowedWalls.includes(el.name) &&
+    el.x === myself.x + 1 && el.y === myself.y
+  );
+
+  const hasWallLeft = objects.items.find(el =>
+    el && porta.includes(el.name) &&
+    el.x === myself.x - 1 && el.y === myself.y
+  );
+
+  // =========================
+  // Funções auxiliares
+  // =========================
+
+  async function repairShovel() {
+    if (myself.dir == 0 && !hasWallRight) {
+      await xDelay(400);
+      await xDoDropByID(0, 621);
+      await xDelay(400);
+      await xDoUseSlotByID(xGetSlotByID(719));
+      await xDelay(400);
+      await xDoMove(myself.x + 1, myself.y);
+      await xDelay(400);
+      await xDoChangeDir(3);
+      await xDelay(400);
+      for (let j = 0; j < 9; j++) {
+        if (!dsk.aloe.enabled) return;
+        await xDoKeyPress(6, 180);
+        await xDelay(800);
+      }
+      await xDoMove(myself.x - 1, myself.y);
+      await xDelay(400);
+      await xDoPickUp();
+      await xDelay(400);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(400);
+      await xDoChangeDir(0);
+      await xDelay(400);
+      await digUntilReady(myself.x, myself.y - 1);
+    }
+    if (myself.dir == 0 && hasWallRight) {
+      await xDelay(400);
+      await xDoDropByID(0, 621);
+      await xDelay(400);
+      await xDoUseSlotByID(xGetSlotByID(719));
+      await xDelay(400);
+      await xDoMove(myself.x - 1, myself.y);
+      await xDelay(400);
+      await xDoChangeDir(1);
+      await xDelay(400);
+      for (let j = 0; j < 9; j++) {
+        if (!dsk.aloe.enabled) return;
+        await xDoKeyPress(6, 180);
+        await xDelay(800);
+      }
+      await xDoMove(myself.x + 1, myself.y);
+      await xDelay(400);
+      await xDoPickUp();
+      await xDelay(400);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(400);
+      await xDoChangeDir(0);
+      await xDelay(400);
+      await digUntilReady(myself.x, myself.y - 1);
+    }
+    if (myself.dir == 2 && !hasWallRight) {
+      await xDelay(400);
+      await xDoDropByID(0, 621);
+      await xDelay(400);
+      await xDoUseSlotByID(xGetSlotByID(719));
+      await xDelay(400);
+      await xDoMove(myself.x + 1, myself.y);
+      await xDelay(400);
+      await xDoChangeDir(3);
+      await xDelay(400);
+      for (let j = 0; j < 9; j++) {
+        if (!dsk.aloe.enabled) return;
+        await xDoKeyPress(6, 180);
+        await xDelay(800);
+      }
+      await xDoMove(myself.x - 1, myself.y);
+      await xDelay(400);
+      await xDoPickUp();
+      await xDelay(400);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(400);
+      await xDoChangeDir(2);
+      await xDelay(400);
+      await digUntilReady(myself.x, myself.y + 1);
+    }
+    if (myself.dir == 2 && hasWallRight) {
+      await xDelay(400);
+      await xDoDropByID(0, 621);
+      await xDelay(400);
+      await xDoUseSlotByID(xGetSlotByID(719));
+      await xDelay(400);
+      await xDoMove(myself.x - 1, myself.y);
+      await xDelay(400);
+      await xDoChangeDir(1);
+      await xDelay(400);
+      for (let j = 0; j < 9; j++) {
+        if (!dsk.aloe.enabled) return;
+        await xDoKeyPress(6, 180);
+        await xDelay(800);
+      }
+      await xDoMove(myself.x + 1, myself.y);
+      await xDelay(400);
+      await xDoPickUp();
+      await xDelay(400);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(400);
+      await xDoChangeDir(2);
+      await xDelay(400);
+      await digUntilReady(myself.x, myself.y + 1);
+    }
+  }
+
+  async function checkShovel() {
+    if (inv[0]?.equip === 2) await repairShovel();
+  }
+
+  function getFrontTile() {
+    if (myself.dir === 1) return {x: myself.x + 1, y: myself.y};
+    if (myself.dir === 3) return {x: myself.x - 1, y: myself.y};
+    if (myself.dir === 0) return {x: myself.x, y: myself.y - 1};
+    if (myself.dir === 2) return {x: myself.x, y: myself.y + 1};
+  }
+
+  function getObstacle(x, y) {
+    return objects.items.find(el =>
+      el && (el.name.includes('Tree') || el.name.includes('Bush') || el.name.includes('Rock')) &&
+      el.x === x && el.y === y
+    );
+  }
+
+  async function clearObstacle(x, y) {
+    let obstacle = getObstacle(x, y);
+    let tries = 0;
+    while (obstacle && tries < 20) {
+      await xDoKeyPress(6, 219);
+      await xDelay(321);
+      obstacle = getObstacle(x, y);
+      tries++;
+    }
+  }
+
+  async function digTile() {
+    await checkShovel();
+    await xDoKeyPress(6, 211);
+    await xDelay(441);
+  }
+
+  async function digUntilReady(x, y) {
+    let tries = 0;
+    while (occupied(x, y) === 0 && tries < 10) {
+      await digTile();
+      await xDelay(350);
+      tries++;
+    }
+  }
+
+  async function plantSeed() {
+    await xDelay(150);
+    await xDoPickUp();
+    await xDelay(100);
+    await xDoUseSlot(seedSlot);
+    await xDelay(110);
+  }
+
+  const front = getFrontTile();
+  const obstacleFront = getObstacle(front.x, front.y);
+
+  // =========================
+  // WALL DIREITA >
+  // =========================
+  if (myself.dir === 1 && hasWallRight) {
+
+    // 1) cavar em cima
+    if (farmOcc(myself.x, myself.y - 1) === 0) {
+      await xDelay(515);
+      await xDoChangeDir(0);
+      await xDelay(418);
+      await xDoUseSlot(shovelSlot);
+      await digUntilReady(myself.x, myself.y - 1);
+      await xDelay(241);
+      await xDoUseSlot(0);
+      await xDelay(141);
+      await xDoUseSlot(1);
+    }
+
+    // 2) limpar bush em baixo
+    await xDelay(423);
+    await xDoChangeDir(2);
+    await xDelay(418);
+    await clearObstacle(myself.x, myself.y + 1);
+
+    // 3) descer e plantar
+    await xDelay(325);
+    await xDoMove(myself.x, myself.y + 1);
+    await xDelay(234);
+    await plantSeed();
+
+    // 4) cavar embaixo (tile destino)
+    if (farmOcc(myself.x, myself.y + 1) === 0) {
+      await xDelay(423);
+      await xDoChangeDir(2);
+      await xDelay(418);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(418);
+      await digUntilReady(myself.x, myself.y + 1);
+      await xDelay(241);
+      await xDoUseSlot(0);
+      await xDelay(141);
+      await xDoUseSlot(1);
+    }
+
+    // virar esquerda
+    await xDelay(349);
+    await xDoChangeDir(3);
+
+    return;
+  }
+
+  // =========================
+  // WALL ESQUERDA < (Tribe Gate — sem plantio, tem piso)
+  // =========================
+  if (myself.dir === 3 && hasWallLeft) {
+
+    // 1) cavar embaixo
+    if (farmOcc(myself.x, myself.y + 1) === 0) {
+      await xDelay(549);
+      await xDoChangeDir(2);
+      await xDelay(418);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(418);
+      await digUntilReady(myself.x, myself.y + 1);
+      await xDelay(241);
+      await xDoUseSlot(0);
+      await xDelay(141);
+      await xDoUseSlot(1);
+    }
+
+    // 3) lógica de drop/pickup na Tribe Gate
+    const gateLeft = objects.items.find(el =>
+      el?.name === 'Tribe Gate' && el.x === myself.x - 1 && el.y === myself.y
+    );
+    if (gateLeft) {
+      const aloe    = item_data.find(el => el?.n?.includes('Aloe'));
+      await xDelay(500);
+      await xDoKeyPress(6, 200);
+      await xDelay(500);
+      await xDoPickUp();
+      await xDelay(500);
+	  await xDoPickUp();
+      await xDelay(500);
+      if (aloe) await xDoDropByID(0, 767);
+      await xDelay(500);
+      const sementeAtual = item_data.find(el => el?.n?.includes('Seed'));
+	  if (sementeAtual && sementeAtual.qty > 50) {
+		const qnts = sementeAtual.qty - 50;
+		await xDelay(500);
+		await xDoDropByID(qnts, 614);
+	}
+      await xDelay(500);
+      await xDoChangeDir(0);
+      await xDelay(500);
+      await xDoKeyPress(6, 200);
+      await xDelay(500);
+      await xDoChangeDir(1);
+    }
+
+    return;
+  }
+
+  // =========================
+  // Movimento normal lateral
+  // =========================
+  if (myself.dir === 1) {
+    if (farmOcc(myself.x, myself.y - 1) === 0) {
+      await xDoChangeDir(0);
+      await xDelay(357);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(418);
+      await digUntilReady(myself.x, myself.y - 1);
+      await xDelay(241);
+      await xDoUseSlot(0);
+      await xDelay(141);
+      await xDoUseSlot(1);
+      await xDoChangeDir(1);
+    }
+  } else if (myself.dir === 3) {
+    if (farmOcc(myself.x, myself.y + 1) === 0) {
+      await xDoChangeDir(2);
+      await xDelay(418);
+      await xDoUseSlot(shovelSlot);
+      await xDelay(418);
+      await digUntilReady(myself.x, myself.y + 1);
+      await xDelay(241);
+      await xDoUseSlot(0);
+      await xDelay(141);
+      await xDoUseSlot(1);
+      await xDoChangeDir(3);
+    }
+  } else {
+    if (farmOcc(front.x, front.y) === 0) {
+      await xDelay(418);
+      await xDoUseSlot(shovelSlot);
+      await digUntilReady(front.x, front.y);
+      await xDelay(241);
+      await xDoUseSlot(0);
+      await xDelay(141);
+      await xDoUseSlot(1);
+    }
+  }
+
+  // =========================
+  // Obstáculo à frente
+  // =========================
+  if (obstacleFront) {
+    await xDoKeyPress(6, 239);
+    await xDelay(213);
+    return;
+  }
+
+  // mover e plantar normalmente
+  await xDoMove(front.x, front.y);
+  await xDelay(237);
   await plantSeed();
 }
 
@@ -5173,7 +5960,6 @@ async function xGetShiny() {
   if (!myself || game_state !== 2) return;
   xTemp[170] = undefined;
   for (let i in objects.items) {
-	await xDelay(0);
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0 || obj.name !== 'Shiny Rock') continue;
 	if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
@@ -5201,7 +5987,6 @@ async function xGetSSDStone() {
   xTemp[172] = undefined;
   const rockSprites = [-261, -618];
   for (let i in objects.items) {
-	await xDelay(0);
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0) continue;
     // verifica por nome OU por sprite
@@ -6419,6 +7204,7 @@ async function rotRun() {
     skillName    = 'cooking';
     cookPositionX = 112;
     cookPositionY = 278;
+	skillLevel = 0;
     dsk.cooking.enabled = true;
     dsk.localMsg(`Rotation → Cook até nível ${currentLevel}`, '#5f5');
 
@@ -8916,8 +9702,241 @@ dsk.setCmd('/wood', () => {
   }
 });
 
-// ── MINE BOT ──────────────────────────────────────────────────
 
+
+// ── Helpers internos ──────────────────────────────────────────
+
+function retnum(str) {
+  const match = str.match(/\((\d)\)/);
+  return match ? parseInt(match[1]) : 0;
+}
+
+function whatChatHas(text) {
+  for (let i in jv.chat_box.lines) {
+    if (jv.chat_box.lines[i].text.indexOf(text) !== -1) {
+      return jv.chat_box.lines[i].text;
+    }
+  }
+  return '';
+}
+
+function xGetItemByPos(x, y) {
+  for (let i in objects.items) {
+    const obj = objects.items[i];
+    if (obj && obj.can_pickup === 1 && obj.x === x && obj.y === y) {
+      return obj;
+    }
+  }
+  return undefined;
+}
+
+// checkPosition(n): retorna true se o pathfinder ainda está em movimento
+// (impede ação enquanto o personagem não chegou)
+function checkPosition(n) {
+  return xMovingNow;
+}
+
+
+// ── Funções de transformação de runas ─────────────────────────
+
+function sortTransformLetter(str) {
+  let result = '';
+  const matches = str.match(/\b(\w+)\((\d)\)/g) || [];
+  for (const m of matches) {
+    const parts = m.match(/\b(\w+)\((\d)\)/);
+    result += parts[1].charAt(0).toUpperCase();
+  }
+  return result;
+}
+
+function sortTransformNumber(str) {
+  const matches = str.match(/\b(\w+)\((\d)\)/g) || [];
+  const count = matches.length;
+  let sum = 0;
+  for (const m of matches) {
+    const parts = m.match(/\b(\w+)\((\d)\)/);
+    sum += parseInt(parts[2]);
+  }
+  return count * 3 - sum;
+}
+
+function sortGeneratePermutationsLetters(str) {
+  const results = [];
+  function permute(s, start) {
+    if (start === s.length) { results.push(s); return; }
+    for (let i = start; i < s.length; i++) {
+      const arr = s.split('');
+      [arr[start], arr[i]] = [arr[i], arr[start]];
+      permute(arr.join(''), start + 1);
+    }
+  }
+  permute(str, 0);
+  return results;
+}
+
+// ── Lógica principal ───────────────────────────────────────────
+
+window.sortDoTrash = true;
+
+async function SortFooders() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
+  // Pegar item mais próximo nas posições 
+  if (inv[0].sprite === undefined) {
+    let closest = undefined;
+    let closestDist = Infinity;
+
+    for (let x = 113; x <= 126; x++) {
+      for (let y = 290; y <= 291; y++) {
+        const item = xGetItemByPos(x, y);
+        if (item !== undefined) {
+          const dist = Math.sqrt(Math.pow(myself.x - x, 2) + Math.pow(myself.y - y, 2));
+          if (dist < closestDist) {
+            closest = item;
+            closestDist = dist;
+          }
+        }
+      }
+    }
+
+    if (!closest) return;
+
+    // Tenta chegar e pegar — até 6 tentativas
+    xDoMove(closest.x, closest.y);
+    for (let attempt = 0; attempt < 6; attempt++) {
+      await xDelay(900);
+      if (myself.still() && !checkPosition(50)) {
+        xDoPickUp();
+        await xDelay(700);
+        xDoUseSlot(0);
+        await xDelay(700);
+        break;
+      }
+      await xDelay(700);
+    }
+  }
+
+  // ── Processa chat com resultado do robe ───────────────────────
+  if (xIfChatHas("You wear the Noble Jacket")) {
+    const fullLine = whatChatHas("You wear the Noble Jacket");
+    xDoClearChat("You wear the Noble Jacket");
+
+    const defIdx = fullLine.indexOf("def");
+    const runeStr = fullLine.substring(defIdx + 4);
+
+    if (runeStr !== "") {
+      sortDoTrash = false;
+
+      const allCombos = [
+        "A","S","H","G","R",
+        "AS","AH","AG","AR","SH","SG","SR","HG","HR","GR",
+        "ASH","ASG","ASR","AHG","AHR","AGR","SHG","SHR","SGR","HGR",
+        "ASHG","ASHR","AHGR","ASGR","SHGR","ASHGR"
+      ];
+
+      const runeLetters = sortTransformLetter(runeStr);
+      const runeNumber  = sortTransformNumber(runeStr);
+
+      let targetX = 117, targetY = 300; // default: Trash
+
+      for (const combo of allCombos) {
+        if (sortGeneratePermutationsLetters(combo).includes(runeLetters)) {
+          const n  = retnum(runeStr);
+          const rn = runeNumber;
+
+          switch (combo) {
+            // ── Runas simples (A/S/H/G/R) por nível 1-5 ──────────
+            case "A": targetX=112; targetY=292+n; break;
+            case "S": targetX=113; targetY=292+n; break;
+            case "H": targetX=114; targetY=292+n; break;
+            case "G": targetX=115; targetY=292+n; break;
+            case "R": targetX=116; targetY=292+n; break;
+
+            // ── Combinações duplas (sem "1" e rn<=0) ──────────────
+            case "AH": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?293:300; break;
+            case "AR": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?294:300; break;
+            case "SH": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?295:300; break;
+            case "SG": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?296:300; break;
+            case "SR": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?297:300; break;
+            case "HG": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?293:300; break;
+            case "HR": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?294:300; break;
+            case "GR": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?295:300; break;
+
+            // ── Combinações triplas/quádruplas (rn<=0) ────────────
+            case "SHG":   targetX=119; targetY=rn<=0?296:300; break;
+            case "SHR":   targetX=119; targetY=rn<=0?297:300; break;
+            case "SGR":   targetX=120; targetY=rn<=0?293:300; break;
+            case "HGR":   targetX=120; targetY=rn<=0?294:300; break;
+            case "ASHG":  targetX=120; targetY=rn<=0?295:300; break;
+            case "ASHR":  targetX=120; targetY=rn<=0?296:300; break;
+            case "AHGR":  targetX=120; targetY=rn<=0?297:300; break;
+            case "ASGR":  targetX=121; targetY=rn<=0?293:300; break;
+            case "SHGR":  targetX=121; targetY=rn<=0?294:300; break;
+            case "ASHGR": targetX=121; targetY=rn<=0?295:300; break;
+
+            default: targetX=117; targetY=300; break;
+          }
+          break;
+        }
+      }
+
+      xDoMove(targetX, targetY);
+
+      // Tenta dropar — até 7 tentativas
+      for (let attempt = 0; attempt < 7; attempt++) {
+        await xDelay(1300);
+        if (myself.still() && !checkPosition(50)) {
+          await xDelay(850);
+          xDoDropSlot(0, 1);
+          await xDelay(800);
+          if (dsk.sort.enabled) SortFooders();
+          return;
+        }
+        await xDelay(800);
+      }
+
+    } else {
+      // runeStr vazio → vai para o Trash
+      xDoMove(117, 300);
+      for (let attempt = 0; attempt < 8; attempt++) {
+        await xDelay(1300);
+        if (myself.still()) {
+          await xDelay(850);
+          xDoDropSlot(0, 1);
+          await xDelay(800);
+          if (dsk.sort.enabled) SortFooders();
+          return;
+        }
+        await xDelay(800);
+      }
+    }
+
+  } else {
+    // Não tem mensagem do robe ainda — aguarda
+    await xDelay(800);
+    if (dsk.sort.enabled) SortFooders();
+  }
+}
+
+// ── Objeto e comandos ──────────────────────────────────────────
+
+dsk.sort = { enabled: false };
+
+dsk.setCmd('/sort', () => {
+  dsk.sort.enabled = !dsk.sort.enabled;
+
+  if (dsk.sort.enabled) {
+    sortDoTrash = true;
+    dsk.localMsg('Sort Fooders: Ativado', '#5f5');
+    SortFooders();
+  } else {
+    dsk.localMsg('Sort Fooders: Desativado', '#f55');
+  }
+});
+
+
+// ── MINE BOT ──────────────────────────────────────────────────
 dsk.mine = { enabled: false, targetName: undefined };
 window.xMiningActive = false;
 
@@ -9095,6 +10114,7 @@ dsk.menu.items.push(
   { label: 'Zoom 1.5x',     state: () => dsk.zoom?.enabled,       toggle: () => dsk.commands['/zoom']()       },
   { label: 'Color Picker',  state: () => cp?.visible,             toggle: () => dsk.commands['/colorpicker']()},
   { label: 'Buy (via /buy N)', state: () => false,                toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+  { label: 'Sort Fooders', state: () => dsk.sort?.enabled,        toggle: () => dsk.commands['/sort']() },
 );
 dsk.menu.rebuild();
 //check bot para aplicar o delay e não da packet spam
@@ -9121,6 +10141,19 @@ dsk.checkBotActive = () => {
 dsk.on('postLoop', () => {
   dsk.botActive = dsk.checkBotActive();
 });
+
+dsk.menu.addChild(dsk.menu.pageLabel);
+
+// Botão Discord dentro do menu
+dsk.menu.btnDiscord = jv.Button.create(0, 0, 100, '💬 Discord', dsk.menu, 22);
+jv.bottom(dsk.menu.btnDiscord, 4);
+dsk.menu.btnDiscord.x = 4;
+dsk.menu.btnDiscord.title.style.fill = 0x7289DA;
+dsk.menu.btnDiscord.on_click = () => {
+  window.open('https://discord.gg/XkVhYENK7k', '_blank');
+};
+
+dsk.menu.addChild(dsk.menu.pageLabel);
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
 
