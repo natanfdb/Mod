@@ -10222,18 +10222,66 @@ dsk.on('postLoop', () => {
   dsk.botActive = dsk.checkBotActive();
 });
 
-dsk.menu.addChild(dsk.menu.pageLabel);
+// Criar botão
+dsk.menu.btnDiscord = jv.Button.create(0, 0, 140, '💬 DISCORD', dsk.menu, 22);
 
-// Botão Discord dentro do menu
-dsk.menu.btnDiscord = jv.Button.create(0, 0, 100, '💬 Discord', dsk.menu, 22);
+// Posição
 jv.bottom(dsk.menu.btnDiscord, 4);
 dsk.menu.btnDiscord.x = 4;
-dsk.menu.btnDiscord.title.style.fill = 0x7289DA;
-dsk.menu.btnDiscord.on_click = () => {
-  window.open('https://discord.gg/XkVhYENK7k', '_blank');
+
+// ===== ESTILO =====
+const style = dsk.menu.btnDiscord.title.style;
+
+// Texto verde neon
+style.fill = 0x00ff99;
+style.fontWeight = 'bold';
+
+// Glow (sombra)
+style.dropShadow = true;
+style.dropShadowColor = '#00ff99';
+style.dropShadowBlur = 8;
+style.dropShadowDistance = 0;
+
+// Fundo do botão (se tiver suporte)
+if (dsk.menu.btnDiscord.bg) {
+  dsk.menu.btnDiscord.bg.tint = 0x0a0a0a; // fundo escuro
+}
+
+// Borda fake (hacky style)
+dsk.menu.btnDiscord.lineStyle?.(2, 0x00ff99, 1);
+
+// ===== HOVER (PC) =====
+dsk.menu.btnDiscord.on_over = () => {
+  dsk.menu.btnDiscord.scale.set(1.05);
 };
 
-dsk.menu.addChild(dsk.menu.pageLabel);
+dsk.menu.btnDiscord.on_out = () => {
+  dsk.menu.btnDiscord.scale.set(1);
+};
+
+// ===== CLICK =====
+dsk.menu.btnDiscord.on_click = () => {
+  const url = 'https://discord.gg/XkVhYENK7k';
+
+  // efeito clique
+  dsk.menu.btnDiscord.scale.set(0.95);
+  setTimeout(() => dsk.menu.btnDiscord.scale.set(1), 100);
+
+  // MOBILE FRIENDLY
+  try {
+    const win = window.open(url, '_blank');
+
+    // fallback se bloquear
+    if (!win) {
+      window.location.href = url;
+    }
+  } catch (e) {
+    window.location.href = url;
+  }
+};
+
+// Adicionar ao menu
+dsk.menu.addChild(dsk.menu.btnDiscord);
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
 
