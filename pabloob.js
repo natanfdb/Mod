@@ -10261,7 +10261,7 @@ dsk.menu.btnDiscord.on_out = () => {
 
 // ===== CLICK =====
 dsk.menu.btnDiscord.on_click = () => {
-  const url = 'https://discord.gg/XkVhYENK7k';
+  const url = 'https://discord.com/invite/XkVhYENK7k';
 
   // efeito clique
   dsk.menu.btnDiscord.scale.set(0.95);
