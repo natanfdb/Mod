@@ -10223,7 +10223,7 @@ dsk.on('postLoop', () => {
 });
 
 // Criar botão
-dsk.menu.btnDiscord = jv.Button.create(0, 0, 140, '💬 DISCORD', dsk.menu, 22);
+dsk.menu.btnDiscord = jv.Button.create(0, 0, 110, '💬 DISCORD', dsk.menu, 22);
 
 // Posição
 jv.bottom(dsk.menu.btnDiscord, 4);
