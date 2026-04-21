@@ -758,6 +758,27 @@ dsk.discord.saveConfig = () => {
   } catch(e) {}
 };
 
+dsk.setCmd('/setwebook', (context) => {
+  // /setwebook global https://discord.com/api/webhooks/...
+  const parts = context.trim().split(' ');
+  const tipo  = parts[0]; // global, tribe, death, respawn, who
+  const url   = parts[1];
+
+  const keys = {
+    global: 'globalUrl', tribe: 'tribeUrl',
+    death: 'deathUrl', respawn: 'respawnUrl', who: 'whoUrl'
+  };
+
+  if (!keys[tipo] || !url?.includes('discord.com/api/webhooks/')) {
+    dsk.localMsg('Uso: /setwebook global|tribe|death|respawn|who <url>', '#ff0');
+    return;
+  }
+
+  dsk.discord[keys[tipo]] = url;
+  dsk.discord.saveConfig();
+  dsk.localMsg(`Webhook ${tipo}: atualizado!`, '#5f5');
+});
+
 // Carrega ao iniciar
 dsk.discord.loadConfig();
 
