@@ -758,6 +758,27 @@ dsk.discord.saveConfig = () => {
   } catch(e) {}
 };
 
+dsk.setCmd('/setwebook', (context) => {
+  // /setwebook global https://discord.com/api/webhooks/...
+  const parts = context.trim().split(' ');
+  const tipo  = parts[0]; // global, tribe, death, respawn, who
+  const url   = parts[1];
+
+  const keys = {
+    global: 'globalUrl', tribe: 'tribeUrl',
+    death: 'deathUrl', respawn: 'respawnUrl', who: 'whoUrl'
+  };
+
+  if (!keys[tipo] || !url?.includes('discord.com/api/webhooks/')) {
+    dsk.localMsg('Uso: /setwebook global|tribe|death|respawn|who <url>', '#ff0');
+    return;
+  }
+
+  dsk.discord[keys[tipo]] = url;
+  dsk.discord.saveConfig();
+  dsk.localMsg(`Webhook ${tipo}: atualizado!`, '#5f5');
+});
+
 // Carrega ao iniciar
 dsk.discord.loadConfig();
 
@@ -7137,6 +7158,16 @@ window.rotationConfig = window.rotationConfig ?? {
   skipHammer:  false,
   skipArmas:   false,
   skipDestru:  false,
+  // ── Posições ──────────────────────────────────────────────
+  pos: {
+    cook:   { x: 112, y: 278 },
+    smelt:  { x: 112, y: 275 },
+    sword:  { x: 115, y: 279 },
+    hammer: { x: 119, y: 280 },
+    armas:  { x: 114, y: 280 }, // posição de combate (segunda do step)
+    armasPick: { x: 117, y: 280 }, // posição de pegar itens (primeira)
+    destru: { x: 124, y: 281 },
+  },
 };
 
 dsk.rotation = { enabled: false, step: '-', phase: '-' };
@@ -7197,13 +7228,13 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo para Cook...', '#0ff');
-    await rotMoveTo(112, 278);
+    await rotMoveTo(rotationConfig.pos.cook.x, rotationConfig.pos.cook.y);
 
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.cookLevel;
     skillName    = 'cooking';
-    cookPositionX = 112;
-    cookPositionY = 278;
+    cookPositionX = rotationConfig.pos.cook.x;
+    cookPositionY = rotationConfig.pos.cook.y;
 	skillLevel = 0;
     dsk.cooking.enabled = true;
     dsk.localMsg(`Rotation → Cook até nível ${currentLevel}`, '#5f5');
@@ -7237,7 +7268,7 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo para Smelt...', '#0ff');
-    await rotMoveTo(112, 275);
+    await rotMoveTo(rotationConfig.pos.smelt.x, rotationConfig.pos.smelt.y);
 
     for (const id of [539, 538]) {
       if (xGetSlotByID(id) !== undefined) {
@@ -7250,8 +7281,8 @@ async function rotRun() {
     dsk.rotation.phase = 'bot';
     currentLevel  = rotationConfig.smeltLevel;
     skillName     = 'smelting';
-    smeltPositionX = 112;
-    smeltPositionY = 275;
+    smeltPositionX = rotationConfig.pos.smelt.x;
+    smeltPositionY = rotationConfig.pos.smelt.y;
 	skillLevel = 0;
     dsk.smelting.enabled = true;
     dsk.localMsg(`Rotation → Smelt até nível ${currentLevel}`, '#5f5');
@@ -7285,7 +7316,7 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo buscar espada...', '#0ff');
-    await rotMoveTo(115, 279);
+    await rotMoveTo(rotationConfig.pos.sword.x, rotationConfig.pos.sword.y);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
@@ -7327,7 +7358,7 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo buscar martelo...', '#0ff');
-    await rotMoveTo(119, 280);
+    await rotMoveTo(rotationConfig.pos.hammer.x, rotationConfig.pos.hammer.y);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
@@ -7369,10 +7400,10 @@ async function rotRun() {
     dsk.rotation.phase = 'nav';
 
     dsk.localMsg('Rotation → indo buscar armas...', '#0ff');
-    await rotMoveTo(117, 280);
+    await rotMoveTo(rotationConfig.pos.armasPick.x, rotationConfig.pos.armasPick.y);
     for (let p = 0; p < 6; p++) { await xDoPickUp(); await xDelay(200); }
     if (inv[0]?.sprite && inv[0].equip === 0) { await xDoUseSlot(0); await xDelay(500); }
-    await rotMoveTo(114, 280);
+    await rotMoveTo(rotationConfig.pos.armas.x, rotationConfig.pos.armas.y);
     await xDelay(500);
     await xDoChangeDir(0);
     await xDelay(500);
@@ -7417,7 +7448,7 @@ async function rotRun() {
     dsk.rotation.step  = 'destru';
     dsk.rotation.phase = 'nav';
 
-    await rotMoveTo(124, 281);
+    await rotMoveTo(rotationConfig.pos.destru.x, rotationConfig.pos.destru.y);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
@@ -7438,8 +7469,8 @@ async function rotRun() {
 	}
     await xDelay(500);
 
-    destructPosX = 124;
-    destructPosY = 281;
+    destructPosX = rotationConfig.pos.destru.x;
+    destructPosY = rotationConfig.pos.destru.y;
 
     dsk.rotation.phase = 'bot';
     skillName    = 'destruction';
@@ -7474,7 +7505,7 @@ async function rotRun() {
 
 // ── Config Panel ──────────────────────────────────────────────
 
-dsk.rotManager = jv.Dialog.create(250, 350);
+dsk.rotManager = jv.Dialog.create(250, 416);
 const rm = dsk.rotManager;
 rm.visible = false;
 
@@ -7573,37 +7604,86 @@ dsk.on('postLoop', () => {
   lblAlvo.text  = `Alvo: ${rotationConfig[alvoMap[r.step]] ?? '-'}`;
   lblOn.text    = r.enabled ? '● ON' : '○ OFF';
   lblOn.style.fill = r.enabled ? 0x44ff44 : 0xff4444;
-  btnToggle.title.text = r.enabled ? '⏹ Desligar' : '▶ Ligar';
-	valCook.text   = String(rotationConfig.cookLevel);
-	valSmelt.text  = String(rotationConfig.smeltLevel);
-	valSword.text  = String(rotationConfig.swordLevel);
-	valHammer.text = String(rotationConfig.hammerLevel);
-	valArmas.text  = String(rotationConfig.armasLevel);
-	valDestru.text = String(rotationConfig.destruLevel);
 });
 
-const btnToggle = jv.Button.create(10, 300, 230, '▶ Ligar Rotation', rm, 22);
-btnToggle.on_click = () => dsk.commands['/rotation']();
 
-const btnReset = jv.Button.create(10, 320, 230, '↺ Reiniciar', rm, 22);
-btnReset.on_click = () => {
-	dsk.cooking.enabled     = false;
-	dsk.smelting.enabled    = false;
-	dsk.sword.enabled       = false;
-	dsk.hammer.enabled      = false;
-	dsk.armas.enabled       = false;
-	dsk.destruction.enabled = false;
-	dsk.rotation.step    = '-';
-	dsk.rotation.phase   = '-';
-	xGoing[0]   = false;
-	xGoing[1]   = false;
-	xGoing[2]   = false;
-	xGoing[110] = false;
-	xGoing[112] = false;
-	xGoing[113] = false;
-	xDoKeyUp(6);
-	dsk.localMsg('Rotation: resetado', '#ff0');
+
+// ── Seção de posições ─────────────────────────────────────────
+const rmPosLbl = jv.text('── Posições (clique para capturar) ──', {
+  font: '9px Verdana', fill: 0xaaaaaa, stroke: 0x000000, strokeThickness: 2,
+});
+rmPosLbl.x = 10; rmPosLbl.y = 270;
+rm.addChild(rmPosLbl);
+
+const rmPosSteps = [
+  { key: 'cook',      label: 'Cook'      },
+  { key: 'smelt',     label: 'Smelt'     },
+  { key: 'sword',     label: 'Sword'     },
+  { key: 'hammer',    label: 'Hammer'    },
+  { key: 'armasPick', label: 'Armas Pick' },
+  { key: 'armas',     label: 'Armas Luta' },
+  { key: 'destru',    label: 'Destru'    },
+];
+
+rm.posLabels = {};
+
+rmPosSteps.forEach(({ key, label }, i) => {
+  const col = i % 2;       // 0 = esquerda, 1 = direita
+  const row = Math.floor(i / 2);
+  const bx  = col === 0 ? 4 : 126;
+  const by  = 282 + row * 26;
+
+  const btn = jv.Button.create(bx, by, 118, '', rm, 20);
+
+  const lbl = jv.text(`${label}: (${rotationConfig.pos[key].x},${rotationConfig.pos[key].y})`, {
+    font: '9px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2,
+  });
+  lbl.x = 4; lbl.y = 4;
+  btn.addChild(lbl);
+  rm.posLabels[key] = lbl;
+
+  btn.on_click = () => {
+    if (!myself) return;
+    rotationConfig.pos[key].x = myself.x;
+    rotationConfig.pos[key].y = myself.y;
+    lbl.text = `${label}: (${myself.x},${myself.y})`;
+    dsk.localMsg(`Rotation: ${label} → (${myself.x},${myself.y})`, '#0ff');
+    // Salva no localStorage
+    try {
+      localStorage.setItem('dsk_rotation_pos', JSON.stringify(rotationConfig.pos));
+    } catch(e) {}
+  };
+});
+
+// Botão para resetar posições para o padrão
+const btnResetPos = jv.Button.create(10, 386, 230, '↺ Resetar Posições', rm, 20);
+btnResetPos.on_click = () => {
+  rotationConfig.pos = {
+    cook:     { x: 112, y: 278 },
+    smelt:    { x: 112, y: 275 },
+    sword:    { x: 115, y: 279 },
+    hammer:   { x: 119, y: 280 },
+    armas:    { x: 114, y: 280 },
+    armasPick:{ x: 117, y: 280 },
+    destru:   { x: 124, y: 281 },
+  };
+  try { localStorage.removeItem('dsk_rotation_pos'); } catch(e) {}
+  // Atualiza labels
+  rmPosSteps.forEach(({ key, label }) => {
+    rm.posLabels[key].text = `${label}: (${rotationConfig.pos[key].x},${rotationConfig.pos[key].y})`;
+  });
+  dsk.localMsg('Rotation: posições resetadas para padrão', '#ff0');
 };
+
+// Carrega posições salvas ao iniciar
+try {
+  const saved = JSON.parse(localStorage.getItem('dsk_rotation_pos') || '{}');
+  Object.keys(saved).forEach(k => {
+    if (rotationConfig.pos[k]) {
+      rotationConfig.pos[k] = saved[k];
+    }
+  });
+} catch(e) {}
 
 dsk.setCmd('/rotationconfig', () => {
   rm.visible = !rm.visible;
