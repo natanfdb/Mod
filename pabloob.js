@@ -726,7 +726,7 @@ dsk.setCmd('/craft', () => {
     });
     playBtn.onclick = () => {
       dsk.commands['/craft']();
-      setTimeout(updatePlayBtn, 150);
+      setTimeout(updatePlayBtn, 100);
     };
     updatePlayBtn();
     body.appendChild(playBtn);
@@ -1020,7 +1020,6 @@ dsk.invManager.updateSlots = () => {
   }
 };
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
-
 dsk.dias = {
     global: "https://discord.com/api/webhooks/1480829602791428098/H9pG9tZQitytoVLlmAD5pv3s_Yr0QOG88AbhFZWykDWIMYOTXOarRdOUCzDBO50Lag99"
   };
@@ -1050,6 +1049,7 @@ dsk.dias = {
       }
     } catch(e) { console.log('dsk.dias error:', e); }
   }
+
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
@@ -2322,11 +2322,11 @@ dsk.craft.loop = async () => {
 
     if (game_state == 2) {
       send({ type: "bld", tpl: craftConfig.tpl });
-      await dsk.wait(150);
+      await dsk.wait(100);
     }
 
 
-    await dsk.wait(50); // proteção anti-freeze
+    await dsk.wait(15); // proteção anti-freeze
   }
 };
 
@@ -3597,6 +3597,50 @@ dsk.setCmd('/skills', () => {
     updateSkipBtn();
     skipRow.appendChild(skipLbl); skipRow.appendChild(skipBtn);
     body.appendChild(skipRow);
+	
+	// ── Skill HUD toggle (/skills) ─────────────────────────────
+	const skillRow = document.createElement('div');
+	Object.assign(skillRow.style, {
+	  background: '#2a2a3e', borderRadius: '7px',
+	  padding: '7px 10px', display: 'flex',
+	  alignItems: 'center', justifyContent: 'space-between',
+	});
+
+	const skillLbl = document.createElement('span');
+	skillLbl.textContent = 'Skill HUD';
+	Object.assign(skillLbl.style, { color: '#ddd', fontSize: '11px' });
+
+	const skillBtn = document.createElement('button');
+
+	function updateSkillBtn() {
+	  const on = !!dsk.skillHud?.enabled;
+	  skillBtn.textContent = on ? '👁️ Esconder' : '👁️ Mostrar';
+	  skillBtn.style.borderColor = on ? '#5f5' : '#f55';
+	  skillBtn.style.color       = on ? '#5f5' : '#f55';
+	}
+
+	Object.assign(skillBtn.style, {
+	  padding: '3px 12px', borderRadius: '5px', border: '1px solid #f55',
+	  background: '#1a1a2e', color: '#f55', cursor: 'pointer', fontSize: '11px',
+	});
+
+	skillBtn.onclick = () => {
+	  // mesma lógica do /skills
+	  dsk.skillHud.enabled = !dsk.skillHud.enabled;
+	  dsk.skillHud.label.visible = dsk.skillHud.enabled;
+
+	  updateSkillBtn();
+
+	  dsk.localMsg(
+		`Skill HUD: ${dsk.skillHud.enabled ? 'Ativado' : 'Desativado'}`,
+		dsk.skillHud.enabled ? '#5f5' : '#f55'
+	  );
+	};
+
+	updateSkillBtn();
+	skillRow.appendChild(skillLbl);
+	skillRow.appendChild(skillBtn);
+	body.appendChild(skillRow);
 
 
     acmPanel.appendChild(header);
@@ -4734,56 +4778,73 @@ dsk.on('postLoop', dsk.menu.updatePosition);
 
 // Lista de bots com referência ao objeto de estado
 dsk.menu.items = [
-        { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
-    { label: 'Skills',             state: () => !!dsk.skillHud?.enabled,       toggle: () => dsk.commands['/skills']() },
-    { label: 'Skills Config',      state: () => !!dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
-    { label: 'Cooking',            state: () => !!dsk.cooking?.enabled,        toggle: () => dsk.commands['/cook']() },
-    { label: 'Smelting',           state: () => !!dsk.smelting?.enabled,       toggle: () => dsk.commands['/smelt']() },
-    { label: 'Farming',            state: () => !!dsk.farm?.enabled,           toggle: () => dsk.commands['/farm']() },
-    { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
-    { label: 'Sword',              state: () => !!dsk.sword?.enabled,          toggle: () => dsk.commands['/sword']() },
-    { label: 'Hammer',             state: () => !!dsk.hammer?.enabled,         toggle: () => dsk.commands['/hammer']() },
-    { label: 'Armas Bot',          state: () => !!dsk.armas?.enabled,          toggle: () => dsk.commands['/armas']() },
-    { label: 'Destruction',        state: () => !!dsk.destruction?.enabled,    toggle: () => dsk.commands['/destru']() },
-    { label: 'Craft Config',        state: () => !!dsk.craftManager?.visible,   toggle: () => dsk.commands['/craftconfig']() },
-    { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
-    { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
-    { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
-    { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
-    { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
-        { label: '⛏️ Mine Hub',        state: () => !!window.minm?.visible,  toggle: () => dsk.commands['/minehub']() },
-        { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
-    { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
-    { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
-    { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
-    { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
-    { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
-    { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
-    { label: 'Auto Explo',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
-    { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
-    { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
-    { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
-    { label: 'Rotation Config',    state: () => !!rm?.visible,                 toggle: () => dsk.commands['/rotationconfig']() },
-    { label: 'Reconnect',          state: () => !!dsk.reconnect?.enabled,      toggle: () => dsk.commands['/reconnect']() },
-    { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
-    { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
-    { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
-    { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
-    { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
-    { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
-    { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
-    { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
-    { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
-    { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
-    { label: 'Hide Name',          state: () => !!dsk.hide?.enabled,           toggle: () => dsk.commands['/hide']() },
-    { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
-    { label: 'Zoom 1.5x',          state: () => !!dsk.zoom?.enabled,           toggle: () => dsk.commands['/zoom']() },
-    { label: 'Color Picker',       state: () => !!cp?.visible,                 toggle: () => dsk.commands['/colorpicker']() },
-    { label: 'Top Skill Calc',     state: () => !!tscD?.visible,               toggle: () => dsk.commands['/topskill']() },
-    { label: 'Discord Config',     state: () => !!dcm?.visible,                toggle: () => dsk.commands['/discordconfig']() },
-    { label: 'Discord',            state: () => !!dsk.discord?.enabled,        toggle: () => dsk.commands['/discord']() },
-    { label: 'Buy (use /buy N)',   state: () => false,                          toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
 
+  // ─── ⚔️ Skills ────────────────────────────────────────────
+  { type: 'section', label: '⚔️  Skills' },
+  { label: 'Skills',             state: () => !!dsk.skillHud?.enabled,       toggle: () => dsk.commands['/skills']() },
+  { label: 'Skills Config',      state: () => !!dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
+  { label: 'Armas Bot',          state: () => !!dsk.armas?.enabled,          toggle: () => dsk.commands['/armas']() },
+  { label: 'Craft Config',       state: () => !!dsk.craftManager?.visible,   toggle: () => dsk.commands['/craftconfig']() },
+  { label: 'Destruction',        state: () => !!dsk.destruction?.enabled,    toggle: () => dsk.commands['/destru']() },
+  { label: 'Top Skill Calc',     state: () => !!(typeof tscD !== 'undefined' && tscD?.visible),               toggle: () => dsk.commands['/topskill']() },
+
+  // ─── 🗡️ Hunt ─────────────────────────────────────────────
+  { type: 'section', label: '🗡️  Hunt' },
+  { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
+  { label: 'Rotation Config',    state: () => !!(typeof rm !== 'undefined' && rm?.visible),                 toggle: () => dsk.commands['/rotationconfig']() },
+  { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
+  { label: 'Auto Explo',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
+  { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
+  { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
+  { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
+  { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
+  { label: 'Sword',              state: () => !!dsk.sword?.enabled,          toggle: () => dsk.commands['/sword']() },
+  { label: 'Hammer',             state: () => !!dsk.hammer?.enabled,         toggle: () => dsk.commands['/hammer']() },
+
+  // ─── ⛏️ Recursos ─────────────────────────────────────────
+  { type: 'section', label: '⛏️  Recursos' },
+  { label: '⛏️ Mine Hub',        state: () => !!(window.minm?.visible),        toggle: () => dsk.commands['/minehub']() },
+  { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
+  { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
+  { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
+  { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
+  { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
+  { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
+  { label: 'Farming',            state: () => !!dsk.farm?.enabled,           toggle: () => dsk.commands['/farm']() },
+  { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
+  { label: 'Cooking',            state: () => !!dsk.cooking?.enabled,        toggle: () => dsk.commands['/cook']() },
+  { label: 'Smelting',           state: () => !!dsk.smelting?.enabled,       toggle: () => dsk.commands['/smelt']() },
+  { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
+  { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
+  { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
+  { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
+
+  // ─── 🛠️ Utilidades ───────────────────────────────────────
+  { type: 'section', label: '🛠️  Utilidades' },
+  { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
+  { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
+  { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
+  { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
+  { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
+  { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
+  { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
+  { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
+  { label: 'Hide Name',          state: () => !!dsk.hide?.enabled,           toggle: () => dsk.commands['/hide']() },
+  { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
+  { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
+  { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
+  { label: 'Zoom 1.5x',          state: () => !!dsk.zoom?.enabled,           toggle: () => dsk.commands['/zoom']() },
+  { label: 'Reconnect',          state: () => !!dsk.reconnect?.enabled,      toggle: () => dsk.commands['/reconnect']() },
+
+  // ─── ⚙️ Config / UI ──────────────────────────────────────
+  { type: 'section', label: '⚙️  Config / UI' },
+  { label: 'Color Picker',       state: () => !!(typeof cp !== 'undefined' && cp?.visible),                 toggle: () => dsk.commands['/colorpicker']() },
+  { label: 'Discord Config',     state: () => !!(typeof dcm !== 'undefined' && dcm?.visible),                toggle: () => dsk.commands['/discordconfig']() },
+  { label: 'Discord',            state: () => !!dsk.discord?.enabled,        toggle: () => dsk.commands['/discord']() },
+  { label: 'Hub Button',         state: () => !!hubBtnVisible,               toggle: () => dsk.commands['/menu']() },
+  { label: 'Death Tracker',      state: () => !!dsk.deathManager?.visible,   toggle: () => dsk.commands['/deathtracker']() },
+  { label: 'Loot Tracker',       state: () => !!mineHubLoot?.enabled,        toggle: () => dsk.commands['/loottracker']() },
+  { label: 'Buy (use /buy N)',   state: () => false,                         toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
 
 ];
 
@@ -4826,17 +4887,35 @@ dsk.menu.rebuild = () => {
   dsk.menu.btns.forEach(b => dsk.menu.removeChild(b));
   dsk.menu.btns = [];
 
-
   const start = dsk.menu.page * dsk.menu.perPage;
   const slice = dsk.menu.items.slice(start, start + dsk.menu.perPage);
   const maxPage = Math.ceil(dsk.menu.items.length / dsk.menu.perPage);
 
+  let yOffset = 35;
 
-  slice.forEach((item, i) => {
+  slice.forEach((item) => {
+
+    // ── SEPARADOR DE SEÇÃO ──────────────────────────────────
+    if (item.type === 'section') {
+      const lbl = jv.text(item.label, {
+        font: 'bold 11px Verdana',
+        fill: 0xffcc00,
+        stroke: 0x000000,
+        strokeThickness: 2,
+      });
+      lbl.x = 6;
+      lbl.y = yOffset;
+      dsk.menu.addChild(lbl);
+      dsk.menu.btns.push(lbl);   // guarda pra poder remover no próximo rebuild
+      yOffset += 20;
+      return;
+    }
+
+    // ── BOTÃO NORMAL ─────────────────────────────────────────
     const btn = jv.Button.create(0, 0, 160, '', dsk.menu, 22);
     btn.x = 20;
-    btn.y = 35 + i * 26;
-
+    btn.y = yOffset;
+    yOffset += 26;
 
     // label do nome (branco fixo)
     const lbl = jv.text(item.label, {
@@ -4850,7 +4929,6 @@ dsk.menu.rebuild = () => {
     btn.addChild(lbl);
     btn.lbl = lbl;
 
-
     // label do status (ON/OFF colorido)
     const status = jv.text('OFF', {
       font: '11px Verdana',
@@ -4862,7 +4940,6 @@ dsk.menu.rebuild = () => {
     status.y = 4;
     btn.addChild(status);
     btn.status = status;
-
 
     btn.item = item;
     btn.on_click = () => {
@@ -4880,7 +4957,6 @@ dsk.menu.rebuild = () => {
     dsk.menu.btns.push(btn);
   });
 
-
   dsk.menu.pageLabel.text = `${dsk.menu.page + 1}/${maxPage}`;
   dsk.menu.refresh();
 };
@@ -4888,11 +4964,12 @@ dsk.menu.rebuild = () => {
 
 dsk.menu.refresh = () => {
   dsk.menu.btns.forEach(btn => {
+    if (!btn.item || btn.item.type === 'section') return;  // pula separadores
     const on = btn.item.state();
-    btn.lbl.text    = btn.item.label;           // nome sempre branco
-    btn.status.text = on ? 'ON' : 'OFF';        // só o status muda
-    btn.status.style.fill = on ? 0x00ff00 : 0xff4444; // verde ou vermelho
-    btn.tint = on ? 0x44bb44 : 0xbb4444;        // fundo do botão
+    btn.lbl.text    = btn.item.label;
+    btn.status.text = on ? 'ON' : 'OFF';
+    btn.status.style.fill = on ? 0x00ff00 : 0xff4444;
+    btn.tint = on ? 0x44bb44 : 0xbb4444;
   });
 };
 
@@ -4935,56 +5012,70 @@ dsk.menu.toggleBtn.on_click = () => {
   const DISCORD_URL = 'https://discord.gg/XkVhYENK7k';
 
 
-  const ITEMS = [
-    { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
-    { label: 'Skills',             state: () => !!dsk.skillHud?.enabled,       toggle: () => dsk.commands['/skills']() },
-    { label: 'Skills Config',      state: () => !!dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
-    { label: 'Cooking',            state: () => !!dsk.cooking?.enabled,        toggle: () => dsk.commands['/cook']() },
-    { label: 'Smelting',           state: () => !!dsk.smelting?.enabled,       toggle: () => dsk.commands['/smelt']() },
-    { label: 'Farming',            state: () => !!dsk.farm?.enabled,           toggle: () => dsk.commands['/farm']() },
-    { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
-    { label: 'Sword',              state: () => !!dsk.sword?.enabled,          toggle: () => dsk.commands['/sword']() },
-    { label: 'Hammer',             state: () => !!dsk.hammer?.enabled,         toggle: () => dsk.commands['/hammer']() },
-    { label: 'Armas Bot',          state: () => !!dsk.armas?.enabled,          toggle: () => dsk.commands['/armas']() },
-    { label: 'Destruction',        state: () => !!dsk.destruction?.enabled,    toggle: () => dsk.commands['/destru']() },
-    { label: 'Craft Config',        state: () => !!dsk.craftManager?.visible,   toggle: () => dsk.commands['/craftconfig']() },
-    { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
-    { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
-    { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
-    { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
-    { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
-        { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
-        { label: '⛏️ Mine Hub',        state: () => !!window.minm?.visible,  toggle: () => dsk.commands['/minehub']() },
-    { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
-    { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
-    { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
-    { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
-    { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
-    { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
-    { label: 'Auto Explo',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
-    { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
-    { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
-    { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
-    { label: 'Rotation Config',    state: () => !!rm?.visible,                 toggle: () => dsk.commands['/rotationconfig']() },
-    { label: 'Reconnect',          state: () => !!dsk.reconnect?.enabled,      toggle: () => dsk.commands['/reconnect']() },
-    { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
-    { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
-    { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
-    { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
-    { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
-    { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
-    { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
-    { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
-    { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
-    { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
-    { label: 'Hide Name',          state: () => !!dsk.hide?.enabled,           toggle: () => dsk.commands['/hide']() },
-    { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
-    { label: 'Zoom 1.5x',          state: () => !!dsk.zoom?.enabled,           toggle: () => dsk.commands['/zoom']() },
-    { label: 'Color Picker',       state: () => !!cp?.visible,                 toggle: () => dsk.commands['/colorpicker']() },
-    { label: 'Top Skill Calc',     state: () => !!tscD?.visible,               toggle: () => dsk.commands['/topskill']() },
-    { label: 'Discord Config',     state: () => !!dcm?.visible,                toggle: () => dsk.commands['/discordconfig']() },
-    { label: 'Discord',            state: () => !!dsk.discord?.enabled,        toggle: () => dsk.commands['/discord']() },
-    { label: 'Buy (use /buy N)',   state: () => false,                          toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+  const SECTIONS = [
+    { label: '⚔️  Skills', items: [
+      { label: 'Skills Config',      state: () => !!dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
+	  { label: 'Cooking',            state: () => !!dsk.cooking?.enabled,        toggle: () => dsk.commands['/cook']() },
+      { label: 'Smelting',           state: () => !!dsk.smelting?.enabled,       toggle: () => dsk.commands['/smelt']() },
+	  { label: 'Sword',              state: () => !!dsk.sword?.enabled,          toggle: () => dsk.commands['/sword']() },
+      { label: 'Hammer',             state: () => !!dsk.hammer?.enabled,         toggle: () => dsk.commands['/hammer']() },
+	  { label: 'Armas Bot',          state: () => !!dsk.armas?.enabled,          toggle: () => dsk.commands['/armas']() },
+      { label: 'Destruction',        state: () => !!dsk.destruction?.enabled,    toggle: () => dsk.commands['/destru']() },
+	  { label: 'Farming',            state: () => !!dsk.farm?.enabled,           toggle: () => dsk.commands['/farm']() },
+	  { label: 'Craft Config',       state: () => !!dsk.craftManager?.visible,   toggle: () => dsk.commands['/craftconfig']() },
+	  { label: 'Rotation Config',    state: () => !!(typeof rm !== 'undefined' && rm?.visible), toggle: () => dsk.commands['/rotationconfig']() },
+	  { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
+	  { label: 'Explo Farm',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
+	  { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
+	  { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
+	  { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
+      { label: 'Top Skill Calc',     state: () => !!(typeof tscD !== 'undefined' && tscD?.visible), toggle: () => dsk.commands['/topskill']() },
+    ]},
+    { label: '🗡️  Hunt', items: [
+      { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
+      { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
+      { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
+      { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
+      { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
+	  { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
+      { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
+      { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
+	  { label: 'Quest Painel', state: () => dsk.questManager?.visible, toggle: () => dsk.commands['/questhub']() },
+	  { label: 'Quest Hud', state: () => dsk.questHud?.enabled, toggle: () => dsk.commands['/questtext']() },
+    ]},
+    { label: '⛏️  Recursos', items: [
+      { label: '⛏️ Mine Hub',        state: () => !!(window.minm?.visible),      toggle: () => dsk.commands['/minehub']() },
+      { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
+      { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
+      { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
+      { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
+      { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
+    ]},
+    { label: '🛠️  Utilidades', items: [
+      { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
+      { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
+      { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
+      { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
+      { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
+      { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
+      { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
+      { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
+      { label: 'Hide Name',          state: () => !!dsk.hide?.enabled,           toggle: () => dsk.commands['/hide']() },
+      { label: 'Zoom 1.5x',          state: () => !!dsk.zoom?.enabled,           toggle: () => dsk.commands['/zoom']() },
+      { label: 'Reconnect',          state: () => !!dsk.reconnect?.enabled,      toggle: () => dsk.commands['/reconnect']() },
+	  { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
+	  { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
+	  { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
+    ]},
+    { label: '⚙️  Config / UI', items: [
+      { label: 'Color Picker',       state: () => !!(typeof cp !== 'undefined' && cp?.visible),  toggle: () => dsk.commands['/colorpicker']() },
+      { label: 'Discord Config',     state: () => !!(typeof dcm !== 'undefined' && dcm?.visible), toggle: () => dsk.commands['/discordconfig']() },
+      { label: 'Discord',            state: () => !!dsk.discord?.enabled,        toggle: () => dsk.commands['/discord']() },
+      { label: 'Hub Button',         state: () => !!hubBtnVisible,               toggle: () => dsk.commands['/menu']() },
+      { label: 'Death Tracker',      state: () => !!dsk.deathManager?.visible,   toggle: () => dsk.commands['/deathtracker']() },
+      { label: 'Loot Tracker',       state: () => !!mineHubLoot?.enabled,        toggle: () => dsk.commands['/loottracker']() },
+      { label: 'Buy (use /buy N)',   state: () => false,                         toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+    ]},
   ];
 
 
@@ -5126,60 +5217,106 @@ dsk.menu.toggleBtn.on_click = () => {
     const list = document.createElement('div');
     Object.assign(list.style, {
       overflowY:     'auto',
-      padding:       '6px',
+      padding:       '0',
       display:       'flex',
       flexDirection: 'column',
-      gap:           '3px',
       flex:          '1',
+      minHeight:     '0',
     });
 
 
     const updateFns = [];
 
-
-    ITEMS.forEach(item => {
-      const row = document.createElement('div');
-      Object.assign(row.style, {
+    SECTIONS.forEach((sec, si) => {
+      // ── Header da seção (clicável) ──────────────────────────
+      const secHeader = document.createElement('div');
+      Object.assign(secHeader.style, {
         display:        'flex',
         alignItems:     'center',
         justifyContent: 'space-between',
-        padding:        '5px 8px',
-        borderRadius:   '6px',
-        background:     '#2a2a3e',
+        padding:        '6px 8px',
         cursor:         'pointer',
-        transition:     'background 0.1s',
+        borderBottom:   '1px solid #333',
+        userSelect:     'none',
       });
-      row.onmouseenter = () => row.style.background = '#3a3a5e';
-      row.onmouseleave = () => row.style.background = '#2a2a3e';
+      secHeader.onmouseenter = () => secHeader.style.background = '#252540';
+      secHeader.onmouseleave = () => secHeader.style.background = 'transparent';
 
+      const secLabel = document.createElement('span');
+      Object.assign(secLabel.style, { color: '#ffcc00', fontSize: '10px', fontWeight: 'bold', letterSpacing: '0.5px' });
+      secLabel.textContent = sec.label;
 
-      const lbl = document.createElement('span');
-      lbl.textContent = item.label;
-      Object.assign(lbl.style, { color: '#ddd', fontSize: '11px' });
+      const arrow = document.createElement('span');
+      Object.assign(arrow.style, { color: '#ffcc00', fontSize: '9px', transition: 'transform 0.2s', display: 'inline-block', transformOrigin: 'center' });
+      arrow.textContent = '▶';
 
+      secHeader.appendChild(secLabel);
+      secHeader.appendChild(arrow);
 
-      const status = document.createElement('span');
-      Object.assign(status.style, {
-        fontSize: '10px', fontWeight: 'bold',
-        minWidth: '28px', textAlign: 'right',
+      // ── Body da seção (colapsável) ──────────────────────────
+      const secBody = document.createElement('div');
+      Object.assign(secBody.style, {
+        overflow:   'hidden',
+        maxHeight:  si === 0 ? '999px' : '0px',
+        transition: 'max-height 0.25s ease',
       });
-
-
-      function update() {
-        try {
-          const on = item.state();
-          status.textContent = on ? 'ON' : 'OFF';
-          status.style.color = on ? '#2ecc71' : '#e74c3c';
-        } catch (_) {}
+      if (si === 0) {
+        arrow.style.transform = 'rotate(90deg)';
+        secBody.style.overflow = 'visible';
       }
-      update();
 
+      secHeader.onclick = () => {
+        const isOpen = secBody.style.maxHeight !== '0px';
+        if (isOpen) {
+          secBody.style.overflow  = 'hidden';
+          secBody.style.maxHeight = '0px';
+          arrow.style.transform   = 'rotate(0deg)';
+        } else {
+          secBody.style.maxHeight = '999px';
+          arrow.style.transform   = 'rotate(90deg)';
+          setTimeout(() => { secBody.style.overflow = 'visible'; }, 260);
+        }
+      };
 
-      row.onclick = () => { try { item.toggle(); } catch (_) {} setTimeout(update, 150); };
-      row.appendChild(lbl);
-      row.appendChild(status);
-      list.appendChild(row);
-      updateFns.push(update);
+      // ── Itens da seção ──────────────────────────────────────
+      sec.items.forEach(item => {
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+          display:        'flex',
+          alignItems:     'center',
+          justifyContent: 'space-between',
+          padding:        '5px 14px',
+          cursor:         'pointer',
+          transition:     'background 0.1s',
+        });
+        row.onmouseenter = () => row.style.background = '#3a3a5e';
+        row.onmouseleave = () => row.style.background = 'transparent';
+
+        const lbl = document.createElement('span');
+        lbl.textContent = item.label;
+        Object.assign(lbl.style, { color: '#ddd', fontSize: '11px' });
+
+        const status = document.createElement('span');
+        Object.assign(status.style, { fontSize: '10px', fontWeight: 'bold', minWidth: '28px', textAlign: 'right' });
+
+        function update() {
+          try {
+            const on = item.state();
+            status.textContent = on ? 'ON' : 'OFF';
+            status.style.color = on ? '#2ecc71' : '#e74c3c';
+          } catch (_) {}
+        }
+        update();
+
+        row.onclick = () => { try { item.toggle(); } catch (_) {} setTimeout(update, 150); };
+        row.appendChild(lbl);
+        row.appendChild(status);
+        secBody.appendChild(row);
+        updateFns.push(update);
+      });
+
+      list.appendChild(secHeader);
+      list.appendChild(secBody);
     });
 
 
@@ -5262,15 +5399,6 @@ dsk.menu.toggleBtn.on_click = () => {
     } else {
       createPanel();
       dsk.localMsg('Hub: Aberto', '#5f5');
-    }
-  });
-
-
-  // /menu — continua mostrando/escondendo o botão físico original
-  dsk.setCmd('/menu', () => {
-    if (dsk.menu?.toggleBtn) {
-      dsk.menu.toggleBtn.visible = !dsk.menu.toggleBtn.visible;
-      dsk.localMsg(`Menu: ${dsk.menu.toggleBtn.visible ? 'Ativado' : 'Desativado'}`, dsk.menu.toggleBtn.visible ? '#5f5' : '#f55');
     }
   });
 
@@ -5926,7 +6054,7 @@ async function xWCave() {
 
   const temMob = xTemp[13] !== undefined && xTemp[13] !== myself;
   const emCombate = xRecentCombat;
-        if (!temMob && !emCombate && hp_status.val >= 80 && hp_status.val <= 92) {
+        if (!temMob && !emCombate && hp_status.val >= 72 && hp_status.val <= 92) {
     if (!xGoing[105]) {
       const slotBandagem = xGetSlotByID(767);
       if (slotBandagem !== undefined) {
@@ -6509,7 +6637,7 @@ async function xSnakePit() {
   // Bandagem fora de combate
   const spTemMob  = xTemp[13] !== undefined && xTemp[13] !== myself;
   const spCombate = xSPRecentCombat;
-  if (!spTemMob && !spCombate && hp_status.val >= 80 && hp_status.val <= 92) {
+  if (!spTemMob && !spCombate && hp_status.val >= 72 && hp_status.val <= 92) {
     if (!xGoing[135]) {
       const slotBandagem = xGetSlotByID(767);
       if (slotBandagem !== undefined) {
@@ -7651,7 +7779,7 @@ async function xCemetery() {
   // Bandagem se fora de combate
   const cmTemMob  = xTemp[13] !== undefined && xTemp[13] !== myself;
   const cmCombate = xCMRecentCombat;
-  if (!cmTemMob && !cmCombate && hp_status.val >= 80 && hp_status.val <= 92) {
+  if (!cmTemMob && !cmCombate && hp_status.val >= 72 && hp_status.val <= 92) {
     if (!xGoing[125]) {
       const slotBandagem = xGetSlotByID(767);
       if (slotBandagem !== undefined) {
@@ -10157,15 +10285,17 @@ async function xSSD() {
       xTemp[70]++;
     }
 
-
-if (RepTimer >= wcaveRepVoltas) {
+    // ← Reparo fixo: só dispara no WP 16 (85,76) — mais próximo de 94,93
+    // ← Reparo in-place: dispara em qualquer WP ao atingir o limite
+    const _ssdRepairTrigger = dsk.ssd.repairInPlace ? true : (xTemp[70] === 16);
+    if (RepTimer >= wcaveRepVoltas && _ssdRepairTrigger) {
       dsk.localMsg('SSD: indo reparar...', '#ff0');
       xNeedsRep  = true;
       RepTimer   = 0;
       xTemp[92]  = undefined;
       xTemp[93]  = undefined;
       xMovingNow = false;
-      if (!dsk.ssd.repairInPlace) await xDoMove(94, 93); // ← só move fixo se não for in-place
+      if (!dsk.ssd.repairInPlace) await xDoMove(94, 93);
     }
 
 
@@ -11309,8 +11439,7 @@ dsk.on('postPacket:inv', () => {
     document.body.appendChild(panel);
 
 
-    // Auto-inicia o loot tracker ao abrir o hub
-    if (!mineHubLoot.enabled) { mineHubLoot.start(); updLootToggle(); }
+    // Loot tracker não inicia automaticamente — use o botão Track ou /loottracker
   }
 
 
@@ -11335,16 +11464,192 @@ dsk.on('postPacket:inv', () => {
 })();
 
 
+
+
+// ══════════════════════════════════════════════════════════════
+// 🎒  LOOT TRACKER STANDALONE  ─  by Pablo Mod
+// Abre o tracker de qualquer lugar, sem precisar do Mine Hub
+// Comando: /loottracker
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let ltPanel = null;
+
+  const ltm = {
+    get visible() { return !!ltPanel; },
+    set visible(v) { if (!v && ltPanel) removePanel(); else if (v && !ltPanel) createPanel(); },
+  };
+  dsk.lootTrackerManager = ltm;
+
+  function mkEl(tag, css, text) {
+    const e = document.createElement(tag);
+    if (css)  Object.assign(e.style, css);
+    if (text !== undefined) e.textContent = text;
+    return e;
+  }
+
+  function renderLootList(listEl, titleEl) {
+    listEl.innerHTML = '';
+    mineHubLoot._dirty = false;
+
+    if (titleEl) titleEl.textContent = '🎒 ' + mineHubLoot.total + ' itens coletados';
+
+    const entries = Object.values(mineHubLoot.items).sort((a, b) => b.count - a.count);
+
+    if (!entries.length) {
+      listEl.appendChild(mkEl('div', {
+        color: '#444', fontSize: '10px', padding: '8px',
+        textAlign: 'center', fontStyle: 'italic',
+      }, 'Nenhum item coletado ainda...'));
+      return;
+    }
+
+    entries.forEach(({ name, count }) => {
+      const row = mkEl('div', {
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', padding: '3px 6px', borderRadius: '4px',
+      });
+      row.onmouseenter = () => row.style.background = '#252540';
+      row.onmouseleave = () => row.style.background = 'transparent';
+      row.appendChild(mkEl('span', { color: '#c8c8e0', fontSize: '10px' }, name));
+      row.appendChild(mkEl('span', {
+        color: '#FFD700', fontSize: '10px', fontWeight: 'bold',
+        background: '#2a2010', padding: '1px 6px',
+        borderRadius: '10px', border: '1px solid #4a3a10',
+      }, '×' + count));
+      listEl.appendChild(row);
+    });
+  }
+
+  function createPanel() {
+    if (ltPanel) { removePanel(); return; }
+
+    ltPanel = mkEl('div', {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)', width: '280px',
+      background: '#1a1a2e', border: '1px solid #3a3a5a',
+      borderRadius: '12px', boxShadow: '0 12px 40px rgba(0,0,0,.8)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      display: 'flex', flexDirection: 'column',
+    });
+
+    // Header
+    const header = mkEl('div', {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '9px 12px',
+      background: 'linear-gradient(90deg, #1e1e3a, #252545)',
+      borderRadius: '12px 12px 0 0',
+      cursor: 'move', borderBottom: '1px solid #3a3a5a',
+    });
+    const hLeft = mkEl('div', { display: 'flex', alignItems: 'center', gap: '8px' });
+    hLeft.appendChild(mkEl('span', { fontSize: '14px' }, '🎒'));
+    hLeft.appendChild(mkEl('span', { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' }, 'Loot Tracker'));
+    const closeBtn = mkEl('button', {
+      background: 'none', border: '1px solid #444', color: '#888',
+      cursor: 'pointer', fontSize: '12px', padding: '2px 7px', borderRadius: '4px',
+    }, '✕');
+    closeBtn.onmouseenter = () => { closeBtn.style.borderColor = '#f55'; closeBtn.style.color = '#f55'; };
+    closeBtn.onmouseleave = () => { closeBtn.style.borderColor = '#444'; closeBtn.style.color = '#888'; };
+    closeBtn.onclick = removePanel;
+    header.appendChild(hLeft); header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - ltPanel.getBoundingClientRect().left;
+      oy = _xy.y - ltPanel.getBoundingClientRect().top;
+      ltPanel.style.transform = 'none';
+    }
+    const _mvFn = e => { if (!dragging) return; const _xy = _getXY(e); ltPanel.style.left = (_xy.x - ox) + 'px'; ltPanel.style.top = (_xy.y - oy) + 'px'; };
+    const _upFn = () => { dragging = false; };
+    window.addEventListener('mousemove', _mvFn);
+    window.addEventListener('touchmove', _mvFn, { passive: false });
+    window.addEventListener('mouseup', _upFn);
+    window.addEventListener('touchend', _upFn);
+
+    // Body
+    const body = mkEl('div', { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+    // Status + controles
+    const ctrlRow = mkEl('div', { display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const titleEl = mkEl('span', { color: '#9090b0', fontSize: '10px' }, '🎒 ' + mineHubLoot.total + ' itens coletados');
+    const btnRow  = mkEl('div', { display: 'flex', gap: '5px' });
+
+    let trackBtn;
+    const updTrack = () => {
+      const on = mineHubLoot.enabled;
+      trackBtn.textContent       = on ? '⏹ Pausar' : '▶ Iniciar';
+      trackBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      trackBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    };
+    trackBtn = mkEl('button', {
+      padding: '3px 10px', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a1a2e',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '10px',
+    }, '▶ Iniciar');
+    trackBtn.onmouseenter = () => trackBtn.style.background = '#2a2a3e';
+    trackBtn.onmouseleave = () => trackBtn.style.background = '#1a1a2e';
+    trackBtn.onclick = () => { mineHubLoot.enabled ? mineHubLoot.stop() : mineHubLoot.start(); updTrack(); };
+    updTrack();
+
+    const resetBtn = mkEl('button', {
+      padding: '3px 10px', borderRadius: '6px',
+      border: '1px solid #e74c3c', background: '#1a1a2e',
+      color: '#e74c3c', cursor: 'pointer', fontSize: '10px',
+    }, '🗑 Reset');
+    resetBtn.onmouseenter = () => resetBtn.style.background = '#2a2a3e';
+    resetBtn.onmouseleave = () => resetBtn.style.background = '#1a1a2e';
+    resetBtn.onclick = () => { mineHubLoot.reset(); renderLootList(listEl, titleEl); updTrack(); };
+
+    btnRow.appendChild(trackBtn); btnRow.appendChild(resetBtn);
+    ctrlRow.appendChild(titleEl); ctrlRow.appendChild(btnRow);
+    body.appendChild(ctrlRow);
+
+    // Lista
+    const listEl = mkEl('div', {
+      maxHeight: '300px', overflowY: 'auto',
+      background: '#0e0e1e', borderRadius: '7px', padding: '4px 5px',
+      border: '1px solid #2a2a3a',
+    });
+    renderLootList(listEl, titleEl);
+    body.appendChild(listEl);
+
+    ltPanel.appendChild(header);
+    ltPanel.appendChild(body);
+    document.body.appendChild(ltPanel);
+
+    const _ticker = setInterval(() => {
+      if (!ltPanel) { clearInterval(_ticker); return; }
+      if (mineHubLoot._dirty) renderLootList(listEl, titleEl);
+      updTrack();
+    }, 500);
+  }
+
+  function removePanel() {
+    if (ltPanel) { ltPanel.remove(); ltPanel = null; }
+  }
+
+  dsk.setCmd('/loottracker', () => {
+    if (ltPanel) { removePanel(); dsk.localMsg('Loot Tracker: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Loot Tracker: Aberto', '#5f5'); }
+  });
+})();
+
 // ── SKILL ROTATION BOT ────────────────────────────────────────
 
 
 window.rotationConfig = window.rotationConfig ?? {
-  cookLevel:   30,
-  smeltLevel:  30,
-  swordLevel:  30,
-  hammerLevel: 30,
-  armasLevel:  30,
-  destruLevel: 30,
+  cookLevel:   40,
+  smeltLevel:  40,
+  swordLevel:  40,
+  hammerLevel: 40,
+  armasLevel:  40,
+  destruLevel: 40,
   skipCook:    false,
   skipSmelt:   false,
   skipSword:   false,
@@ -11618,6 +11923,8 @@ async function rotRun() {
     xDoKeyUp(6);
         await xDelay(500);
         await xDoDropSlot(1, 1);
+		await xDelay(500);
+		await xDoUseSlotByID(xGetSlotByID(649));
     await xDelay(500);
   }
 
@@ -16049,6 +16356,30 @@ dsk.setCmd('/sp', () => {
 });
 
 
+
+
+// ── BOTÃO FLUTUANTE HUB ───────────────────────────────────────
+
+
+var hubBtnVisible = false;
+
+jv.botaoHub = jv.Button.create(0, 0, 60, '⚔ Hub', ui_container, 22);
+jv.botaoHub.x = 1;
+jv.botaoHub.y = 390;
+jv.botaoHub.title.style.fill = 0x01ffe6;
+jv.botaoHub.visible = false;
+
+jv.botaoHub.on_click = () => {
+  dsk.commands['/hub']();
+};
+
+dsk.setCmd('/menu', () => {
+  hubBtnVisible = !hubBtnVisible;
+  jv.botaoHub.visible = hubBtnVisible;
+  dsk.localMsg(`Hub Button: ${hubBtnVisible ? 'Visível' : 'Escondido'}`, hubBtnVisible ? '#5f5' : '#f55');
+});
+
+
 // ── HUNT HUB (HTML overlay — não interfere com PIXI) ─────────
 
 
@@ -16066,7 +16397,7 @@ dsk.setCmd('/sp', () => {
       top:           '120px',
       left:          '50%',
       transform:     'translateX(-50%)',
-      width:         '570px',
+      width:         '690px',
       background:    '#1e1e2e',
       border:        '1px solid #555',
       borderRadius:  '10px',
@@ -16255,6 +16586,16 @@ dsk.setCmd('/sp', () => {
         );
         body.appendChild(div4);
         body.appendChild(colSnow);
+        const div5 = document.createElement('div');
+        Object.assign(div5.style, { width: '1px', background: '#444', margin: '0 2px' });
+        const colSsdHunt = makeCol(
+          '🗡️ SSD Hunt',
+          () => dsk.commands['/ssdhuntconfig'](),
+          () => dsk.commands['/ssdhunt'](),
+          () => !!dsk.ssdhunt?.enabled,
+        );
+        body.appendChild(div5);
+        body.appendChild(colSsdHunt);
 
 
     panel.appendChild(header);
@@ -16519,6 +16860,1408 @@ dsk.on('postLoop', () => {
 });
 
 
+
+
+
+
+// ══════════════════════════════════════════════════════════════
+// 🗡️  SSD HUNT BOT  ─  by Pablo Mod
+// Bot de caça na área do SSD: mesmos waypoints, mesmos mobs
+// NÃO minera pedras — foca em mobs, chests e drops
+// Reparo igual ao SSD (fixo ou in-place)
+// ══════════════════════════════════════════════════════════════
+
+
+// ── Estado persistente ────────────────────────────────────────
+window.ssdhStat = window.ssdhStat ?? {
+  kills:        0,
+  startMyst:    0,
+  totalMyst:    0,
+  mystPerHour:  0,
+  timerStart:   0,
+  totalTime:    0,
+  timerRunning: false,
+  repairoTotal: 0,
+};
+
+
+dsk.ssdhunt = { enabled: false };
+
+
+dsk.setCmd('/ssdhunt', () => {
+  dsk.ssdhunt.enabled = !dsk.ssdhunt.enabled;
+
+  if (dsk.ssdhunt.enabled) {
+    xWCID1 = inv[0]?.sprite;
+    xWCID2 = inv[1]?.sprite;
+    xWCID3 = inv[2]?.sprite;
+    repItem = xGetItemNameBySlot(0) ?? '';
+    dsk.ssdhunt.repairInPlace = dsk.ssdhunt.repairInPlace ?? false;
+
+    if (!xWCID1 || !xWCID2 || !xWCID3) {
+      dsk.localMsg('SSD Hunt: coloque itens nos slots 0, 1 e 2 primeiro!', '#f55');
+      dsk.ssdhunt.enabled = false;
+      return;
+    }
+
+    xGoing[120]  = false;
+    xMovingNow   = false;
+    xNeedsRep    = false;
+    RepTimer     = 0;
+    xTemp[13]    = myself;
+    xTemp[171]   = undefined;
+    xTemp[180]   = undefined;
+    xTemp[181]   = undefined;
+    xTemp[182]   = undefined;
+    xTemp[183]   = undefined;
+    target.id    = me;
+
+    ssdhStat.timerStart   = Date.now();
+    ssdhStat.timerRunning = true;
+    if (ssdhStat.totalMyst === 0 && ssdhStat.totalTime === 0) {
+      ssdhStat.startMyst = jv.upgrade_number ?? 0;
+    }
+
+    dsk.localMsg(`SSD Hunt: Ativado | ID1=${xWCID1} ID2=${xWCID2} ID3=${xWCID3}`, '#5f5');
+
+    (async function loop() {
+      while (dsk.ssdhunt.enabled) {
+        try {
+          const curMyst = (jv.upgrade_number ?? 0) - ssdhStat.startMyst;
+          ssdhStat.totalMyst = curMyst;
+          const elapsed = ssdhStat.totalTime + (Date.now() - ssdhStat.timerStart);
+          if (elapsed > 5000) ssdhStat.mystPerHour = Math.round(curMyst / elapsed * 3600);
+          await xSSDHunt();
+        } catch(e) {
+          console.log('[SSDHunt] erro:', e);
+          xGoing[120]  = false;
+          xMovingNow   = false;
+        }
+        await xDelay(500);
+      }
+    })();
+
+  } else {
+    xGoing[120]  = false;
+    xMovingNow   = false;
+    xNeedsRep    = false;
+    xTemp[13]    = myself;
+    xTemp[171]   = undefined;
+    xTemp[180]   = undefined;
+    xTemp[181]   = undefined;
+    xTemp[182]   = undefined;
+    xTemp[183]   = undefined;
+    target.id    = me;
+    ssdhStat.totalTime   += Date.now() - ssdhStat.timerStart;
+    ssdhStat.timerRunning = false;
+    dsk.localMsg('SSD Hunt: Desativado', '#f55');
+  }
+});
+
+
+async function xSSDHunt() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (connection?.readyState === 3) { xMovingNow = false; return; }
+  if (!connection) { xMovingNow = false; return; }
+
+  if (xGoing[120] === true) {
+    if (!xGoing._ssdhTime) xGoing._ssdhTime = Date.now();
+    if (Date.now() - xGoing._ssdhTime > 10000) {
+      xGoing[120]      = false;
+      xGoing._ssdhTime = undefined;
+      xMovingNow       = false;
+    }
+    return;
+  }
+  xGoing[120]      = true;
+  xGoing._ssdhTime = undefined;
+
+  // ── INIT WAYPOINTS (mesmos do SSD) ───────────────────────────
+  if (xTemp[182] === undefined) {
+    xTemp[182] = 0;
+    xTemp[183] = 25;
+    const px = [9,25,30,25,39,26,27,25,27,25,56,56,56,79,79,75,85,69,52,52,52,69,85,75,79,79];
+    const py = [8,15,32,54,56,65,75,39,23,13,12,42,12,14,44,56,76,78,74,57,74,78,76,56,44,12];
+    for (let i = 0; i < px.length; i++) {
+      WCPosListX[i] = px[i];
+      WCPosListY[i] = py[i];
+    }
+    xTemp[180] = undefined;
+    xTemp[181] = undefined;
+    dsk.localMsg('SSD Hunt: waypoints iniciados', '#0ff');
+  }
+
+  // ── MODO REPARO ──────────────────────────────────────────────
+  if (xNeedsRep) {
+    if (dsk.ssdhunt.repairInPlace) {
+      await xSSDHuntRepairInPlace();
+    } else {
+      await xSSDHuntRepair();
+    }
+    xGoing[120] = false;
+    return;
+  }
+
+  // ── COMIDA ───────────────────────────────────────────────────
+  const foodId = xGetSlotFood();
+  if (foodId !== undefined) {
+    if (hunger_status.val <= 70) {
+      await xDoUseSlotByID(xGetSlotByID(foodId));
+      await xDelay(2000);
+    }
+  } else {
+    xDoLogOff();
+    xGoing[120] = false;
+    return;
+  }
+
+  // ── GEAR QUEBRADO ────────────────────────────────────────────
+  if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2) {
+    if (dsk.ssdhunt.repairInPlace) {
+      xNeedsRep   = true;
+      xMovingNow  = false;
+      xDoKeyUp(6);
+      await xDelay(900);
+      xTemp[180]  = undefined;
+      xTemp[181]  = undefined;
+      xGoing[120] = false;
+      return;
+    } else {
+      xDoLogOff();
+      xGoing[120] = false;
+      return;
+    }
+  }
+
+  // ── HP ───────────────────────────────────────────────────────
+  if (hp_status.val <= 70 && hp_status.val >= 0.1) {
+    await xHeal();
+    if (hp_status.val <= 40) {
+      xDoLogOff();
+      xGoing[120] = false;
+      return;
+    }
+  }
+
+  // ── BANDAGEM ─────────────────────────────────────────────────
+  const ssdhTemMob  = xTemp[13] !== undefined && xTemp[13] !== myself;
+  const ssdhCombate = xRecentCombat;
+  if (!ssdhTemMob && !ssdhCombate && hp_status.val >= 72 && hp_status.val <= 92) {
+    if (!xGoing[128]) {
+      const slotBandagem = xGetSlotByID(767);
+      if (slotBandagem !== undefined) {
+        xGoing[128] = true;
+        xDoUseSlotByID(slotBandagem);
+        xDoUseSlotByID(slotBandagem);
+        setTimeout(() => { xGoing[128] = false; }, 10000);
+      }
+    }
+  }
+
+  // ── SLOTS VAZIOS ─────────────────────────────────────────────
+  if (!inv[0]?.sprite || !inv[1]?.sprite || !inv[2]?.sprite) {
+    await xPickupAllGear(xWCID3, xWCID1, xWCID2);
+    xDoLogOff();
+    xGoing[120] = false;
+    return;
+  }
+
+  // ── PRIORIDADE 1: MOBS ───────────────────────────────────────
+  if (!xTemp[100]) xTemp[100] = {};
+  const now100 = Date.now();
+  Object.keys(xTemp[100]).forEach(id => { if (xTemp[100][id] < now100) delete xTemp[100][id]; });
+
+  await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+
+  if (xTemp[13] && xTemp[13] !== myself) {
+    const mob  = xTemp[13];
+    const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
+
+    if (dist > 7) {
+      xTemp[13] = myself; target.id = me;
+      xGoing[120] = false; return;
+    }
+
+    if (target.id !== mob.id) { target.id = mob.id; send({ type: 't', t: target.id }); }
+
+    if (!xTemp[96] || xTemp[96].id !== mob.id) {
+      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+    }
+
+    if (dist <= 1) {
+      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+    } else {
+      if (xTemp[96].attempts >= 10) {
+        dsk.localMsg('SSD Hunt: mob inacessível, ignorando...', '#ff0');
+        if (!xTemp[100]) xTemp[100] = {};
+        xTemp[100][mob.id] = Date.now() + 60000;
+        xTemp[13] = myself; xTemp[96] = undefined;
+        xTemp[90] = undefined; xTemp[91] = undefined;
+        target.id = me; xMovingNow = false;
+        xGoing[120] = false; return;
+      }
+      const now = Date.now();
+      if (!xMovingNow && now - xTemp[96].lastMove > 2000) {
+        xTemp[96].attempts++;
+        xTemp[96].lastMove = now;
+        xMovingNow = false;
+        xDoMove(mob.x, mob.y);
+      }
+    }
+
+    xGoing[120] = false;
+    return;
+  }
+
+  target.id = me; xTemp[13] = myself;
+  xTemp[90] = undefined; xTemp[91] = undefined;
+
+  // ── PRIORIDADE 2: CHEST ──────────────────────────────────────
+  await xGetChest();
+  if (xTemp[171]) {
+    const dist = xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y);
+    if (dist > 1) {
+      xMovingNow = false;
+      await xDoMove(xTemp[171].x, xTemp[171].y);
+    } else {
+      const dx  = xTemp[171].x - myself.x;
+      const dy  = xTemp[171].y - myself.y;
+      const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+      await xDoChangeDir(dir);
+      await xDelay(100);
+      xDoKeyPress(6, 100);
+    }
+    xGoing[120] = false;
+    return;
+  }
+
+  // ── PRIORIDADE 3: DROPS ──────────────────────────────────────
+  if (await xPickSpecificDrop()) { xGoing[120] = false; return; }
+
+  // ── PRIORIDADE 4: WAYPOINTS ──────────────────────────────────
+  const wpX    = WCPosListX[xTemp[182]];
+  const wpY    = WCPosListY[xTemp[182]];
+  const distWP = xGetDistance(myself.x, myself.y, wpX, wpY);
+
+  if (distWP <= 2) {
+    if (xTemp[182] >= xTemp[183]) {
+      xTemp[182] = 0;
+      RepTimer++;
+      dsk.localMsg(`SSD Hunt: volta ${RepTimer}/${wcaveRepVoltas}`, '#0ff');
+    } else {
+      xTemp[182]++;
+    }
+
+    // ← Reparo fixo: só dispara no WP 16 (85,76) — mais próximo de 94,93
+    // ← Reparo in-place: dispara em qualquer WP ao atingir o limite
+    const _ssdhRepairTrigger = dsk.ssdhunt.repairInPlace ? true : (xTemp[182] === 16);
+    if (RepTimer >= wcaveRepVoltas && _ssdhRepairTrigger) {
+      dsk.localMsg('SSD Hunt: indo reparar...', '#ff0');
+      xNeedsRep  = true; RepTimer = 0;
+      xTemp[180] = undefined; xTemp[181] = undefined;
+      xMovingNow = false;
+      if (!dsk.ssdhunt.repairInPlace) await xDoMove(94, 93);
+    }
+
+    xGoing[120] = false;
+    return;
+  }
+
+  if (xTemp[180] !== wpX || xTemp[181] !== wpY) {
+    xTemp[180] = wpX; xTemp[181] = wpY;
+    xMovingNow = false;
+    await xDoMove(wpX, wpY);
+  } else if (!xMovingNow) {
+    xDoMove(wpX, wpY);
+  }
+
+  xGoing[120] = false;
+}
+
+
+// ── REPARO IN-PLACE (SSD Hunt) ────────────────────────────────
+async function xSSDHuntRepairInPlace() {
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (xPlyrTest(mob)) continue;
+    if (xGetDistance(myself.x, myself.y, mob.x, mob.y) > 6) continue;
+    await xEquipSlots();
+    await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+    if (xTemp[13] && xTemp[13] !== myself) {
+      if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+      if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
+    }
+    xNeedsRep = false; RepTimer = 0; return;
+  }
+
+  const hasGear = inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite;
+  if (hasGear) {
+    xMovingNow = false; xDoKeyUp(6); await xDelay(900);
+    xTemp[184] = myself.x; xTemp[185] = myself.y;
+    xTemp[186] = undefined; xTemp[187] = undefined;
+    if (inv[2]?.sprite) { xDoDropSlot(0, 3); await xDelay(300); }
+    if (inv[1]?.sprite) { xDoDropSlot(0, 2); await xDelay(300); }
+    if (inv[0]?.sprite) { xDoDropSlot(0, 1); await xDelay(300); }
+    return;
+  }
+
+  const kitSlot = xGetSlotByID(719);
+  if (kitSlot === undefined) {
+    dsk.localMsg('SSD Hunt in-place: sem Repair Kit!', '#f55');
+    xNeedsRep = false; RepTimer = 0; return;
+  }
+
+  const dropX = xTemp[184] ?? myself.x;
+  const dropY = xTemp[185] ?? myself.y;
+
+  if (xTemp[186] === undefined || xTemp[187] === undefined) {
+    const adjFree = [
+      { x: dropX + 1, y: dropY }, { x: dropX - 1, y: dropY },
+      { x: dropX, y: dropY + 1 }, { x: dropX, y: dropY - 1 },
+    ].find(t => !xGetSolidByID(t.x, t.y));
+    if (!adjFree) { dsk.localMsg('SSD Hunt in-place: sem tile livre!', '#f55'); xNeedsRep = false; RepTimer = 0; return; }
+    xTemp[186] = adjFree.x; xTemp[187] = adjFree.y;
+  }
+
+  if (myself.x !== xTemp[186] || myself.y !== xTemp[187]) {
+    if (!xMovingNow) await xDoMove(xTemp[186], xTemp[187]);
+    return;
+  }
+
+  if (inv[kitSlot]?.equip === 0) { await xDoUseSlot(kitSlot); await xDelay(400); return; }
+
+  const dx2 = dropX - myself.x; const dy2 = dropY - myself.y;
+  const facingDir = dx2 === 1 ? 1 : dx2 === -1 ? 3 : dy2 === 1 ? 2 : 0;
+  if (myself.dir !== facingDir) { await xDoChangeDir(facingDir); await xDelay(300); return; }
+
+  if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
+    xDoClearChat('The ' + repItem + ' is in perfect condition.');
+    xDoKeyUp(6); await xDelay(400);
+    xMovingNow = false;
+    await xDoMove(dropX, dropY); await xDelay(500);
+    for (let p = 0; p < 8; p++) { xDoPickUp(); await xDelay(180); }
+    await xEquipSlots();
+    xNeedsRep = false; RepTimer = 0;
+    xTemp[180] = undefined; xTemp[181] = undefined;
+    xTemp[184] = undefined; xTemp[185] = undefined;
+    xTemp[186] = undefined; xTemp[187] = undefined;
+    ssdhStat.repairoTotal++;
+    dsk.localMsg('SSD Hunt: reparo in-place concluído!', '#5f5');
+  } else {
+    xDoKeyDown(6);
+  }
+}
+
+
+// ── REPARO FIXO (SSD Hunt) ────────────────────────────────────
+async function xSSDHuntRepair() {
+  if (dsk.ssdhunt.repairInPlace) { await xSSDHuntRepairInPlace(); return; }
+  if (xGetSlotByID(719) === undefined) {
+    const wc3 = xGetItemByID(xWCID3);
+    if (wc3) {
+      xMovingNow = false; await xDoMove(wc3.x, wc3.y); await xDelay(300);
+      for (let p = 0; p < 4; p++) { xDoPickUp(); await xDelay(150); }
+    } else {
+      dsk.localMsg('SSD Hunt: sem repair kit, saindo...', '#f55');
+      xDoLogOff();
+    }
+    return;
+  }
+
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (xPlyrTest(mob)) continue;
+    const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+    if (dist > 6) continue;
+    const wc3 = xGetItemByID(xWCID3);
+    if (wc3) { xMovingNow = false; await xDoMove(wc3.x, wc3.y); await xDelay(200); for (let p = 0; p < 3; p++) { xDoPickUp(); await xDelay(100); } }
+    await xEquipSlots();
+    await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+    if (xTemp[13] && xTemp[13] !== myself) {
+      if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+      if (dist > 2) target.id = me;
+    }
+    return;
+  }
+
+  if (inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite) {
+    if (myself.x === 94 && myself.y === 93) {
+      if      (inv[2]?.sprite) { await xDelay(200); xDoDropSlot(0, 3); await xDelay(300); }
+      else if (inv[1]?.sprite) { xDoDropSlot(0, 2); await xDelay(300); }
+      else if (inv[0]?.sprite) { xDoDropSlot(0, 1); await xDelay(300); }
+    } else {
+      xMovingNow = false; xDoKeyUp(6); await xDoMove(94, 93);
+    }
+    return;
+  }
+
+  if (myself.x === 94 && myself.y === 92 && myself.dir === 2) {
+    if (inv[xGetSlotByID(719)]?.equip === 0) { await xDoUseSlot(xGetSlotByID(719)); await xDelay(300); return; }
+    if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
+      xDoClearChat('The ' + repItem + ' is in perfect condition.');
+      xDoKeyUp(6); await xDelay(300);
+      const wc3 = xGetItemByID(xWCID3);
+      if (wc3) { xMovingNow = false; await xDoMove(wc3.x, wc3.y); await xDelay(300); for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(150); } }
+      await xEquipSlots();
+      xNeedsRep = false; RepTimer = 0;
+      xTemp[180] = undefined; xTemp[181] = undefined;
+      ssdhStat.repairoTotal++;
+      dsk.localMsg('SSD Hunt: reparo concluído!', '#5f5');
+    } else {
+      xDoKeyDown(6);
+    }
+  } else {
+    xMovingNow = false; await xDoMove(94, 92); await xDelay(400); await xDoChangeDir(2); await xDelay(200);
+  }
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  SSD HUNT CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let ssdhPanel = null;
+  let _drag_move_fn = null, _drag_end_fn = null;
+
+  const ssdhm = {
+    get visible() { return !!ssdhPanel; },
+    set visible(v) { if (!v && ssdhPanel) removePanel(); else if (v && !ssdhPanel) createPanel(); },
+  };
+  dsk.ssdhuntManager = ssdhm;
+
+  dsk.on('postLoop', () => {
+    if (!ssdhPanel) return;
+    const q   = k => ssdhPanel.querySelector(`[data-ssdhm="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    const wp    = xTemp[182] ?? 0;
+    const maxWp = xTemp[183] ?? 25;
+    set('status', dsk.ssdhunt?.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('wp',     `WP: ${wp} / ${maxWp}`);
+    set('rep',    `Voltas: ${window.RepTimer ?? 0} / ${window.wcaveRepVoltas ?? 1}`);
+    set('needs',  window.xNeedsRep ? '🔧 Reparando...' : '✅ OK');
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('hunger', `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`);
+    set('mob',    `Mob: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('kills',  `Kills: ${window.ssdhStat?.kills ?? 0}`);
+    set('repairs',`Reparos: ${window.ssdhStat?.repairoTotal ?? 0}`);
+    set('myst',   `Myst: +${window.ssdhStat?.totalMyst ?? 0}`);
+    const ssdhMph = window.ssdhStat?.mystPerHour ?? 0;
+    set('mph', ssdhMph >= 1000 ? `Myst/h: ${(ssdhMph/1000).toFixed(1)}M` : `Myst/h: ${ssdhMph}k`);
+    if (window.ssdhStat?.timerRunning) {
+      const elapsed = Math.floor((window.ssdhStat.totalTime + (Date.now() - window.ssdhStat.timerStart)) / 1000);
+      const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
+      set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
+    }
+  });
+
+  function createPanel() {
+    if (ssdhPanel) { removePanel(); return; }
+
+    ssdhPanel = document.createElement('div');
+    Object.assign(ssdhPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)', width: '280px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '🗡️ SSD Hunt Config';
+    Object.assign(title.style, { color: '#ff6b6b', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - ssdhPanel.getBoundingClientRect().left;
+      oy = _xy.y - ssdhPanel.getBoundingClientRect().top;
+      ssdhPanel.style.transform = 'none';
+    }
+    _drag_move_fn = (e) => { if (!dragging) return; const _xy = _getXY(e); ssdhPanel.style.left = (_xy.x - ox) + 'px'; ssdhPanel.style.top = (_xy.y - oy) + 'px'; };
+    _drag_end_fn  = () => { dragging = false; };
+    window.addEventListener('mousemove',  _drag_move_fn);
+    window.addEventListener('touchmove',  _drag_move_fn, { passive: false });
+    window.addEventListener('mouseup',  _drag_end_fn);
+    window.addEventListener('touchend', _drag_end_fn);
+
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+    const statusKeys = [
+      ['status', '🔴 Pausado'],
+      ['wp',     'WP: 0 / 25'],
+      ['rep',    'Voltas: 0 / 1'],
+      ['needs',  '✅ OK'],
+      ['hp',     'HP: -'],
+      ['hunger', 'Fome: -'],
+      ['mob',    'Mob: -'],
+      ['kills',  'Kills: 0'],
+      ['repairs','Reparos: 0'],
+      ['myst',   'Myst: +0'],
+      ['mph',    'Myst/h: 0k'],
+      ['time',   'Tempo: 0m 0s'],
+    ];
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, { background: '#12121e', borderRadius: '7px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '3px' });
+    statusKeys.forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.ssdhm = key; el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+    // Voltas p/ reparar
+    const voltasRow = document.createElement('div');
+    Object.assign(voltasRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const voltasLbl = document.createElement('div');
+    const voltasTitle2 = document.createElement('div');
+    voltasTitle2.textContent = 'Voltas p/ reparar';
+    Object.assign(voltasTitle2.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const voltasVal = document.createElement('div');
+    voltasVal.dataset.ssdhm = 'voltasVal';
+    voltasVal.textContent   = `Voltas: ${window.wcaveRepVoltas ?? 1}`;
+    Object.assign(voltasVal.style, { color: '#ff6b6b', fontSize: '11px' });
+    voltasLbl.appendChild(voltasTitle2); voltasLbl.appendChild(voltasVal);
+    const voltasBtns = document.createElement('div');
+    Object.assign(voltasBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, { padding: '3px 10px', borderRadius: '5px', border: '1px solid #555', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px' });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn; return b;
+    }
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.wcaveRepVoltas ?? 1) > 1) window.wcaveRepVoltas--; voltasVal.textContent = `Voltas: ${window.wcaveRepVoltas}`; }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 1) + 1; voltasVal.textContent = `Voltas: ${window.wcaveRepVoltas}`; }));
+    voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
+    body.appendChild(voltasRow);
+
+    // Modo de reparo
+    const repRow = document.createElement('div');
+    Object.assign(repRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const repLbl = document.createElement('div');
+    repLbl.textContent = 'Modo de reparo';
+    Object.assign(repLbl.style, { color: '#aaa', fontSize: '11px' });
+    const repBtn = document.createElement('button');
+    repBtn.textContent = dsk.ssdhunt?.repairInPlace ? 'in-place' : 'fixo';
+    Object.assign(repBtn.style, { padding: '4px 12px', borderRadius: '5px', border: '1px solid #9090b0', background: '#1a1a2e', color: '#9090b0', cursor: 'pointer', fontSize: '11px' });
+    repBtn.onmouseenter = () => repBtn.style.background = '#3a3a5e';
+    repBtn.onmouseleave = () => repBtn.style.background = '#1a1a2e';
+    repBtn.onclick = () => {
+      if (dsk.ssdhunt) dsk.ssdhunt.repairInPlace = !dsk.ssdhunt.repairInPlace;
+      repBtn.textContent = dsk.ssdhunt?.repairInPlace ? 'in-place' : 'fixo';
+      dsk.localMsg(`SSD Hunt reparo: ${repBtn.textContent}`, '#0ff');
+    };
+    repRow.appendChild(repLbl); repRow.appendChild(repBtn);
+    body.appendChild(repRow);
+
+    // Botões de ação
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, { flex: '1', padding: '7px 0', borderRadius: '7px', border: `1px solid ${color}`, background: '#1a1a2e', color: color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px' });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn; return b;
+    }
+    actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
+      window.ssdhStat = { kills:0, startMyst: jv.upgrade_number??0, totalMyst:0, mystPerHour:0, timerStart: Date.now(), totalTime:0, timerRunning: !!dsk.ssdhunt?.enabled, repairoTotal:0 };
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('SSD Hunt: stats resetados!', '#ff0');
+    }));
+    actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
+      xTemp[182] = undefined;
+      window.WCPosListX = new Array(26).fill(0);
+      window.WCPosListY = new Array(26).fill(0);
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('SSD Hunt: waypoints resetados!', '#fa5');
+    }));
+    actRow.appendChild(makeActionBtn('🔧 Forçar Rep', '#0cf', () => {
+      window.xNeedsRep = true;
+      dsk.localMsg('SSD Hunt: reparo forçado!', '#ff0');
+    }));
+    body.appendChild(actRow);
+
+    ssdhPanel.appendChild(header);
+    ssdhPanel.appendChild(body);
+    document.body.appendChild(ssdhPanel);
+  }
+
+  function removePanel() {
+    if (_drag_move_fn) { window.removeEventListener('mousemove', _drag_move_fn); window.removeEventListener('touchmove', _drag_move_fn); }
+    if (_drag_end_fn)  { window.removeEventListener('mouseup', _drag_end_fn);   window.removeEventListener('touchend', _drag_end_fn); }
+    if (ssdhPanel) { ssdhPanel.remove(); ssdhPanel = null; }
+  }
+
+  dsk.setCmd('/ssdhuntconfig', () => {
+    if (ssdhPanel) { removePanel(); dsk.localMsg('SSD Hunt Config: Fechado', '#f55'); }
+    else           { createPanel(); dsk.localMsg('SSD Hunt Config: Aberto',  '#5f5'); }
+  });
+})();
+
+
+
+// ══════════════════════════════════════════════════════════════
+// 💀  DEATH TRACKER  ─  by Pablo Mod
+// Detecta morte automaticamente e salva local + coordenadas
+// Sempre ativo — sem precisar ligar nada
+// Comando: /deathtracker  → abre/fecha o painel
+// ══════════════════════════════════════════════════════════════
+
+
+// ── Estado persistente (localStorage) ────────────────────────
+window.deathLog = (() => {
+  try {
+    const saved = JSON.parse(localStorage.getItem('dsk_death_log') || '[]');
+    return Array.isArray(saved) ? saved : [];
+  } catch { return []; }
+})();
+
+
+function deathLogSave() {
+  try { localStorage.setItem('dsk_death_log', JSON.stringify(window.deathLog)); } catch {}
+}
+
+
+// ── Detecção de morte ────────────────────────────────────────
+// Usa o packet type:"death" que contém coords exatas da morte.
+window._deathCooldown ??= 0;
+
+// Listener no postPacket:pkg — detecta type:"death"
+dsk.on('postPacket:pkg', packet => {
+  if (!packet?.data) return;
+  try {
+    const arr = JSON.parse(packet.data);
+    arr.forEach(raw => {
+      const item = JSON.parse(raw);
+      if (item.type !== 'death') return;
+
+      const now = Date.now();
+      if (now - window._deathCooldown < 10000) return;
+      window._deathCooldown = now;
+
+      // Parseia todos os items do pacote de uma vez
+      const allItems = arr.map(r => { try { return JSON.parse(r); } catch { return null; } });
+
+      // fx_tpl tem as coords exatas da morte
+      const deathFx  = allItems.find(i => i?.type === 'fx_tpl' && i?.tpl === 'death');
+      // fx simples também tem coords
+      const deathFx2 = allItems.find(i => i?.type === 'fx' && i?.tpl === 'death');
+
+      const x    = deathFx?.x  ?? deathFx2?.x  ?? myself?.x ?? 0;
+      const y    = deathFx?.y  ?? deathFx2?.y  ?? myself?.y ?? 0;
+      const map  = jv?.map_title?.text ?? '?';
+      // Nome: extrai da mensagem de morte se myself não disponível
+      const deathMsg = dsk.stripHTMLTags(item.death ?? '').trim();
+      const nameMatch = deathMsg.match(/^(\S+)\s+has fallen/);
+      const char = myself?.name ?? nameMatch?.[1] ?? '?';
+
+      const entry = {
+        char,
+        map,
+        x,
+        y,
+        time: new Date().toLocaleString('pt-BR'),
+        msg:  dsk.stripHTMLTags(item.death ?? '').trim(),
+      };
+
+      console.log('[DeathTracker] death packet:', JSON.stringify(entry));
+      window.deathLog.unshift(entry);
+      if (window.deathLog.length > 10) window.deathLog.pop();
+      deathLogSave();
+
+      dsk.localMsg('💀 Morte registrada! ' + map + ' — ' + x + ',' + y, '#f55');
+      if (dsk.deathManager && !dsk.deathManager.visible) dsk.deathManager.visible = true;
+    });
+  } catch(e) { console.log('[DeathTracker] erro:', e); }
+});
+
+function _deathRegister() {} // mantido para /deathtest
+
+// /deathtest — testa o painel manualmente
+dsk.setCmd('/deathtest', () => {
+  const now = Date.now();
+  window._deathCooldown = 0;
+
+  const entry = {
+    char: myself?.name          ?? 'Teste',
+    map:  jv?.map_title?.text   ?? 'Mapa Teste',
+    x:    myself?.x             ?? 0,
+    y:    myself?.y             ?? 0,
+    time: new Date().toLocaleString('pt-BR'),
+    msg:  'Teste manual',
+  };
+
+  window.deathLog.unshift(entry);
+  if (window.deathLog.length > 10) window.deathLog.pop();
+  deathLogSave();
+
+  dsk.localMsg('💀 Morte registrada! ' + entry.map + ' — ' + entry.x + ',' + entry.y, '#f55');
+  if (dsk.deathManager && !dsk.deathManager.visible) dsk.deathManager.visible = true;
+  dsk.localMsg('Death Tracker: teste executado!', '#ff0');
+});
+
+
+// ── Painel HTML ───────────────────────────────────────────────
+(function () {
+  let dtPanel = null;
+
+  const dtm = {
+    get visible() { return !!dtPanel; },
+    set visible(v) { if (!v && dtPanel) removePanel(); else if (v && !dtPanel) createPanel(); },
+  };
+  dsk.deathManager = dtm;
+
+  function createPanel() {
+    if (dtPanel) { removePanel(); return; }
+
+    dtPanel = document.createElement('div');
+    Object.assign(dtPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '320px',
+      background: '#1e1e2e', border: '1px solid #c0392b',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a1a1a',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #c0392b',
+    });
+    const title = document.createElement('span');
+    title.textContent = '💀 Death Tracker';
+    Object.assign(title.style, { color: '#ff6b6b', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - dtPanel.getBoundingClientRect().left;
+      oy = _xy.y - dtPanel.getBoundingClientRect().top;
+      dtPanel.style.transform = 'none';
+    }
+    const _mvFn = (e) => { if (!dragging) return; const _xy = _getXY(e); dtPanel.style.left = (_xy.x - ox) + 'px'; dtPanel.style.top = (_xy.y - oy) + 'px'; };
+    const _upFn = () => { dragging = false; };
+    window.addEventListener('mousemove',  _mvFn);
+    window.addEventListener('touchmove',  _mvFn, { passive: false });
+    window.addEventListener('mouseup',  _upFn);
+    window.addEventListener('touchend', _upFn);
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+    // Lista de mortes
+    const listBox = document.createElement('div');
+    Object.assign(listBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '8px',
+      maxHeight: '340px', overflowY: 'auto',
+    });
+    listBox.id = 'dsk-death-list';
+
+    function renderList() {
+      listBox.innerHTML = '';
+      if (window.deathLog.length === 0) {
+        const empty = document.createElement('div');
+        empty.textContent = 'Nenhuma morte registrada.';
+        Object.assign(empty.style, { color: '#555', fontSize: '11px', textAlign: 'center', padding: '8px' });
+        listBox.appendChild(empty);
+        return;
+      }
+
+      window.deathLog.forEach((entry, idx) => {
+        const card = document.createElement('div');
+        Object.assign(card.style, {
+          background: idx === 0 ? '#2a1010' : '#1a1a2e',
+          borderRadius: '6px', padding: '8px 10px',
+          borderLeft: `3px solid ${idx === 0 ? '#e74c3c' : '#444'}`,
+        });
+
+        const topRow = document.createElement('div');
+        Object.assign(topRow.style, { display: 'flex', justifyContent: 'space-between', marginBottom: '4px' });
+
+        const charEl = document.createElement('span');
+        charEl.textContent = `💀 ${entry.char}`;
+        Object.assign(charEl.style, { color: idx === 0 ? '#ff6b6b' : '#aaa', fontSize: '11px', fontWeight: 'bold' });
+
+        const timeEl = document.createElement('span');
+        timeEl.textContent = entry.time;
+        Object.assign(timeEl.style, { color: '#555', fontSize: '9px' });
+
+        topRow.appendChild(charEl); topRow.appendChild(timeEl);
+
+        const mapRow = document.createElement('div');
+        mapRow.textContent = `🗺 ${entry.map}`;
+        Object.assign(mapRow.style, { color: '#ccc', fontSize: '10px', marginBottom: '3px' });
+
+        // Mensagem de morte
+        if (entry.msg) {
+          const msgEl = document.createElement('div');
+          msgEl.textContent = entry.msg;
+          Object.assign(msgEl.style, { color: '#888', fontSize: '9px', marginBottom: '3px', fontStyle: 'italic' });
+          card.appendChild(msgEl);
+        }
+
+        const coordRow = document.createElement('div');
+        Object.assign(coordRow.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+
+        const coords = document.createElement('span');
+        coords.textContent = `📍 X: ${entry.x}  Y: ${entry.y}`;
+        Object.assign(coords.style, { color: '#FFD700', fontSize: '11px', fontWeight: 'bold' });
+
+        // Botão copiar coords
+        const copyBtn = document.createElement('button');
+        copyBtn.textContent = '📋 Copiar';
+        Object.assign(copyBtn.style, {
+          padding: '2px 8px', borderRadius: '4px', border: '1px solid #444',
+          background: '#2a2a3e', color: '#aaa', cursor: 'pointer', fontSize: '9px',
+        });
+        copyBtn.onmouseenter = () => copyBtn.style.background = '#3a3a5e';
+        copyBtn.onmouseleave = () => copyBtn.style.background = '#2a2a3e';
+        copyBtn.onclick = () => {
+          navigator.clipboard?.writeText(`${entry.char} morreu em ${entry.map} — X:${entry.x} Y:${entry.y} (${entry.time})`)
+            .then(() => dsk.localMsg('Death Tracker: copiado!', '#5f5'))
+            .catch(() => {});
+        };
+
+        coordRow.appendChild(coords); coordRow.appendChild(copyBtn);
+
+        card.appendChild(topRow);
+        card.appendChild(mapRow);
+        card.appendChild(coordRow);
+        listBox.appendChild(card);
+      });
+    }
+
+    renderList();
+    body.appendChild(listBox);
+
+    // Botões de ação
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        flex: '1', padding: '7px 0', borderRadius: '7px',
+        border: `1px solid ${color}`, background: '#1a1a2e',
+        color: color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px',
+      });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+
+    actRow.appendChild(makeActionBtn('🗑 Resetar Histórico', '#e74c3c', () => {
+      window.deathLog = [];
+      deathLogSave();
+      renderList();
+      dsk.localMsg('Death Tracker: histórico resetado!', '#ff0');
+    }));
+
+    actRow.appendChild(makeActionBtn('↺ Atualizar', '#0cf', () => {
+      renderList();
+    }));
+
+    body.appendChild(actRow);
+
+    // Info rodapé
+    const footer = document.createElement('div');
+    footer.textContent = '⚡ Sempre ativo — registra mortes automaticamente';
+    Object.assign(footer.style, { color: '#444', fontSize: '9px', textAlign: 'center', paddingTop: '2px' });
+    body.appendChild(footer);
+
+    dtPanel.appendChild(header);
+    dtPanel.appendChild(body);
+    document.body.appendChild(dtPanel);
+  }
+
+  function removePanel() {
+    if (dtPanel) { dtPanel.remove(); dtPanel = null; }
+  }
+
+  dsk.setCmd('/deathtracker', () => {
+    if (dtPanel) { removePanel(); dsk.localMsg('Death Tracker: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Death Tracker: Aberto', '#5f5'); }
+  });
+})();
+
+// ══════════════════════════════════════════════════════════════
+// 📜  QUEST HUD (texto flutuante)
+// ══════════════════════════════════════════════════════════════
+
+window.currentQuest  = jv.quest?.hunting || null;
+window.questInterval = null;
+
+// ── Bloqueia o dialog durante qualquer fetch de quest ─────────
+function blockQuestDialog(ms) {
+  jv.quest_dialog.show = function () {};
+
+  const forceClose = setInterval(() => {
+    if (jv.quest_dialog.visible) jv.quest_dialog.visible = false;
+  }, 50);
+
+  setTimeout(() => {
+    clearInterval(forceClose);
+    jv.quest_dialog.visible = false;
+    jv.quest_dialog.show = function () {
+      for (var e in jv.Dialog.list) {
+        if (jv.Dialog.list[e].visible && jv.Dialog.list[e].modal) return;
+        jv.Dialog.list[e].visible = false;
+      }
+      this.visible = true;
+      this.on_open && this.on_open();
+    };
+  }, ms || 800);
+}
+
+// ── Refresh usado pelo HUD ────────────────────────────────────
+const questRefresh = () => {
+  blockQuestDialog(800);
+  connection.send(JSON.stringify({ type: 'c', r: 'qs' }));
+  setTimeout(() => {
+    window.currentQuest = jv.quest?.hunting || null;
+  }, 800);
+};
+
+// ── HUD (label PixiJS arrastável) ────────────────────────────
+dsk.questHud = { enabled: false, dragging: false, ox: 0, oy: 0 };
+
+dsk.questHud.label = jv.text('', {
+  font: '13px Verdana',
+  fill: 0x00FFFF,
+  stroke: 0x000000,
+  strokeThickness: 3,
+  lineJoin: 'round',
+  align: 'left',
+});
+dsk.questHud.label.x = 8;
+dsk.questHud.label.y = 65;
+dsk.questHud.label.visible     = false;
+dsk.questHud.label.interactive = true;
+dsk.questHud.label.buttonMode  = true;
+ui_container.addChild(dsk.questHud.label);
+
+dsk.questHud.label.on('pointerdown', e => {
+  dsk.questHud.dragging = true;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.questHud.ox = pos.x - dsk.questHud.label.x;
+  dsk.questHud.oy = pos.y - dsk.questHud.label.y;
+});
+dsk.questHud.label.on('pointermove', e => {
+  if (!dsk.questHud.dragging) return;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.questHud.label.x = pos.x - dsk.questHud.ox;
+  dsk.questHud.label.y = pos.y - dsk.questHud.oy;
+});
+dsk.questHud.label.on('pointerup',        () => { dsk.questHud.dragging = false; });
+dsk.questHud.label.on('pointerupoutside', () => { dsk.questHud.dragging = false; });
+
+dsk.on('postLoop', () => {
+  if (!dsk.questHud.enabled) return;
+  const quest = currentQuest;
+  if (!quest) { dsk.questHud.label.text = '📜 Sem quest ativa'; return; }
+  const match   = quest.desc.match(/Defeat an? (.+?) \d+ times/i);
+  const mobName = match ? match[1] : quest.name;
+  dsk.questHud.label.text = `📜 ${mobName}: ${quest.prog || '0/0'}`;
+});
+
+dsk.setCmd('/questtext', () => {
+  dsk.questHud.enabled = !dsk.questHud.enabled;
+  dsk.questHud.label.visible = dsk.questHud.enabled;
+
+  if (dsk.questHud.enabled) {
+    questRefresh();
+    window.questInterval = setInterval(questRefresh, 3000);
+  } else {
+    clearInterval(window.questInterval);
+    window.questInterval = null;
+  }
+
+  dsk.localMsg(
+    `Quest HUD: ${dsk.questHud.enabled ? 'Ativado' : 'Desativado'}`,
+    dsk.questHud.enabled ? '#5f5' : '#f55'
+  );
+
+  // Atualiza o botão do painel se estiver aberto
+  if (typeof qhUpdateHudBtn === 'function') qhUpdateHudBtn();
+});
+
+// ── Toggle no menu lateral (se existir) ──────────────────────
+// { label: 'Questing Hud', state: () => dsk.questHud?.enabled, toggle: () => dsk.commands['/questtext']() },
+
+
+// ══════════════════════════════════════════════════════════════
+// 📜  QUEST HUB  (painel HTML)
+// ══════════════════════════════════════════════════════════════
+
+dsk.questHub = { data: null, waiting: false };
+
+// ── Intercepta _originalParse → segunda camada: filtra quest packet ─
+(function () {
+  const __gameParse = _originalParse;
+
+  _originalParse = function (packet) {
+    if (dsk.questHub.waiting && packet?.type === 'pkg' && packet.data) {
+      try {
+        const arr      = JSON.parse(packet.data);
+        const hasQuest = arr.some(raw => {
+          try { return JSON.parse(raw).type === 'quest'; } catch { return false; }
+        });
+
+        if (hasQuest) {
+          const filtered = arr.filter(raw => {
+            try { return JSON.parse(raw).type !== 'quest'; } catch { return true; }
+          });
+          const origData  = packet.data;
+          packet.data     = JSON.stringify(filtered);
+          __gameParse(packet);
+          packet.data     = origData;
+          return;
+        }
+      } catch (e) {}
+    }
+    __gameParse(packet);
+  };
+})();
+
+// ── Captura dados da quest após filtragem ─────────────────────
+dsk.on('postPacket:pkg', packet => {
+  if (!dsk.questHub.waiting || !packet?.data) return;
+  try {
+    JSON.parse(packet.data).forEach(raw => {
+      const item = JSON.parse(raw);
+      if (item.type !== 'quest') return;
+      dsk.questHub.data    = item.obj;
+      dsk.questHub.waiting = false;
+      if (typeof qhRender === 'function') qhRender();
+    });
+  } catch (e) {}
+});
+
+// ── Painel HTML ───────────────────────────────────────────────
+(function () {
+  let qhPanel = null;
+
+  // ── Atualiza visual do botão HUD dentro do painel ───────────
+  window.qhUpdateHudBtn = () => {
+    if (!qhPanel) return;
+    const btn = qhPanel.querySelector('[data-qh="hudBtn"]');
+    if (!btn) return;
+    const on = dsk.questHud.enabled;
+    btn.textContent    = on ? '👁 HUD: ON' : '👁 HUD: OFF';
+    btn.style.color    = on ? '#5f5' : '#aaa';
+    btn.style.border   = `1px solid ${on ? '#5f5' : '#555'}`;
+  };
+
+  // ── Render lista de quests ──────────────────────────────────
+  window.qhRender = () => {
+    if (!qhPanel) return;
+    const listEl   = qhPanel.querySelector('[data-qh="list"]');
+    const statusEl = qhPanel.querySelector('[data-qh="status"]');
+    if (!listEl) return;
+
+    listEl.innerHTML = '';
+    const data = dsk.questHub.data;
+
+    if (!data || Object.keys(data).length === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = 'Nenhuma quest ativa.';
+      Object.assign(empty.style, {
+        color: '#555', fontSize: '11px',
+        textAlign: 'center', padding: '16px 0',
+      });
+      listEl.appendChild(empty);
+      if (statusEl) statusEl.textContent = '';
+      return;
+    }
+
+    Object.entries(data).forEach(([category, quest]) => {
+      if (!quest) return;
+
+      const prog    = quest.prog || '0/0';
+      const parts   = prog.split('/');
+      const current = parseInt(parts[0]) || 0;
+      const total   = parseInt(parts[1]) || 1;
+      const pct     = Math.min(100, Math.round((current / total) * 100));
+      const mobMatch = (quest.desc || '').match(/Defeat (?:a |an )?(.+?) \d+/i);
+      const mobName  = mobMatch ? mobMatch[1] : '?';
+
+      const card = document.createElement('div');
+      Object.assign(card.style, {
+        background: '#12121e', borderRadius: '7px',
+        padding: '10px 12px', borderLeft: '3px solid #FFD700',
+      });
+
+      // Nome + categoria
+      const topRow = document.createElement('div');
+      Object.assign(topRow.style, {
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', marginBottom: '6px',
+      });
+      const nameEl = document.createElement('span');
+      nameEl.textContent = quest.name || 'Quest';
+      Object.assign(nameEl.style, { color: '#FFD700', fontSize: '12px', fontWeight: 'bold' });
+
+      const catEl = document.createElement('span');
+      catEl.textContent = category.charAt(0).toUpperCase() + category.slice(1);
+      Object.assign(catEl.style, {
+        color: '#555', fontSize: '9px',
+        background: '#2a2a3e', padding: '2px 6px', borderRadius: '4px',
+      });
+      topRow.appendChild(nameEl);
+      topRow.appendChild(catEl);
+
+      // Alvo
+      const mobRow = document.createElement('div');
+      Object.assign(mobRow.style, { marginBottom: '6px' });
+      const mobLabel = document.createElement('span');
+      mobLabel.textContent = 'Alvo: ';
+      Object.assign(mobLabel.style, { color: '#888', fontSize: '11px' });
+      const mobVal = document.createElement('span');
+      mobVal.textContent = mobName;
+      Object.assign(mobVal.style, { color: '#fff', fontSize: '11px', fontWeight: 'bold' });
+      mobRow.appendChild(mobLabel);
+      mobRow.appendChild(mobVal);
+
+      // Descrição
+      const descEl = document.createElement('div');
+      descEl.textContent = quest.desc || '';
+      Object.assign(descEl.style, {
+        color: '#555', fontSize: '9px',
+        fontStyle: 'italic', marginBottom: '8px',
+      });
+
+      // Barra de progresso
+      const barWrap = document.createElement('div');
+      Object.assign(barWrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
+      const barBg   = document.createElement('div');
+      Object.assign(barBg.style, {
+        flex: '1', height: '8px',
+        background: '#2a2a3e', borderRadius: '4px', overflow: 'hidden',
+      });
+      const barFill = document.createElement('div');
+      Object.assign(barFill.style, {
+        width: pct + '%', height: '100%',
+        background: pct === 100 ? '#2ecc71' : '#FFD700',
+        borderRadius: '4px',
+      });
+      barBg.appendChild(barFill);
+      const progEl = document.createElement('span');
+      progEl.textContent = prog;
+      Object.assign(progEl.style, {
+        color: pct === 100 ? '#2ecc71' : '#FFD700',
+        fontSize: '12px', fontWeight: 'bold',
+        minWidth: '40px', textAlign: 'right',
+      });
+      barWrap.appendChild(barBg);
+      barWrap.appendChild(progEl);
+
+      card.appendChild(topRow);
+      card.appendChild(mobRow);
+      card.appendChild(descEl);
+      card.appendChild(barWrap);
+      listEl.appendChild(card);
+    });
+
+    if (statusEl) statusEl.textContent = '';
+  };
+
+  // ── fetchQuest: bloqueia dialog + envia requisição ──────────
+  function fetchQuest() {
+    dsk.questHub.waiting = true;
+
+    // Mesma técnica do questRefresh → bloqueia o dialog do jogo
+    blockQuestDialog(800);
+
+    const statusEl = qhPanel?.querySelector('[data-qh="status"]');
+    if (statusEl) statusEl.textContent = 'Carregando...';
+
+    _originalSend({ type: 'c', r: 'qs' });
+  }
+
+  // ── Helper: cria botão estilizado ───────────────────────────
+  function makeBtn(txt, color, fn, extraAttr) {
+    const b = document.createElement('button');
+    b.textContent = txt;
+    if (extraAttr) Object.entries(extraAttr).forEach(([k, v]) => b.dataset[k] = v);
+    Object.assign(b.style, {
+      flex: '1', padding: '7px 0', borderRadius: '7px',
+      border: `1px solid ${color}`, background: '#1a1a2e',
+      color: color, cursor: 'pointer', fontFamily: 'Verdana',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    b.onmouseenter = () => b.style.background = '#2a2a3e';
+    b.onmouseleave = () => b.style.background = '#1a1a2e';
+    b.onclick = fn;
+    return b;
+  }
+
+  // ── Cria o painel ────────────────────────────────────────────
+  function createPanel() {
+    if (qhPanel) { removePanel(); return; }
+
+    qhPanel = document.createElement('div');
+    Object.assign(qhPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '300px',
+      background: '#1e1e2e', border: '1px solid #FFD700',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.8)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a10',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #FFD700',
+    });
+    const title = document.createElement('span');
+    title.textContent = '📜 Quest Hub';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    const _getXY = e => e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      const r   = qhPanel.getBoundingClientRect();
+      ox = _xy.x - r.left;
+      oy = _xy.y - r.top;
+      qhPanel.style.transform = 'none';
+    }
+    const _mvFn = e => {
+      if (!dragging) return;
+      const _xy = _getXY(e);
+      qhPanel.style.left = (_xy.x - ox) + 'px';
+      qhPanel.style.top  = (_xy.y - oy) + 'px';
+    };
+    const _upFn = () => { dragging = false; };
+    window.addEventListener('mousemove',  _mvFn);
+    window.addEventListener('touchmove',  _mvFn, { passive: false });
+    window.addEventListener('mouseup',    _upFn);
+    window.addEventListener('touchend',   _upFn);
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, {
+      padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px',
+    });
+
+    const statusEl = document.createElement('div');
+    statusEl.dataset.qh = 'status';
+    statusEl.textContent = 'Carregando...';
+    Object.assign(statusEl.style, { color: '#888', fontSize: '10px', textAlign: 'center' });
+    body.appendChild(statusEl);
+
+    const listEl = document.createElement('div');
+    listEl.dataset.qh = 'list';
+    Object.assign(listEl.style, {
+      display: 'flex', flexDirection: 'column', gap: '8px',
+      maxHeight: '320px', overflowY: 'auto',
+    });
+    body.appendChild(listEl);
+
+    // ── Linha de botões ───────────────────────────────────────
+    const btnRow = document.createElement('div');
+    Object.assign(btnRow.style, {
+      display: 'flex', gap: '6px',
+      borderTop: '1px solid #333', paddingTop: '8px',
+    });
+
+    // Atualizar
+    btnRow.appendChild(makeBtn('↺ Atualizar', '#0cf', () => fetchQuest()));
+
+    // Reroll
+    btnRow.appendChild(makeBtn('🎲 Reroll', '#fa0', () => {
+      _originalSend({ type: 'chat', data: '/reroll' });
+      dsk.localMsg('Quest Hub: reroll enviado!', '#fa0');
+      setTimeout(() => fetchQuest(), 1500);
+    }));
+
+    // Quest HUD toggle
+    const hudBtn = makeBtn(
+      dsk.questHud.enabled ? '👁 HUD: ON' : '👁 HUD: OFF',
+      dsk.questHud.enabled ? '#5f5' : '#aaa',
+      () => {
+        dsk.commands['/questtext']?.();   // dispara o toggle existente
+        qhUpdateHudBtn();
+      }
+    );
+    hudBtn.dataset.qh = 'hudBtn';
+    btnRow.appendChild(hudBtn);
+
+    body.appendChild(btnRow);
+    qhPanel.appendChild(header);
+    qhPanel.appendChild(body);
+    document.body.appendChild(qhPanel);
+
+    fetchQuest();
+  }
+
+  function removePanel() {
+    if (qhPanel) { qhPanel.remove(); qhPanel = null; }
+  }
+
+  dsk.setCmd('/questhub', () => {
+    if (qhPanel) { removePanel(); dsk.localMsg('Quest Hub: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Quest Hub: Aberto',  '#5f5'); }
+  });
+})();
 
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
