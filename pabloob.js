@@ -20,6 +20,7 @@ console.log('PABLO: carregando eventemitter...');
     document.body.appendChild(script);
   });
 
+
   console.log('PABLO: carregando chroma...');
   await new Promise((resolve, reject) => {
     const script = document.createElement('script');
@@ -28,6 +29,7 @@ console.log('PABLO: carregando eventemitter...');
     script.onerror = () => { console.error('PABLO: chroma FALHOU'); reject(); };
     document.body.appendChild(script);
   });
+
 
   console.log('PABLO: dependências prontas, iniciando mod...');
   
@@ -64,13 +66,34 @@ console.log('PABLO: carregando eventemitter...');
   })();
 
 
+
+
 // ── CORE ────────────────────────────────────────────────────
 
+
 window.dsk = new EventEmitter3();
+
+// ── Touch/Mouse helper ───────────────────────────────────────
+function _getXY(e) {
+  if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+  if (e.changedTouches && e.changedTouches.length > 0) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+  return { x: e.clientX, y: e.clientY };
+}
+function _addDragListeners(el, onStart, onMove, onEnd) {
+  el.addEventListener('mousedown',  onStart);
+  el.addEventListener('touchstart', onStart, { passive: false });
+  window.addEventListener('mousemove',  onMove);
+  window.addEventListener('touchmove',  onMove, { passive: false });
+  window.addEventListener('mouseup',  onEnd);
+  window.addEventListener('touchend', onEnd);
+}
+
 dsk.commands = {};
+
 
 dsk.setCmd = (prefix, callback) => { dsk.commands[prefix] = callback; };
 dsk.deleteCmd = prefix => { delete dsk.commands[prefix]; };
+
 
 // ── PATHFINDING VARS ─────────────────────────────────────────
 dsk.botActive = false;
@@ -90,14 +113,17 @@ window.xMoveList    = [];
 window.xMoveListCH  = [];
 window.xTemp        = new Array(200).fill(undefined);
 
+
 // ── PAUSE GLOBAL ─────────────────────────────────────────────
 window.dskPaused = false;
+
 
 dsk.on('postPacket:quit', () => {
   dskPaused = true;
   for (let i = 0; i < 250; i++) xGoing[i] = false;
   xMovingNow = false;
 });
+
 
 dsk.on('postPacket:accepted', () => {
   dskPaused = false;
@@ -109,13 +135,16 @@ dsk.on('postPacket:accepted', () => {
   xDoKeyUp(6);
 });
 
+
 // ── ANTI SPAM connection.send ─────────────────────────────────
 function _protectConnection() {
     const originalSend = connection?.send;
     if (!originalSend || connection._protected) return;
 
+
     let lastSendTime = 0;
     const safeDelay = 200;
+
 
     connection.send = function(msg) {
         // ← ÚNICA MUDANÇA: sem bot, passa direto
@@ -123,6 +152,7 @@ function _protectConnection() {
             originalSend.call(connection, msg);
             return;
         }
+
 
         // Tudo abaixo igual ao original
         const now = Date.now();
@@ -139,26 +169,33 @@ function _protectConnection() {
 // Protege na carga inicial
 _protectConnection();
 
+
 // Re-protege após reconexão
 dsk.on('postPacket:accepted', () => {
     setTimeout(_protectConnection, 1000); // aguarda o novo connection estar pronto
 });
 
+
 // ── INTERCEPTOR DE COMANDOS ──────────────────────────────────
 
+
 let _originalSend = send;
+
 
 const _sendQueue = [];
 const _sendCooldown = 220;
 let _lastSendTime = 0;
 let _sendProcessing = false;
 
+
 function _processSendQueue() {
   if (_sendProcessing) return;
   _sendProcessing = true;
 
+
   const now = Date.now();
   const diff = now - _lastSendTime;
+
 
   if (diff >= _sendCooldown && _sendQueue.length > 0) {
     const packet = _sendQueue.shift();
@@ -166,11 +203,13 @@ function _processSendQueue() {
     _originalSend(packet);
   }
 
+
   _sendProcessing = false;
   if (_sendQueue.length > 0) {
     setTimeout(_processSendQueue, _sendCooldown);
   }
 }
+
 
 const _sendWrapper = function(packet) {
   // Comandos internos sempre processados
@@ -185,11 +224,13 @@ const _sendWrapper = function(packet) {
     }
   }
 
+
   // ← ÚNICA MUDANÇA: sem bot, passa direto sem fila
   if (!dsk.botActive) {
     _originalSend(packet);
     return;
   }
+
 
   // Tudo abaixo igual ao original
   const noRepeat = ['m', 't', 'bld'];
@@ -198,13 +239,17 @@ const _sendWrapper = function(packet) {
     if (last && JSON.stringify(last) === JSON.stringify(packet)) return;
   }
 
+
   if (_sendQueue.length >= 10) _sendQueue.shift();
+
 
   _sendQueue.push(packet);
   _processSendQueue();
 };
 
+
 window.send = _sendWrapper;
+
 
 setInterval(() => {
   if (window.send !== _sendWrapper) {
@@ -213,23 +258,30 @@ setInterval(() => {
   }
 }, 1000);
 
+
 // ── LOOP PRÓPRIO ─────────────────────────────────────────────
+
 
 (function loop() {
   dsk.emit('postLoop');
   requestAnimationFrame(loop);
 })();
 
+
 // ── INTERCEPTOR DE PACOTES ───────────────────────────────────
 
+
 let _originalParse = parse;
+
 
 const _parseWrapper = function(packet) {
   _originalParse(packet);
   if (packet.type) dsk.emit(`postPacket:${packet.type}`, packet);
 };
 
+
 window.parse = _parseWrapper;
+
 
 setInterval(() => {
   if (window.parse !== _parseWrapper) {
@@ -238,12 +290,15 @@ setInterval(() => {
   }
 }, 1000);
 
+
 // Limpa fila do send ao reconectar
 dsk.on('postPacket:quit', () => {
   _sendQueue.length = 0;
 });
 
+
 // ── UTILITÁRIOS ─────────────────────────────────────────────
+
 
 dsk.rand = () => Math.random();
 dsk.rand01 = () => Math.round(dsk.rand());
@@ -271,6 +326,7 @@ dsk.fquit = () => parse({ type: 'quit', text: 'bubye' });
 dsk.appendWithColor = (msg, color) => {
   color = color ?? '#0ff';
 
+
   const label = jv.text(msg, {
     font: '12px Verdana',
     fill: chroma(color).hex(),
@@ -279,11 +335,14 @@ dsk.appendWithColor = (msg, color) => {
     lineJoin: 'round',
   });
 
+
   label.alpha = 1;
   ui_container.addChild(label);
 
+
   label.x = jv.game_width / 2 - label.width / 2;
   label.y = jv.game_height / 2 - 80;
+
 
   const start = Date.now();
   (function fade() {
@@ -360,15 +419,19 @@ dsk.textureById = (id = 0) => {
   return items[pos.x][pos.y];
 };
 
+
 // ── BARS ─────────────────────────────────────────────────────
+
 
 dsk.bars = {
   enabled: false,
   loop: null
 };
 
+
 dsk.setCmd('/bars', () => {
   dsk.bars.enabled = !dsk.bars.enabled;
+
 
   if (dsk.bars.enabled) {
     dsk.bars.start();
@@ -379,35 +442,64 @@ dsk.setCmd('/bars', () => {
   }
 });
 
+
 dsk.bars.start = () => {
-  // Posicionamento das barras
-  hunger_status.y = 8;
-  hunger_status.x = 312;
-  hunger_status.title.x = 10;
-  hunger_status.title.y = -8;
-  hp_status.y = 8;
-
-  exp_status.x = 400;
-  exp_status.y = 8;
-
-  skill_status = jv.StatusBar.create('Exploration', 3381759);
-  skill_status.set(0);
-  skill_status.alpha = 0;
-  skill_status.x = 400;
-  skill_status.y = 25;
-
-  // Loop de atualização dos %
   (function loop() {
     if (!dsk.bars.enabled) return;
 
-    hp_status.title.text     = `${hp_status.val.toLocaleString()}%`;
-    hunger_status.title.text = `${hunger_status.val.toLocaleString()}%`;
-    exp_status.title.text    = `${exp_status.val.toLocaleString()}%`;
-	skill_status.title.text  = `${skill_status.val.toLocaleString()}%`;
+
+    // VIDA
+    if (hp_status && hp_status.title) {
+      hp_status.title.text =
+        `Vida ${Math.floor(hp_status.val)}%`;
+
+
+      hp_status.title.alpha = 1;
+    }
+
+
+    // FOME
+    if (hunger_status && hunger_status.title) {
+      hunger_status.title.text =
+        `Fome ${Math.floor(hunger_status.val)}%`;
+
+
+      hunger_status.title.alpha = 1;
+    }
+
+
+    // EXP — CORREÇÃO PRINCIPAL
+    if (exp_status && exp_status.title) {
+      exp_status.title.text =
+        `Experience ${Math.floor(exp_status.val)}%`;
+
+
+      exp_status.title.alpha = 1; // <- isso resolve
+    }
+
+
+    // SKILL
+    if (
+      skill_status &&
+      skill_status.title &&
+      skill_status.val !== undefined
+    ) {
+      const nomeSkill =
+        skill_status.title.text.split(' ')[0];
+
+
+      skill_status.title.text =
+        `${nomeSkill} ${Math.floor(skill_status.val)}%`;
+
+
+      skill_status.title.alpha = 1;
+    }
+
 
     dsk.bars.loop = requestAnimationFrame(loop);
   })();
 };
+
 
 dsk.bars.stop = () => {
   if (dsk.bars.loop) {
@@ -415,25 +507,37 @@ dsk.bars.stop = () => {
     dsk.bars.loop = null;
   }
 
-  // Restaura os títulos para o padrão
-  hp_status.title.text     = 'Vida';
-  hunger_status.title.text = 'Fome';
-  exp_status.title.text    = 'Experience';
+
+  if (hp_status)
+    hp_status.title.text = 'Vida';
+
+
+  if (hunger_status)
+    hunger_status.title.text = 'Fome';
+
+
+  if (exp_status)
+    exp_status.title.text = 'Experience';
 };
 
+
 // ── COMANDOS PADRÃO ──────────────────────────────────────────
+
 
 dsk.setCmd('/cmd', () => {
   const cmds = Object.keys(dsk.commands).filter(e => e !== '/cmd');
   cmds.forEach(cmd => append(cmd));
 });
 
+
 dsk.setCmd('/id', () => {
   jv.mapping_dialog.show();
 });
 
+
 dsk.setCmd('/craft', () => {
   dsk.craft.enabled = !dsk.craft.enabled;
+
 
   if (dsk.craft.enabled) {
     dsk.localMsg('AutoCraft: Ativado', '#5f5');
@@ -443,6 +547,206 @@ dsk.setCmd('/craft', () => {
   }
 });
 
+
+// ── CRAFT CONFIG PANEL ────────────────────────────────────────────────────
+(function () {
+  let cmPanel = null;
+
+
+  const CRAFT_TPLS = [
+    { key: 'grass_band',  label: '🌿 Grass Band'   },
+    { key: 'wood_arrow',  label: '🏹 Wood Arrow'   },
+    { key: 'spindle',     label: '🪡 Spindle'       },
+    { key: 'clay_floor',  label: '🟫 Clay Floor'   },
+    { key: 'wood_floor',  label: '🪵 Wood Floor'   },
+    { key: 'stone_floor', label: '🪨 Stone Floor'  },
+    { key: 'stone_road',  label: '🛣️ Stone Road'   },
+    { key: 'gravel_road', label: '🪦 Gravel Road'  },
+  ];
+
+
+  const cm = {
+    get visible() { return !!cmPanel; },
+    set visible(v) { if (!v && cmPanel) removePanel(); else if (v && !cmPanel) createPanel(); },
+  };
+  dsk.craftManager = cm;
+
+
+  // Atualiza play btn ao vivo
+  dsk.on('postLoop', () => {
+    if (!cmPanel) return;
+    const btn = cmPanel.querySelector('[data-cm="playbtn"]');
+    if (!btn) return;
+    const on = !!dsk.craft?.enabled;
+    btn.textContent       = on ? '⏹ Stop' : '▶ Play';
+    btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+    btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+    btn.style.color       = on ? '#e74c3c' : '#2ecc71';
+  });
+
+
+  function removePanel() {
+    if (cmPanel) { cmPanel.remove(); cmPanel = null; }
+  }
+
+
+  function createPanel() {
+    if (cmPanel) { removePanel(); return; }
+
+
+    cmPanel = document.createElement('div');
+    Object.assign(cmPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '240px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '⚒️ Craft Config';
+    Object.assign(titleEl.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - cmPanel.getBoundingClientRect().left;
+      oy = _xy.y - cmPanel.getBoundingClientRect().top;
+      cmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); cmPanel.style.left = (_xy.x - ox) + 'px'; cmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    // ── Título da seção ───────────────────────────────────────
+    const secLabel = document.createElement('div');
+    secLabel.textContent = '── Selecionar Template ──';
+    Object.assign(secLabel.style, {
+      color: '#777', fontSize: '10px', textAlign: 'center',
+      paddingBottom: '2px',
+    });
+    body.appendChild(secLabel);
+
+
+    // ── Botões de seleção de tpl ──────────────────────────────
+    const tplBtns = {};
+    CRAFT_TPLS.forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+
+
+      function updateTplBtn() {
+        const sel = craftConfig.tpl === key;
+        btn.style.background  = sel ? '#1a3a2a' : '#2a2a3e';
+        btn.style.borderColor = sel ? '#2ecc71' : '#444';
+        btn.style.color       = sel ? '#2ecc71' : '#ccc';
+        btn.style.fontWeight  = sel ? 'bold'    : 'normal';
+      }
+
+
+      Object.assign(btn.style, {
+        width: '100%', padding: '7px 8px', borderRadius: '6px',
+        border: '1px solid #444', background: '#2a2a3e',
+        color: '#ccc', cursor: 'pointer', fontSize: '11px',
+        textAlign: 'left', transition: 'all .15s',
+      });
+      btn.onmouseenter = () => { if (craftConfig.tpl !== key) btn.style.background = '#3a3a5e'; };
+      btn.onmouseleave = () => updateTplBtn();
+      btn.onclick = () => {
+        craftConfig.tpl = key;
+        Object.values(tplBtns).forEach(b => b.upd());
+      };
+      tplBtns[key] = { el: btn, upd: updateTplBtn };
+      updateTplBtn();
+      body.appendChild(btn);
+    });
+
+
+    // ── Divider ───────────────────────────────────────────────
+    const divider = document.createElement('div');
+    Object.assign(divider.style, {
+      borderTop: '1px solid #333', marginTop: '2px', paddingTop: '6px',
+    });
+    body.appendChild(divider);
+
+
+    // ── Botão Play/Pause ──────────────────────────────────────
+    const playBtn = document.createElement('button');
+    playBtn.dataset.cm = 'playbtn';
+
+
+    function updatePlayBtn() {
+      const on = !!dsk.craft?.enabled;
+      playBtn.textContent       = on ? '⏹ Stop' : '▶ Play';
+      playBtn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      playBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      playBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    }
+
+
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '8px 0', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    playBtn.onclick = () => {
+      dsk.commands['/craft']();
+      setTimeout(updatePlayBtn, 150);
+    };
+    updatePlayBtn();
+    body.appendChild(playBtn);
+
+
+    cmPanel.appendChild(header);
+    cmPanel.appendChild(body);
+    document.body.appendChild(cmPanel);
+  }
+
+
+  dsk.setCmd('/craftconfig', () => {
+    cm.visible = !cm.visible;
+  });
+
+
+  window.cm = cm;
+})();
+
+
 dsk.setCmd('/speed', (context) => {
   // Se passou um número, atualiza o valor
   if (context) {
@@ -450,6 +754,7 @@ dsk.setCmd('/speed', (context) => {
     if (!isNaN(val) && val > 0) {
       dsk.speed.value = val;
       dsk.localMsg(`Speed: valor alterado para ${val}`, '#0ff');
+
 
       // Se já estava ativo, reinicia com novo valor
       if (dsk.speed.enabled) {
@@ -460,8 +765,10 @@ dsk.setCmd('/speed', (context) => {
     }
   }
 
+
   // Sem argumento → toggle on/off
   dsk.speed.enabled = !dsk.speed.enabled;
+
 
   if (dsk.speed.enabled) {
     dsk.speed.start();
@@ -470,10 +777,12 @@ dsk.setCmd('/speed', (context) => {
   }
 });
 
+
 dsk.follow = {
   enabled: false,
   targetName: null
 };
+
 
 dsk.setCmd('/follow', (context) => {
   // Se digitou nome → atualiza e ativa
@@ -483,6 +792,7 @@ dsk.setCmd('/follow', (context) => {
     dsk.localMsg(`Follow: ${dsk.follow.targetName}`, '#5f5');
     return;
   }
+
 
   // Se digitou só /follow → toggle, mantendo o nome salvo
   if (dsk.follow.enabled) {
@@ -501,13 +811,16 @@ dsk.setCmd('/follow', (context) => {
   }
 });
 
+
 // ── compass ────────────────────────────────────────────────────
+
 
 dsk.ginfo = new EventEmitter3();
 dsk.ginfo.directions = ['North', 'East', 'South', 'West'];
 dsk.ginfo.showTime = false;
 dsk.ginfo.showSessionTime = false;
 dsk.ginfo.sessionStartTime = Date.now();
+
 
 dsk.ginfo.label = jv.text('Ginfo label', {
   font: '14px Verdana',
@@ -520,6 +833,7 @@ dsk.ginfo.label = jv.text('Ginfo label', {
 ui_container.addChild(dsk.ginfo.label);
 dsk.ginfo.label.visible = false;
 
+
 dsk.ginfo.getData = () => ({
   x: myself.x,
   y: myself.y,
@@ -527,11 +841,13 @@ dsk.ginfo.getData = () => ({
   direction: dsk.ginfo.directions[myself.dir],
 });
 
+
 dsk.setCmd('/compass', () => {
   const visible = !dsk.ginfo.label.visible;
   dsk.ginfo.label.visible = visible;
   dsk.localMsg(`Bussula: ${visible ? 'Ativada' : 'Disativada'}`, visible ? '#5f5' : '#f55');
 });
+
 
 dsk
   .on('postPacket:accepted', () => { dsk.ginfo.sessionStartTime = Date.now(); })
@@ -545,15 +861,19 @@ dsk
     dsk.ginfo.label.text = text;
   });
 
+
 // ── INVMANAGER ───────────────────────────────────────────────
 
+
 dsk.invManager = jv.Dialog.create(560, 240);
+
 
 dsk.setCmd('/inv', () => {
   const visible = !dsk.invManager.visible;
   dsk.invManager.visible = visible;
   dsk.localMsg(`InvManager: ${visible ? 'Ativado' : 'Desativado'}`, visible ? '#5f5' : '#f55');
 });
+
 
 dsk.invManager.heading = jv.text('Inventory Manager', {
   font: '18px Verdana',
@@ -566,14 +886,17 @@ dsk.invManager.addChild(dsk.invManager.heading);
 jv.center(dsk.invManager.heading);
 jv.top(dsk.invManager.heading, 4);
 
+
 dsk.invManager.move = jv.Button.create(0, 0, 24, '@', dsk.invManager, 24);
 jv.top(dsk.invManager.move, 4);
 jv.right(dsk.invManager.move, 28);
+
 
 dsk.invManager.close = jv.Button.create(0, 0, 24, 'X', dsk.invManager, 24);
 jv.top(dsk.invManager.close, 4);
 jv.right(dsk.invManager.close, 4);
 dsk.invManager.close.on_click = () => { dsk.invManager.visible = 0; };
+
 
 // Rastreia posição do mouse/touch
 dsk.invManager._px = 0;
@@ -586,6 +909,7 @@ window.addEventListener('touchmove', e => {
   dsk.invManager._px = e.touches[0].clientX;
   dsk.invManager._py = e.touches[0].clientY;
 });
+
 
 dsk.invManager.update = () => {
   const im = dsk.invManager;
@@ -606,11 +930,13 @@ dsk.invManager.update = () => {
 };
 dsk.on('postLoop', dsk.invManager.update);
 
+
 dsk.invManager.drag = null;
 dsk.invManager.slots = [];
 dsk.invManager.marginLeft = 10;
 dsk.invManager.marginTop = 50;
 dsk.invManager.offsetX = 112;
+
 
 dsk.invManager.dragMove = e => {
   const im = dsk.invManager;
@@ -622,6 +948,7 @@ dsk.invManager.dragMove = e => {
     }
   }
 };
+
 
 dsk.invManager.endDrag = () => {
   const im = dsk.invManager;
@@ -637,6 +964,7 @@ dsk.invManager.endDrag = () => {
   im.drag = null;
 };
 
+
 dsk.invManager.dragEnd = e => {
   const im = dsk.invManager;
   const tX = e.data.getLocalPosition(im).x - im.marginLeft;
@@ -650,6 +978,7 @@ dsk.invManager.dragEnd = e => {
   im.endDrag();
 };
 
+
 dsk.invManager.setDrag = w => {
   const im = dsk.invManager;
   im.drag = w;
@@ -660,6 +989,7 @@ dsk.invManager.setDrag = w => {
   im.drag.z = 100;
   im.children.sort(zCompare);
 };
+
 
 dsk.invManager.initSlots = function () {
   for (let i = 0; i < 75; i++) {
@@ -680,6 +1010,7 @@ dsk.invManager.initSlots = function () {
   }
 };
 dsk.invManager.initSlots();
+
 
 dsk.invManager.updateSlots = () => {
   const im = dsk.invManager;
@@ -722,6 +1053,7 @@ dsk.dias = {
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
+
 dsk.discord = {
   globalUrl: '',
   tribeUrl:  '',
@@ -731,7 +1063,9 @@ dsk.discord = {
   enabled:   false,
 };
 
+
 // ── DISCORD CONFIG MANAGER ────────────────────────────────────
+
 
 // Carrega webhooks salvos ou usa os padrão
 dsk.discord.loadConfig = () => {
@@ -744,6 +1078,7 @@ dsk.discord.loadConfig = () => {
     if (saved.whoUrl)     dsk.discord.whoUrl      = saved.whoUrl;
   } catch(e) {}
 };
+
 
 dsk.discord.saveConfig = () => {
   try {
@@ -758,144 +1093,259 @@ dsk.discord.saveConfig = () => {
   } catch(e) {}
 };
 
+
 dsk.setCmd('/setwebook', (context) => {
   // /setwebook global https://discord.com/api/webhooks/...
   const parts = context.trim().split(' ');
   const tipo  = parts[0]; // global, tribe, death, respawn, who
   const url   = parts[1];
 
+
   const keys = {
     global: 'globalUrl', tribe: 'tribeUrl',
     death: 'deathUrl', respawn: 'respawnUrl', who: 'whoUrl'
   };
+
 
   if (!keys[tipo] || !url?.includes('discord.com/api/webhooks/')) {
     dsk.localMsg('Uso: /setwebook global|tribe|death|respawn|who <url>', '#ff0');
     return;
   }
 
+
   dsk.discord[keys[tipo]] = url;
   dsk.discord.saveConfig();
   dsk.localMsg(`Webhook ${tipo}: atualizado!`, '#5f5');
 });
 
+
 // Carrega ao iniciar
 dsk.discord.loadConfig();
 
-// ── Dialog ────────────────────────────────────────────────────
 
-dsk.discordManager = jv.Dialog.create(400, 260);
-const dcm = dsk.discordManager;
-dcm.visible = false;
+// ── Discord Config (HTML overlay) ────────────────────────────
 
-dcm.header = jv.text('Discord Webhook Config', {
-  font: '13px Verdana', fill: 0x7289DA, stroke: 0x555555, strokeThickness: 2,
-});
-dcm.addChild(dcm.header);
-jv.center(dcm.header);
-jv.top(dcm.header, 4);
 
-dcm.close = jv.Button.create(0, 0, 24, 'X', dcm, 24);
-jv.top(dcm.close, 4); jv.right(dcm.close, 4);
-dcm.close.on_click = () => (dcm.visible = 0);
+(function () {
+  let dcmPanel = null;
 
-dcm.move = jv.Button.create(0, 0, 24, '@', dcm, 24);
-jv.top(dcm.move, 4); jv.right(dcm.move, 28);
 
-dcm._px = 0; dcm._py = 0;
-window.addEventListener('mousemove', e => { dcm._px = e.clientX; dcm._py = e.clientY; });
-window.addEventListener('touchmove', e => { dcm._px = e.touches[0].clientX; dcm._py = e.touches[0].clientY; });
+  const dcmFields = [
+    { label: 'Global',  key: 'globalUrl'  },
+    { label: 'Tribe',   key: 'tribeUrl'   },
+    { label: 'Death',   key: 'deathUrl'   },
+    { label: 'Respawn', key: 'respawnUrl' },
+    { label: 'Who',     key: 'whoUrl'     },
+  ];
 
-dsk.on('postLoop', () => {
-  if (!dcm.move?.is_pressed) return;
-  const canvas = document.querySelector('canvas');
-  const rect = canvas ? canvas.getBoundingClientRect() : { left:0, top:0, width:jv.game_width, height:jv.game_height };
-  dcm.x = (dcm._px - rect.left) * (jv.game_width / rect.width)  - dcm.w / 2;
-  dcm.y = (dcm._py - rect.top)  * (jv.game_height / rect.height) - 12;
-  dcm.x = Math.max(0, Math.min(dcm.x, jv.game_width  - dcm.w));
-  dcm.y = Math.max(0, Math.min(dcm.y, jv.game_height - dcm.h));
-});
 
-// ── Linhas de campo ───────────────────────────────────────────
+  // Compat: outros módulos chamam dsk.discordManager.refresh()
+  dsk.discordManager = { refresh: () => renderFields() };
 
-const dcmFields = [
-  { label: 'Global',   key: 'globalUrl'  },
-  { label: 'Tribe',    key: 'tribeUrl'   },
-  { label: 'Death',    key: 'deathUrl'   },
-  { label: 'Respawn',  key: 'respawnUrl' },
-  { label: 'Who',      key: 'whoUrl'     },
-];
 
-dcm.inputs = {};
+  function renderFields() {
+    if (!dcmPanel) return;
+    dcmPanel.querySelectorAll('[data-dcm-val]').forEach(el => {
+      const key = el.dataset.dcmVal;
+      const url = dsk.discord[key] || '';
+      el.textContent = url ? '.../' + url.split('/').slice(-2).join('/').slice(0, 38) : '(vazio)';
+    });
+  }
 
-dcmFields.forEach(({ label, key }, i) => {
-  const y = 32 + i * 38;
 
-  // Label
-  const lbl = jv.text(label + ':', {
-    font: '10px Verdana', fill: 0xaaaaaa, stroke: 0x000000, strokeThickness: 2,
-  });
-  lbl.x = 8; lbl.y = y;
-  dcm.addChild(lbl);
+  function createPanel() {
+    if (dcmPanel) { removePanel(); return; }
 
-  // Valor atual (truncado para caber)
-  const val = jv.text('', {
-    font: '9px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2,
-  });
-  val.x = 8; val.y = y + 13;
-  dcm.addChild(val);
-  dcm.inputs[key] = val;
 
-  // Botão Colar
-  const btnPaste = jv.Button.create(0, 0, 55, 'Colar', dcm, 20);
-  btnPaste.x = dcm.w - 63;
-  btnPaste.y = y + 10;
-  btnPaste.on_click = async () => {
-    try {
-      const text = await navigator.clipboard.readText();
-      if (text.includes('discord.com/api/webhooks/')) {
-        dsk.discord[key] = text.trim();
-        dsk.discordManager.refresh();
-        dsk.localMsg(`Discord ${label}: URL atualizada`, '#5f5');
-      } else {
-        dsk.localMsg('URL inválida! Precisa ser um webhook do Discord.', '#f55');
-      }
-    } catch(e) {
-      dsk.localMsg('Erro ao colar. Tente copiar o link primeiro.', '#f55');
+    dcmPanel = document.createElement('div');
+    Object.assign(dcmPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '400px',
+      background: '#1e1e2e', border: '1px solid #7289DA',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move',
+      borderBottom: '1px solid #7289DA',
+    });
+
+
+    const title = document.createElement('span');
+    title.textContent = '💬 Discord Webhook Config';
+    Object.assign(title.style, { color: '#7289DA', fontWeight: 'bold', fontSize: '13px' });
+
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+
+
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown',  _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - dcmPanel.getBoundingClientRect().left;
+      oy = _xy.y - dcmPanel.getBoundingClientRect().top;
+      dcmPanel.style.transform = 'none';
     }
-  };
-});
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); dcmPanel.style.left = (_xy.x - ox) + 'px'; dcmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
 
-// Botão Salvar
-const dcmBtnSave = jv.Button.create(0, 0, 180, '💾 Salvar Config', dcm, 24);
-jv.bottom(dcmBtnSave, 4);
-dcmBtnSave.x = 8;
-dcmBtnSave.on_click = () => dsk.discord.saveConfig();
 
-// Botão Limpar Tudo
-const dcmBtnClear = jv.Button.create(0, 0, 100, '🗑 Limpar', dcm, 24);
-jv.bottom(dcmBtnClear, 4);
-dcmBtnClear.x = 196;
-dcmBtnClear.on_click = () => {
-  localStorage.removeItem('dsk_discord_config');
-  dsk.localMsg('Discord Config: Limpo! Recarregue o mod.', '#ff0');
-};
+    // ── Campos ────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
 
-// Atualiza os valores exibidos
-dsk.discordManager.refresh = () => {
-  dcmFields.forEach(({ key }) => {
-    const url = dsk.discord[key] || '';
-    // Mostra só o ID do webhook (parte final) para não ocupar espaço
-    const short = url ? '.../' + url.split('/').slice(-2).join('/').slice(0, 40) : '(vazio)';
-    dcm.inputs[key].text = short;
+
+    dcmFields.forEach(({ label, key }) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        background: '#2a2a3e', borderRadius: '7px',
+        padding: '7px 10px', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between', gap: '8px',
+      });
+
+
+      const info = document.createElement('div');
+      Object.assign(info.style, { flex: '1', minWidth: 0 });
+
+
+      const lbl = document.createElement('div');
+      lbl.textContent = label;
+      Object.assign(lbl.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+
+
+      const val = document.createElement('div');
+      val.dataset.dcmVal = key;
+      val.textContent = '(vazio)';
+      Object.assign(val.style, {
+        color: '#fff', fontSize: '9px',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      });
+
+
+      info.appendChild(lbl);
+      info.appendChild(val);
+
+
+      const btnPaste = document.createElement('button');
+      btnPaste.textContent = '📋 Colar';
+      Object.assign(btnPaste.style, {
+        padding: '4px 10px', borderRadius: '6px', border: '1px solid #7289DA',
+        background: '#1e1e2e', color: '#7289DA', cursor: 'pointer',
+        fontSize: '10px', whiteSpace: 'nowrap', flexShrink: '0',
+      });
+      btnPaste.onmouseenter = () => { btnPaste.style.background = '#7289DA'; btnPaste.style.color = '#fff'; };
+      btnPaste.onmouseleave = () => { btnPaste.style.background = '#1e1e2e'; btnPaste.style.color = '#7289DA'; };
+      btnPaste.onclick = async () => {
+        try {
+          const text = await navigator.clipboard.readText();
+          if (text.includes('discord.com/api/webhooks/')) {
+            dsk.discord[key] = text.trim();
+            renderFields();
+            dsk.localMsg(`Discord ${label}: URL atualizada`, '#5f5');
+          } else {
+            dsk.localMsg('URL inválida! Precisa ser um webhook do Discord.', '#f55');
+          }
+        } catch(e) {
+          dsk.localMsg('Erro ao colar. Copie o link primeiro.', '#f55');
+        }
+      };
+
+
+      row.appendChild(info);
+      row.appendChild(btnPaste);
+      body.appendChild(row);
+    });
+
+
+    // ── Footer ────────────────────────────────────────────────
+    const footer = document.createElement('div');
+    Object.assign(footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 12px',
+      borderTop: '1px solid #333',
+    });
+
+
+    const btnSave = document.createElement('button');
+    btnSave.textContent = '💾 Salvar Config';
+    Object.assign(btnSave.style, {
+      flex: '1', padding: '7px 0', borderRadius: '7px',
+      border: '1px solid #5f5', background: '#1a2e1a',
+      color: '#5f5', cursor: 'pointer', fontFamily: 'Verdana', fontSize: '11px',
+    });
+    btnSave.onmouseenter = () => { btnSave.style.background = '#2a4e2a'; };
+    btnSave.onmouseleave = () => { btnSave.style.background = '#1a2e1a'; };
+    btnSave.onclick = () => { dsk.discord.saveConfig(); dsk.localMsg('Discord Config: Salvo!', '#5f5'); };
+
+
+    const btnClear = document.createElement('button');
+    btnClear.textContent = '🗑 Limpar';
+    Object.assign(btnClear.style, {
+      flex: '1', padding: '7px 0', borderRadius: '7px',
+      border: '1px solid #f55', background: '#2e1a1a',
+      color: '#f55', cursor: 'pointer', fontFamily: 'Verdana', fontSize: '11px',
+    });
+    btnClear.onmouseenter = () => { btnClear.style.background = '#4e2a2a'; };
+    btnClear.onmouseleave = () => { btnClear.style.background = '#2e1a1a'; };
+    btnClear.onclick = () => {
+      localStorage.removeItem('dsk_discord_config');
+      dsk.localMsg('Discord Config: Limpo! Recarregue o mod.', '#ff0');
+    };
+
+
+    footer.appendChild(btnSave);
+    footer.appendChild(btnClear);
+    dcmPanel.appendChild(header);
+    dcmPanel.appendChild(body);
+    dcmPanel.appendChild(footer);
+    document.body.appendChild(dcmPanel);
+    renderFields();
+  }
+
+
+  function removePanel() {
+    if (dcmPanel) { dcmPanel.remove(); dcmPanel = null; }
+  }
+
+
+  dsk.setCmd('/discordconfig', () => {
+    if (dcmPanel) {
+      removePanel();
+      dsk.localMsg('Discord Config: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Discord Config: Aberto', '#5f5');
+    }
   });
-};
+})();
 
-dsk.setCmd('/discordconfig', () => {
-  dcm.visible = !dcm.visible;
-  if (dcm.visible) dsk.discordManager.refresh();
-  dsk.localMsg(`Discord Config: ${dcm.visible ? 'Aberto' : 'Fechado'}`, dcm.visible ? '#5f5' : '#f55');
-});
+
 
 
 dsk.discord.send = (webhookUrl, username, message) => {
@@ -910,14 +1360,17 @@ dsk.discord.send = (webhookUrl, username, message) => {
   });
 };
 
+
 dsk.setCmd('/discord', () => {
   dsk.discord.enabled = !dsk.discord.enabled;
   dsk.localMsg(`Discord: ${dsk.discord.enabled ? 'enabled' : 'disabled'}`, dsk.discord.enabled ? '#5f5' : '#f55');
 });
 
+
 dsk.on('postPacket:pkg', packet => {
   if (!dsk.discord.enabled) return;
   if (!packet?.data) return;
+
 
   try {
     const arr = JSON.parse(packet.data);
@@ -925,10 +1378,13 @@ dsk.on('postPacket:pkg', packet => {
       const item = JSON.parse(raw);
       if (item.type !== 'message') return;
 
+
       const color = (item.text.match(/style=['"]?color:\s*(#[0-9a-fA-F]{6})['"]?/) || [])[1]?.toLowerCase();
       const text = dsk.stripHTMLTags(item.text).trim();
 
+
       if (!text) return;
+
 
       if (color === '#ff9900') {
         dsk.discord.send(dsk.discord.tribeUrl, '[TRIBE]', text);
@@ -937,15 +1393,17 @@ dsk.on('postPacket:pkg', packet => {
       } else if (color === '#339966') {
         dsk.discord.send(dsk.discord.respawnUrl, '[RESPAWN] ✅', text);
       } else if (item.name) {
-		  let decoded;
-		  try { decoded = unescape(text); } catch { decoded = text; }
-		  dsk.discord.send(dsk.discord.globalUrl, `[GLOBAL] ${item.name}`, decoded);
-		}
+                  let decoded;
+                  try { decoded = unescape(text); } catch { decoded = text; }
+                  dsk.discord.send(dsk.discord.globalUrl, `[GLOBAL] ${item.name}`, decoded);
+                }
     });
   } catch (e) { console.log('Discord parse error:', e); }
 });
 
+
 //funções novas//
+
 
 async function xDoMove(ex, wy) {
     if (xMovingNow)
@@ -987,7 +1445,9 @@ async function xDoMove(ex, wy) {
         xSolids[i] = new Array(16).fill(undefined);
     }
 
+
     for (j = 0; j < 46; j++) {
+
 
         for (k = 0; k < 16; k++) {
             if (xGetTileByPos((j + xSolidsPos[0]), (k + xSolidsPos[1])) == 325) {
@@ -996,9 +1456,11 @@ async function xDoMove(ex, wy) {
         }
     }
 
+
     for (i in objects.items) {
         if (objects.items[i] != undefined) {
             if (objects.items[i].can_pickup == 0) {
+
 
                 for (j = 0; j < 46; j++) {
                     for (k = 0; k < 16; k++) {
@@ -1012,54 +1474,57 @@ async function xDoMove(ex, wy) {
             }
         }
     }
-	// ── Paredes do mapa ──────────────────────────────────────────
-	for (j = 0; j < 46; j++) {
-		for (k = 0; k < 16; k++) {
-			if (xSolids[j][k] !== undefined) continue; // já marcado
-			const wall = xGetWallByPos((j + xSolidsPos[0]), (k + xSolidsPos[1]));
-			if (wall && wall.can_block === 1) {
-				xSolids[j][k] = wall.name;
-			}
-		}
-	}
+        // ── Paredes do mapa ──────────────────────────────────────────
+        for (j = 0; j < 46; j++) {
+                for (k = 0; k < 16; k++) {
+                        if (xSolids[j][k] !== undefined) continue; // já marcado
+                        const wall = xGetWallByPos((j + xSolidsPos[0]), (k + xSolidsPos[1]));
+                        if (wall && wall.can_block === 1) {
+                                xSolids[j][k] = wall.name;
+                        }
+                }
+        }
     let _bound = 0;
-	for (k = 0; k < 16; k++) {
-		for (j = 0; j < 46; j++) {
-			if (xSolids[j][k] != undefined) {
-				_bound = k - 1;
-				break;
-			}
-		}
-	}
-	if (_bound >= 4) {
-		_bound = 4;
-	}
-	for (k = 0; k < 16; k++) {
-		for (j = 0; j < _bound; j++) {
-			xSolids[j][k] = "Void";
-		}
-	}
+        for (k = 0; k < 16; k++) {
+                for (j = 0; j < 46; j++) {
+                        if (xSolids[j][k] != undefined) {
+                                _bound = k - 1;
+                                break;
+                        }
+                }
+        }
+        if (_bound >= 4) {
+                _bound = 4;
+        }
+        for (k = 0; k < 16; k++) {
+                for (j = 0; j < _bound; j++) {
+                        xSolids[j][k] = "Void";
+                }
+        }
+
 
     _bound = 0;
-	for (k = 0; k < 16; k++) {
-		for (j = 45; j > 0; j--) {
-			if (xSolids[j][k] != undefined) {
-				_bound = k - 1;
-				break;
-			}
-		}
-	}
-	if (_bound <= 42) {
-		_bound = 42;
-	}
-	for (k = 0; k < 16; k++) {
-		for (j = _bound; j < 46; j++) {
-			xSolids[j][k] = "Void";
-		}
-	}
+        for (k = 0; k < 16; k++) {
+                for (j = 45; j > 0; j--) {
+                        if (xSolids[j][k] != undefined) {
+                                _bound = k - 1;
+                                break;
+                        }
+                }
+        }
+        if (_bound <= 42) {
+                _bound = 42;
+        }
+        for (k = 0; k < 16; k++) {
+                for (j = _bound; j < 46; j++) {
+                        xSolids[j][k] = "Void";
+                }
+        }
+
 
     for (i in mobs.items) {
         if (mobs.items[i] != undefined) {
+
 
             for (j = 0; j < 46; j++) {
                 for (k = 0; k < 16; k++) {
@@ -1072,6 +1537,7 @@ async function xDoMove(ex, wy) {
             }
         }
     }
+
 
     xGCost[xStartPos[0]][xStartPos[1]] = 1;
     xACost[xStartPos[0]][xStartPos[1]] = xGetDistance(xStartPos[0], xStartPos[1], xEndPos[0], xEndPos[1]);
@@ -1088,6 +1554,7 @@ async function WaitForCheck() {
         await xDelay(300);
         await WaitForCheck();
     }
+
 
 }
 async function xCheck(ex, wy) {
@@ -1130,7 +1597,9 @@ async function xCheck(ex, wy) {
         xSolidsCH[i] = new Array(16).fill(undefined);
     }
 
+
     for (j = 0; j < 46; j++) {
+
 
         for (k = 0; k < 16; k++) {
             if (xGetTileByPos((j + xSolidsPosCH[0]), (k + xSolidsPosCH[1])) == 325) {
@@ -1139,9 +1608,11 @@ async function xCheck(ex, wy) {
         }
     }
 
+
     for (i in objects.items) {
         if (objects.items[i] != undefined) {
             if (objects.items[i].can_pickup == 0) {
+
 
                 for (j = 0; j < 46; j++) {
                     for (k = 0; k < 16; k++) {
@@ -1155,54 +1626,57 @@ async function xCheck(ex, wy) {
             }
         }
     }
-	// ── Paredes do mapa ──────────────────────────────────────────
-	for (j = 0; j < 46; j++) {
-		for (k = 0; k < 16; k++) {
-			if (xSolidsCH[j][k] !== undefined) continue; // já marcado
-			const wall = xGetWallByPos((j + xSolidsPosCH[0]), (k + xSolidsPosCH[1]));
-			if (wall && wall.can_block === 1) {
-				xSolidsCH[j][k] = wall.name;
-			}
-		}
-	}
+        // ── Paredes do mapa ──────────────────────────────────────────
+        for (j = 0; j < 46; j++) {
+                for (k = 0; k < 16; k++) {
+                        if (xSolidsCH[j][k] !== undefined) continue; // já marcado
+                        const wall = xGetWallByPos((j + xSolidsPosCH[0]), (k + xSolidsPosCH[1]));
+                        if (wall && wall.can_block === 1) {
+                                xSolidsCH[j][k] = wall.name;
+                        }
+                }
+        }
     let _bound = 0;
-	for (k = 0; k < 16; k++) {
-		for (j = 0; j < 46; j++) {
-			if (xSolidsCH[j][k] != undefined) {
-				_bound = k - 1;
-				break;
-			}
-		}
-	}
-	if (_bound >= 4) {
-		_bound = 4;
-	}
-	for (k = 0; k < 16; k++) {
-		for (j = 0; j < _bound; j++) {
-			xSolidsCH[j][k] = "Void";
-		}
-	}
+        for (k = 0; k < 16; k++) {
+                for (j = 0; j < 46; j++) {
+                        if (xSolidsCH[j][k] != undefined) {
+                                _bound = k - 1;
+                                break;
+                        }
+                }
+        }
+        if (_bound >= 4) {
+                _bound = 4;
+        }
+        for (k = 0; k < 16; k++) {
+                for (j = 0; j < _bound; j++) {
+                        xSolidsCH[j][k] = "Void";
+                }
+        }
+
 
     _bound = 0;
-	for (k = 0; k < 16; k++) {
-		for (j = 45; j > 0; j--) {
-			if (xSolidsCH[j][k] != undefined) {
-				_bound = k - 1;
-				break;
-			}
-		}
-	}
-	if (_bound <= 42) {
-		_bound = 42;
-	}
-	for (k = 0; k < 16; k++) {
-		for (j = _bound; j < 46; j++) {
-			xSolidsCH[j][k] = "Void";
-		}
-	}
+        for (k = 0; k < 16; k++) {
+                for (j = 45; j > 0; j--) {
+                        if (xSolidsCH[j][k] != undefined) {
+                                _bound = k - 1;
+                                break;
+                        }
+                }
+        }
+        if (_bound <= 42) {
+                _bound = 42;
+        }
+        for (k = 0; k < 16; k++) {
+                for (j = _bound; j < 46; j++) {
+                        xSolidsCH[j][k] = "Void";
+                }
+        }
+
 
     for (i in mobs.items) {
         if (mobs.items[i] != undefined) {
+
 
             for (j = 0; j < 46; j++) {
                 for (k = 0; k < 16; k++) {
@@ -1215,6 +1689,7 @@ async function xCheck(ex, wy) {
             }
         }
     }
+
 
     xGCostCH[xStartPosCH[0]][xStartPosCH[1]] = 1;
     xACostCH[xStartPosCH[0]][xStartPosCH[1]] = xGetDistance(xStartPosCH[0], xStartPosCH[1], xEndPosCH[0], xEndPosCH[1]);
@@ -1260,11 +1735,13 @@ async function xSetOpenCH(ex, wy) {
         } else {
             if (xGetSolidsCH(ex + 1, wy) != true && xGCostCH[ex + 1][wy] == undefined) {
 
+
                 xGCostCH[ex + 1][wy] = xGCostCH[ex][wy] + 1;
                 xACostCH[ex + 1][wy] = xGetDistance(ex + 1, wy, xEndPosCH[0], xEndPosCH[1]);
                 xGOpenCH[ex + 1][wy] = true;
             }
             if (xGetSolidsCH(ex - 1, wy) != true && xGCostCH[ex - 1][wy] == undefined) {
+
 
                 xGCostCH[ex - 1][wy] = xGCostCH[ex][wy] + 1;
                 xACostCH[ex - 1][wy] = xGetDistance(ex - 1, wy, xEndPosCH[0], xEndPosCH[1]);
@@ -1272,11 +1749,13 @@ async function xSetOpenCH(ex, wy) {
             }
             if (xGetSolidsCH(ex, wy + 1) != true && xGCostCH[ex][wy + 1] == undefined) {
 
+
                 xGCostCH[ex][wy + 1] = xGCostCH[ex][wy] + 1;
                 xACostCH[ex][wy + 1] = xGetDistance(ex, wy + 1, xEndPosCH[0], xEndPosCH[1]);
                 xGOpenCH[ex][wy + 1] = true;
             }
             if (xGetSolidsCH(ex, wy - 1) != true && xGCostCH[ex][wy - 1] == undefined) {
+
 
                 xGCostCH[ex][wy - 1] = xGCostCH[ex][wy] + 1;
                 xACostCH[ex][wy - 1] = xGetDistance(ex, wy - 1, xEndPosCH[0], xEndPosCH[1]);
@@ -1288,7 +1767,9 @@ async function xSetOpenCH(ex, wy) {
         xGOpenCH[ex][wy] = false;
         xGetOpenTilesCH();
 
+
     }
+
 
 }
 async function xSetOpen(ex, wy) {
@@ -1303,11 +1784,13 @@ async function xSetOpen(ex, wy) {
         } else {
             if (xGetSolids(ex + 1, wy) != true && xGCost[ex + 1][wy] == undefined) {
 
+
                 xGCost[ex + 1][wy] = xGCost[ex][wy] + 1;
                 xACost[ex + 1][wy] = xGetDistance(ex + 1, wy, xEndPos[0], xEndPos[1]);
                 xGOpen[ex + 1][wy] = true;
             }
             if (xGetSolids(ex - 1, wy) != true && xGCost[ex - 1][wy] == undefined) {
+
 
                 xGCost[ex - 1][wy] = xGCost[ex][wy] + 1;
                 xACost[ex - 1][wy] = xGetDistance(ex - 1, wy, xEndPos[0], xEndPos[1]);
@@ -1315,11 +1798,13 @@ async function xSetOpen(ex, wy) {
             }
             if (xGetSolids(ex, wy + 1) != true && xGCost[ex][wy + 1] == undefined) {
 
+
                 xGCost[ex][wy + 1] = xGCost[ex][wy] + 1;
                 xACost[ex][wy + 1] = xGetDistance(ex, wy + 1, xEndPos[0], xEndPos[1]);
                 xGOpen[ex][wy + 1] = true;
             }
             if (xGetSolids(ex, wy - 1) != true && xGCost[ex][wy - 1] == undefined) {
+
 
                 xGCost[ex][wy - 1] = xGCost[ex][wy] + 1;
                 xACost[ex][wy - 1] = xGetDistance(ex, wy - 1, xEndPos[0], xEndPos[1]);
@@ -1331,7 +1816,9 @@ async function xSetOpen(ex, wy) {
         xGOpen[ex][wy] = false;
         xGetOpenTiles();
 
+
     }
+
 
 }
 function xSetEndLowA() {
@@ -1422,9 +1909,11 @@ function xGetCheckLoaded(ex, wy) {
     }
 }
 
+
 function xGetDistance(x1, y1, x2, y2) {
     return Math.abs(x1 - x2) + Math.abs(y1 - y2);
 }
+
 
 function xGetDistanceTwo(x1, x2) {
     return Math.abs(x1 - x2);
@@ -1439,6 +1928,7 @@ async function xFindPath(ex, wy, Direc) {
             xGCost[ex][wy] = 222;
             xACost[ex][wy] = 4;
 
+
         }
         xFindPath(ex - 1, wy, 4)
     } else if (xGCost[ex + 1][wy] == xGCost[ex][wy] - 1) {
@@ -1448,6 +1938,7 @@ async function xFindPath(ex, wy, Direc) {
         } else {
             xGCost[ex][wy] = 222;
             xACost[ex][wy] = 2;
+
 
         }
         xFindPath(ex + 1, wy, 2)
@@ -1459,6 +1950,7 @@ async function xFindPath(ex, wy, Direc) {
             xGCost[ex][wy] = 222;
             xACost[ex][wy] = 1;
 
+
         }
         xFindPath(ex, wy - 1, 1)
     } else if (xGCost[ex][wy + 1] == xGCost[ex][wy] - 1) {
@@ -1469,10 +1961,12 @@ async function xFindPath(ex, wy, Direc) {
             xGCost[ex][wy] = 222;
             xACost[ex][wy] = 3;
 
+
         }
         xFindPath(ex, wy + 1, 3)
     }
     if (ex == xStartPos[0] && wy == xStartPos[1]) {
+
 
         xDoMoveMaker();
     }
@@ -1495,13 +1989,16 @@ async function xDoMoveMaker() {
     xACost[myself.x - xSolidsPos[0]][myself.y - xSolidsPos[1]] = undefined;
     if (myself.x - xSolidsPos[0] >= 45 || myself.x - xSolidsPos[0] <= 1 || myself.y - xSolidsPos[1] >= 15 || myself.y - xSolidsPos[1] <= 1) {
 
+
         xDoKeyUp(1);
         xDoKeyUp(2);
         xDoKeyUp(3);
         xDoKeyUp(0);
         xMovingNow = false;
 
+
     } else if (xACost[myself.x - xSolidsPos[0] + 1][myself.y - xSolidsPos[1]] != undefined) {
+
 
         if (xGetSolidByID(myself.x + 1, myself.y) == undefined) {
             xDoKeyDown(0);
@@ -1511,6 +2008,7 @@ async function xDoMoveMaker() {
             await xDelay(40);
             xDoMoveMaker();
 
+
         } else {
             xDoKeyUp(1);
             xDoKeyUp(2);
@@ -1518,9 +2016,11 @@ async function xDoMoveMaker() {
             xDoKeyUp(0);
             xMovingNow = false;
 
+
         }
     }
     else if (xACost[myself.x - xSolidsPos[0] - 1][myself.y - xSolidsPos[1]] != undefined) {
+
 
         if (xGetSolidByID(myself.x - 1, myself.y) == undefined) {
             xDoKeyDown(1);
@@ -1530,6 +2030,7 @@ async function xDoMoveMaker() {
             await xDelay(40);
             xDoMoveMaker();
 
+
         } else {
             xDoKeyUp(1);
             xDoKeyUp(2);
@@ -1537,9 +2038,11 @@ async function xDoMoveMaker() {
             xDoKeyUp(0);
             xMovingNow = false;
 
+
         }
     }
     else if (xACost[myself.x - xSolidsPos[0]][myself.y - xSolidsPos[1] - 1] != undefined) {
+
 
         if (xGetSolidByID(myself.x, myself.y - 1) == undefined) {
             xDoKeyDown(2);
@@ -1549,6 +2052,7 @@ async function xDoMoveMaker() {
             await xDelay(40);
             xDoMoveMaker();
 
+
         } else {
             xDoKeyUp(1);
             xDoKeyUp(2);
@@ -1556,9 +2060,11 @@ async function xDoMoveMaker() {
             xDoKeyUp(0);
             xMovingNow = false;
 
+
         }
     }
     else if (xACost[myself.x - xSolidsPos[0]][myself.y - xSolidsPos[1] + 1] != undefined) {
+
 
         if (xGetSolidByID(myself.x, myself.y + 1) == undefined) {
             xDoKeyDown(3);
@@ -1568,12 +2074,14 @@ async function xDoMoveMaker() {
             await xDelay(40);
             xDoMoveMaker();
 
+
         } else {
             xDoKeyUp(1);
             xDoKeyUp(2);
             xDoKeyUp(3);
             xDoKeyUp(0);
             xMovingNow = false;
+
 
         }
     } else {
@@ -1620,6 +2128,7 @@ async function xDoKeyUp(id) {
     jv.key_array[id].isUP = true;
     await xDelay(25);
     if (id == 6) {
+
 
         await xDelay(25);
         await xDoKeyPress(6, 102);
@@ -1759,14 +2268,18 @@ async function xDoUseSlotByID(slotID) { //--
     await xDelay(183);
 }
 
+
 //HIDE NAME //
+
 
 dsk.hide = {
   enabled: false
 };
 
+
 dsk.setCmd('/hide', () => {
   dsk.hide.enabled = !dsk.hide.enabled;
+
 
   if (dsk.hide.enabled) {
     myself.title.alpha = 0;
@@ -1778,42 +2291,58 @@ dsk.setCmd('/hide', () => {
 });
 
 
+
+
 // ── AUTO CRAFT ─────────────────────────────────────────────
+
+
+const craftConfig = {
+  tpl: 'wood_arrow',
+};
+
 
 dsk.craft = {
   enabled: false
 };
 
+
 dsk.craft.loop = async () => {
   while (dsk.craft.enabled) {
 
-	if (currentLevel > 0 && skillLevel >= currentLevel && ['crafting'].includes(skillName)) {
-	await xDelay(1000);
-	dsk.craft.enabled = false;
-	dsk.localMsg('Craft: Desativado', '#f55');
+
+        if (currentLevel > 0 && skillLevel >= currentLevel && ['crafting'].includes(skillName)) {
+        await xDelay(1000);
+        dsk.craft.enabled = false;
+        dsk.localMsg('Craft: Desativado', '#f55');
     return;
-	}
-	if (dskPaused) return; // ← adiciona isso
+        }
+        if (dskPaused) return;
     if (!myself || game_state !== 2) return;
 
+
     if (game_state == 2) {
-      send({ type: "bld", tpl: "wood_arrow" });
+      send({ type: "bld", tpl: craftConfig.tpl });
       await dsk.wait(150);
     }
+
 
     await dsk.wait(50); // proteção anti-freeze
   }
 };
 
+
 // ── AUTO FOLLOW ─────────────────────────────────────────────
+
 
 dsk.on('postLoop', () => {
   if (!dsk.follow.enabled) return;
   if (!myself || !mobs?.items) return;
   if (xMovingNow) return; // já está se movendo
 
+
   const target = mobs.items.find(el => el?.name === dsk.follow.targetName);
   if (!target) return;
+
 
   // Só move se estiver a mais de 1 tile de distância
   const dist = Math.abs(myself.x - target.x) + Math.abs(myself.y - target.y);
@@ -1822,7 +2351,9 @@ dsk.on('postLoop', () => {
   }
 });
 
+
 // ── SPEED HACK ─────────────────────────────────────────────
+
 
 dsk.speed = {
   enabled: false,
@@ -1830,212 +2361,301 @@ dsk.speed = {
   value: 250  // valor padrão
 };
 
+
 dsk.speed.start = () => {
   if (dsk.speed.interval) return;
+
 
   dsk.speed.interval = setInterval(() => {
     if (dskPaused) return;
     if (!myself || game_state !== 2) return;
 
+
     myself.cur_speed = dsk.speed.value;
     last_dest = 9e10;
   }, 5);
 
+
   dsk.localMsg(`Speed: Ativado (${dsk.speed.value})`, '#5f5');
 };
+
 
 dsk.speed.stop = () => {
   if (!dsk.speed.interval) return;
 
+
   clearInterval(dsk.speed.interval);
   dsk.speed.interval = null;
+
 
   dsk.localMsg('Speed: Desativado', '#f55');
 };
 
+
 // ── WHO MANAGER ─────────────────────────────────────────────
 
-dsk.whoManager = jv.Dialog.create(300, 320);
-const wm = dsk.whoManager;
-wm.visible = false;
-wm.enemies = [];
 
-wm.header = jv.text('Players Online', {
-  font: '16px Verdana',
-  fill: 0xFFD700,
-  stroke: 0x555555,
-  strokeThickness: 2,
-});
-wm.addChild(wm.header);
-jv.center(wm.header);
-jv.top(wm.header, 4);
+dsk.whoManager = (function () {
 
-wm.close = jv.Button.create(0, 0, 24, 'X', wm, 24);
-jv.top(wm.close, 4);
-jv.right(wm.close, 4);
-wm.close.on_click = () => (wm.visible = 0);
 
-wm.move = jv.Button.create(0, 0, 24, '@', wm, 24);
-jv.top(wm.move, 4);
-jv.right(wm.move, 28);
+  const perPage = 12;
+  let currentPage = 0;
+  let players = [];
+  let whoWindow = null;
+  let listText = [];
+  let pageText = null;
+  let prevBtn = null;
+  let nextBtn = null;
 
-wm._px = 0;
-wm._py = 0;
-window.addEventListener('mousemove', e => { wm._px = e.clientX; wm._py = e.clientY; });
-window.addEventListener('touchmove', e => { wm._px = e.touches[0].clientX; wm._py = e.touches[0].clientY; });
 
-wm.updatePosition = () => {
-  if (wm.move.is_pressed) {
-    const canvas = document.querySelector('canvas');
-    const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: jv.game_width, height: jv.game_height };
-    wm.x = (wm._px - rect.left) * (jv.game_width / rect.width) - wm.w / 2;
-    wm.y = (wm._py - rect.top) * (jv.game_height / rect.height) - 12;
+  function totalPages() {
+    return Math.ceil(players.length / perPage);
   }
-  if (wm.x < 0) wm.x = 0;
-  if (wm.y < 0) wm.y = 0;
-  if (wm.x + wm.w > jv.game_width)  wm.x = jv.game_width - wm.w;
-  if (wm.y + wm.h > jv.game_height) wm.y = jv.game_height - wm.h;
-};
-dsk.on('postLoop', wm.updatePosition);
 
-// Paginação
-wm.page = 0;
-wm.perPage = 17;
-wm.players = [];
-wm.lines = [];
 
-wm.btnPrev = jv.Button.create(0, 0, 24, '<', wm, 24);
-jv.bottom(wm.btnPrev, 4);
-wm.btnPrev.x = wm.w - 58;
-wm.btnPrev.on_click = () => {
-  if (wm.page > 0) { wm.page--; wm.render(); }
-};
+  function renderPage() {
 
-wm.btnNext = jv.Button.create(0, 0, 24, '>', wm, 24);
-jv.bottom(wm.btnNext, 4);
-wm.btnNext.x = wm.w - 30;
-wm.btnNext.on_click = () => {
-  const maxPage = Math.ceil(wm.players.length / wm.perPage) - 1;
-  if (wm.page < maxPage) { wm.page++; wm.render(); }
-};
 
-wm.pageLabel = jv.text('', {
-  font: '11px Verdana',
-  fill: 0xffffff,
-  stroke: 0x000000,
-  strokeThickness: 2,
-});
-wm.pageLabel.x = wm.w - 100;
-jv.bottom(wm.pageLabel, 8);
-wm.addChild(wm.pageLabel);
-wm.loadingLabel = jv.text('', {
-  font: '11px Verdana',
-  fill: 0xffffff,
-  stroke: 0x000000,
-  strokeThickness: 2,
-  lineJoin: 'round',
-});
-wm.loadingLabel.x = 10;
-wm.loadingLabel.y = 35;
-wm.addChild(wm.loadingLabel);
+    const start = currentPage * perPage;
+    const end = Math.min(start + perPage, players.length);
 
-wm.parse = (text) => {
-  const matches = [...text.matchAll(/(\w+):(\d+)/g)];
-  return matches.map(m => ({
-    name:  m[1],
-    level: parseInt(m[2]),
-  })).sort((a, b) => b.level - a.level);
-};
 
-wm.render = () => {
-  if (wm.lines) wm.lines.forEach(l => wm.removeChild(l));
-  wm.lines = [];
+    // limpa textos antigos
+    for (let i = 0; i < listText.length; i++) {
+      const t = listText[i];
+      if (t && t.parent) t.parent.removeChild(t);
+    }
+    listText = [];
 
-  const start = wm.page * wm.perPage;
-  const slice = wm.players.slice(start, start + wm.perPage);
-  const maxPage = Math.ceil(wm.players.length / wm.perPage);
 
-  slice.forEach((p, i) => {
-    const isEnemy = wm.enemies.includes(p.name.toLowerCase());
-    const color = isEnemy ? '#ff4444' : '#ffffff';
-    const label = jv.text(`${isEnemy ? '⚔ ' : ''}${p.name} — Lv ${p.level}`, {
-      font: '11px Verdana',
-      fill: color,
-      stroke: 0x000000,
-      strokeThickness: 2,
-      lineJoin: 'round',
-    });
-    label.x = 10;
-    label.y = 35 + i * 15;
-    wm.addChild(label);
-    wm.lines.push(label);
-  });
+    for (let i = start; i < end; i++) {
 
-  wm.header.text = `Players Online (${wm.players.length})`;
-  wm.pageLabel.text = `${wm.page + 1}/${maxPage}`;
-  jv.center(wm.header);
-};
 
-dsk.on('postPacket:pkg', packet => {
-  if (!wm.waiting) return;
-  if (!packet?.data) return;
+      const p = players[i];
+      const isEnemy = (dsk.enemyList || []).includes(p.name.toLowerCase());
 
-  try {
-    const arr = JSON.parse(packet.data);
-    arr.forEach(raw => {
-      const item = JSON.parse(raw);
-      if (item.type !== 'message') return;
 
-      const text = dsk.stripHTMLTags(item.text);
-      if (!text.includes('players:')) return;
+      const prefix = p.name === myself.name ? "▶ " : "   ";
 
-      wm.players = wm.parse(text);
-      wm.page = 0;
-      wm.loadingLabel.text = '';
-      wm.render();
-      wm.waiting = false;
 
-      // Envia para Discord se estiver ativo
-      if (dsk.discord.enabled) {
-        const lines = wm.players.map((p, i) => {
-          const isEnemy = wm.enemies.includes(p.name.toLowerCase());
-          return `${i + 1}. ${isEnemy ? '⚔ ' : ''}${p.name} — Lv ${p.level}`;
-        }).join('\n');
-
-        const msg = `**Players Online (${wm.players.length})**\n${lines}`;
-
-        for (let i = 0; i < msg.length; i += 1900) {
-          dsk.discord.send(dsk.discord.whoUrl, '[WHO]', msg.slice(i, i + 1900));
+      const txt = jv.text(
+        prefix + p.name + " - " + p.lvl,
+        {
+          font: "11px Verdana",
+          fill: isEnemy ? 0xff4444 : 0xffffff
         }
-      }
-    });
-  } catch (e) { console.log('WhoManager error:', e); }
-});
+      );
 
-// Comandos
+
+      txt.x = 10;
+      txt.y = 55 + (i - start) * 14;
+
+
+      txt.setParent(whoWindow);
+      listText.push(txt);
+    }
+
+
+    pageText.text = (currentPage + 1) + "/" + totalPages();
+
+
+    prevBtn.visible = currentPage > 0;
+    nextBtn.visible = currentPage < totalPages() - 1;
+  }
+
+
+  function show(total, parsedPlayers) {
+
+
+    if (whoWindow) {
+      whoWindow.destroy();
+      whoWindow = null;
+    }
+
+
+    const windowHeight = 260;
+
+
+    players = parsedPlayers;
+    currentPage = 0;
+
+
+    whoWindow = make_dialog(160, windowHeight, "Players Online", 1);
+    whoWindow.children[3].destroy();
+
+
+    jv.add(whoWindow);
+    whoWindow.setParent(ui_container);
+
+
+    whoWindow.x = (jv.game_width / 2) - 80;
+    whoWindow.y = (jv.game_height / 2) - 130;
+
+
+    const closeBtn = jv.Button.create(135, 8, 20, "X", whoWindow, 23);
+    closeBtn.on_click = () => {
+      whoWindow.destroy();
+      whoWindow = null;
+    };
+
+
+    const headerText = jv.text("Online: " + total, {
+      font: "12px Verdana",
+      fill: 0xffff00
+    });
+
+
+    headerText.x = 10;
+    headerText.y = 35;
+    headerText.setParent(whoWindow);
+
+
+    listText = [];
+
+
+    prevBtn = jv.Button.create(10, windowHeight - 35, 40, "<", whoWindow, 23);
+    nextBtn = jv.Button.create(108, windowHeight - 35, 40, ">", whoWindow, 23);
+
+
+    pageText = jv.text("", {
+      font: "10px Verdana",
+      fill: 0xaaaaaa
+    });
+
+
+    pageText.x = 70;
+    pageText.y = windowHeight - 28;
+    pageText.setParent(whoWindow);
+
+
+    prevBtn.on_click = () => {
+      if (currentPage > 0) {
+        currentPage--;
+        renderPage();
+      }
+    };
+
+
+    nextBtn.on_click = () => {
+      if (currentPage < totalPages() - 1) {
+        currentPage++;
+        renderPage();
+      }
+    };
+
+
+    renderPage();
+    whoWindow.show();
+  }
+
+
+  function parseWho(text) {
+
+
+    const clean = text.replace(/<[^>]+>/g, '');
+
+
+    const totalMatch = clean.match(/^(\d+)\s+players:/);
+    const total = totalMatch ? parseInt(totalMatch[1]) - 1 : "?";
+
+
+    const playersPart = clean.slice(clean.indexOf('players:') + 8).trim();
+
+
+    const parsed = playersPart
+      .replace(/\.$/, '')
+      .split(' ')
+      .map(p => {
+        const parts = p.split(':');
+        return { name: parts[0], lvl: parseInt(parts[1]) || 0 };
+      })
+      .filter(p => p.name && p.name !== 'Broadcast')
+      .sort((a, b) => b.lvl - a.lvl);
+
+
+    return { total, players: parsed };
+  }
+
+
+  const _whoOriginal = _originalParse;
+
+
+  window.parse = function(packet) {
+
+
+    if (packet.text?.includes('players:')) {
+      const { total, players } = parseWho(packet.text);
+      show(total, players);
+      return;
+    }
+
+
+    _whoOriginal(packet);
+  };
+
+
+  return { show, parseWho };
+
+
+})();
+
+
+
+
+// ── COMANDOS ─────────────────────────────────────────────
+
+
 dsk.setCmd('/on', () => {
-  wm.visible = true;
-  wm.waiting = true;
-  wm.loadingLabel.text = 'Loading...';
   _originalSend({ type: 'chat', data: '/who' });
 });
 
+
+// Carrega lista de inimigos salva (roda uma vez ao carregar o mod)
+try {
+  const _saved = JSON.parse(localStorage.getItem('dsk_enemy_list') || '[]');
+  dsk.enemyList = Array.isArray(_saved) ? _saved : [];
+  if (dsk.enemyList.length > 0)
+    dsk.localMsg(`Enemy list: ${dsk.enemyList.length} inimigo(s) carregado(s)`, '#f55');
+} catch(_) { dsk.enemyList = []; }
+
+
 dsk.setCmd('/enemy', (context) => {
+
+
   if (!context) {
-    dsk.localMsg('Uso: /enemy NomeJogador', '#ff0');
+    // Sem argumento → lista os inimigos salvos
+    if (dsk.enemyList.length === 0) {
+      dsk.localMsg('Enemy list: vazia', '#aaa');
+    } else {
+      dsk.localMsg(`Inimigos (${dsk.enemyList.length}): ${dsk.enemyList.join(', ')}`, '#f55');
+    }
     return;
   }
+
+
   const name = context.trim().toLowerCase();
-  if (wm.enemies.includes(name)) {
-    dsk.removeFromArr(name, wm.enemies);
+
+
+  if (dsk.enemyList.includes(name)) {
+    dsk.enemyList = dsk.enemyList.filter(e => e !== name);
     dsk.localMsg(`Inimigo removido: ${context.trim()}`, '#f55');
   } else {
-    wm.enemies.push(name);
+    dsk.enemyList.push(name);
     dsk.localMsg(`Inimigo adicionado: ${context.trim()}`, '#f44');
   }
-  wm.render();
+
+
+  // Salva no localStorage após cada alteração
+  try { localStorage.setItem('dsk_enemy_list', JSON.stringify(dsk.enemyList)); } catch(_) {}
 });
 
+
+// /enemyclear → limpa tudo
+dsk.setCmd('/enemyclear', () => {
+  dsk.enemyList = [];
+  try { localStorage.removeItem('dsk_enemy_list'); } catch(_) {}
+  dsk.localMsg('Enemy list: limpa', '#aaa');
+});
 async function xDoSignUp(usernameVal, passVal, emailVal) {
     await xDelay(25);
     send({
@@ -2047,29 +2667,37 @@ async function xDoSignUp(usernameVal, passVal, emailVal) {
     await xDelay(25);
 }
 
+
 dsk.setCmd('/signup', async (context) => {
     if (!context) {
         dsk.localMsg('Uso: /signup usuario senha email', '#ff0');
         return;
     }
 
+
     const parts = context.trim().split(' ');
+
 
     if (parts.length < 3) {
         dsk.localMsg('Uso: /signup usuario senha email', '#ff0');
         return;
     }
 
+
     const usuario = parts[0];
     const senha   = parts[1];
     const email   = parts[2];
 
+
     dsk.localMsg(`Criando conta: ${usuario}...`, '#0ff');
+
 
     await xDoSignUp(usuario, senha, email);
 
+
     dsk.localMsg(`Conta criada: ${usuario}`, '#5f5');
 });
+
 
 async function xWaitWall(ex, wy, tries = 0) {
     if (tries > 50) {
@@ -2081,6 +2709,7 @@ async function xWaitWall(ex, wy, tries = 0) {
         await xWaitWall(ex, wy, tries + 1);
     }
 }
+
 
 async function xDoBuild(type, dir) {
     await xDelay(250);
@@ -2094,6 +2723,7 @@ async function xDoBuild(type, dir) {
     else if (dir == 3) await xWaitWall(myself.x - 1, myself.y    );
 }
 
+
 dsk.setCmd('/build', async (context) => {
     if (!context) {
         dsk.localMsg('Uso: /build <tipo> <direcao> <quantidade>', '#ff0');
@@ -2102,15 +2732,18 @@ dsk.setCmd('/build', async (context) => {
         return;
     }
 
+
     const parts  = context.trim().split(' ');
     const tipo   = parts[0];
     const dir    = parseInt(parts[1]);
     const amount = parseInt(parts[2]) || 1;
 
+
     if (isNaN(dir) || dir < 0 || dir > 3) {
         dsk.localMsg('Direcao invalida!', '#f55');
         return;
     }
+
 
     // Anda paralelo à direção de construção
     const moveOffset = {
@@ -2120,11 +2753,14 @@ dsk.setCmd('/build', async (context) => {
         3: { x:  0, y:  1 }, // construindo pra esquerda → anda baixo
     };
 
+
     dsk.localMsg(`Build: construindo ${amount}x ${tipo}...`, '#0ff');
+
 
     for (let i = 0; i < amount; i++) {
         await xDoBuild(tipo, dir);
         await xDelay(300);
+
 
         if (i < amount - 1) { // não anda no último
             const nx = myself.x + moveOffset[dir].x;
@@ -2134,8 +2770,10 @@ dsk.setCmd('/build', async (context) => {
         }
     }
 
+
     dsk.localMsg(`Build: ${amount}x ${tipo} concluido!`, '#5f5');
 });
+
 
 dsk.setCmd('/buildsnake', async (context) => {
     const parts  = context?.trim().split(' ') ?? [];
@@ -2143,14 +2781,18 @@ dsk.setCmd('/buildsnake', async (context) => {
     const cols   = parseInt(parts[1]) || 10;
     const rows   = parseInt(parts[2]) || 2;
 
+
     dsk.localMsg(`BuildSnake: ${rows} linhas de ${cols}x ${tipo}...`, '#0ff');
+
 
     for (let row = 0; row < rows; row++) {
         const goingDown = row % 2 === 0; // linhas pares descem, ímpares sobem
 
+
         for (let i = 0; i < cols; i++) {
             await xDoBuild(tipo, 1); // sempre constrói pra direita
             await xDelay(300);
+
 
             if (i < cols - 1) {
                 // Anda pra baixo ou pra cima dependendo da linha
@@ -2160,6 +2802,7 @@ dsk.setCmd('/buildsnake', async (context) => {
             }
         }
 
+
         if (row < rows - 1) {
             // Anda 1 pra esquerda pra próxima coluna
             await xDoMove(myself.x - 1, myself.y);
@@ -2167,22 +2810,28 @@ dsk.setCmd('/buildsnake', async (context) => {
         }
     }
 
+
     dsk.localMsg('BuildSnake: concluido!', '#5f5');
 });
 
+
 dsk.reconnect = { enabled: false };
+
 
 // Limpa o interval anterior se existir
 if (window._alInterval) clearInterval(window._alInterval);
 if (window._alIntervalStart) clearInterval(window._alIntervalStart);
 
+
 window.alGoing  = false;
 window.hasNotif = false;
+
 
 async function autolog() {
     if (!dsk.reconnect.enabled) return;
     if (alGoing === true) return;
     alGoing = true;
+
 
     if (myself === undefined && hasNotif === true) {
         if (connection !== undefined) {
@@ -2206,8 +2855,10 @@ async function autolog() {
         }
     }
 
+
     alGoing = false;
 }
+
 
 function startautolog() {
     if (myself !== undefined) {
@@ -2217,8 +2868,10 @@ function startautolog() {
     }
 }
 
+
 dsk.setCmd('/reconnect', () => {
     dsk.reconnect.enabled = !dsk.reconnect.enabled;
+
 
     if (dsk.reconnect.enabled) {
         hasNotif  = false;
@@ -2234,11 +2887,14 @@ dsk.setCmd('/reconnect', () => {
     }
 });
 
+
 // ── TRIBE MANAGER ─────────────────────────────────────────────
+
 
 dsk.tribeManager = jv.Dialog.create(400, 300);
 const tm = dsk.tribeManager;
 tm.visible = false;
+
 
 tm.header = jv.text('Tribe List', {
   font: '16px Verdana',
@@ -2250,19 +2906,24 @@ tm.addChild(tm.header);
 jv.center(tm.header);
 jv.top(tm.header, 4);
 
+
 tm.close = jv.Button.create(0, 0, 24, 'X', tm, 24);
 jv.top(tm.close, 4);
 jv.right(tm.close, 4);
 tm.close.on_click = () => (tm.visible = 0);
 
+
 tm.move = jv.Button.create(0, 0, 24, '@', tm, 24);
 jv.top(tm.move, 4);
 jv.right(tm.move, 28);
 
+
 tm._px = 0;
 tm._py = 0;
 window.addEventListener('mousemove', e => { tm._px = e.clientX; tm._py = e.clientY; });
+window.addEventListener('touchmove', e => { if (e.touches.length > 0) { tm._px = e.touches[0].clientX; tm._py = e.touches[0].clientY; } }, { passive: true });
 window.addEventListener('touchmove', e => { tm._px = e.touches[0].clientX; tm._py = e.touches[0].clientY; });
+
 
 tm.updatePosition = () => {
   if (tm.move.is_pressed) {
@@ -2278,6 +2939,7 @@ tm.updatePosition = () => {
 };
 dsk.on('postLoop', tm.updatePosition);
 
+
 // Label de conteúdo
 tm.content = jv.text('', {
   font: '11px Verdana',
@@ -2290,10 +2952,12 @@ tm.content.x = tm.w - 60;
 tm.content.y = 35;
 tm.addChild(tm.content);
 
+
 // Paginação
 tm.page = 0;
 tm.perPage = 17;
 tm.members = [];
+
 
 tm.btnPrev = jv.Button.create(0, 0, 24, '<', tm, 24);
 jv.bottom(tm.btnPrev, 4);
@@ -2302,6 +2966,7 @@ tm.btnPrev.on_click = () => {
   if (tm.page > 0) { tm.page--; tm.render(); }
 };
 
+
 tm.btnNext = jv.Button.create(0, 0, 24, '>', tm, 24);
 jv.bottom(tm.btnNext, 4);
 tm.btnNext.x = tm.w - 30;
@@ -2309,6 +2974,7 @@ tm.btnNext.on_click = () => {
   const maxPage = Math.ceil(tm.members.length / tm.perPage) - 1;
   if (tm.page < maxPage) { tm.page++; tm.render(); }
 };
+
 
 tm.pageLabel = jv.text('', {
   font: '11px Verdana',
@@ -2320,7 +2986,9 @@ tm.pageLabel.x = tm.w - 100;
 jv.bottom(tm.pageLabel, 8);
 tm.addChild(tm.pageLabel);
 
+
 tm.rankColor = { L: '#FFD700', E: '#FF8C00', M: '#00BFFF', R: '#ffffff' };
+
 
 tm.parse = (text) => {
   const matches = [...text.matchAll(/(\S+)\((\d+)([A-Z])\)/g)];
@@ -2331,14 +2999,17 @@ tm.parse = (text) => {
   })).sort((a, b) => b.level - a.level);
 };
 
+
 tm.render = () => {
   const start = tm.page * tm.perPage;
   const slice = tm.members.slice(start, start + tm.perPage);
   const maxPage = Math.ceil(tm.members.length / tm.perPage);
 
+
   // Remove labels antigas
   if (tm.lines) tm.lines.forEach(l => tm.removeChild(l));
   tm.lines = [];
+
 
   slice.forEach((m, i) => {
     const color = tm.rankColor[m.rank] ?? '#ffffff';
@@ -2355,17 +3026,21 @@ tm.render = () => {
     tm.lines.push(label);
   });
 
+
   tm.header.text = `Tribe List (${tm.members.length})`;
   tm.pageLabel.text = `${tm.page + 1}/${maxPage}`;
   jv.center(tm.header);
 };
 
+
 // Aguarda resposta do /tribe list
 tm.waiting = false;
+
 
 dsk.on('postPacket:pkg', packet => {
   if (!tm.waiting) return;
   if (!packet?.data) return;
+
 
   try {
     const arr = JSON.parse(packet.data);
@@ -2373,17 +3048,20 @@ dsk.on('postPacket:pkg', packet => {
       const item = JSON.parse(raw);
       if (item.type !== 'message') return;
 
+
       const text = dsk.stripHTMLTags(item.text);
       if (!text.includes('members:')) return;
 
+
       const members = tm.parse(text);
-		tm.members = members;
-		tm.page = 0;
-		tm.render();
-		tm.waiting = false;
+                tm.members = members;
+                tm.page = 0;
+                tm.render();
+                tm.waiting = false;
     });
   } catch (e) {}
 });
+
 
 dsk.setCmd('/tlist', () => {
   tm.visible = true;
@@ -2393,16 +3071,20 @@ dsk.setCmd('/tlist', () => {
   dsk.localMsg('Tribe List: carregando...', '#0ff');
 });
 
+
 // ── ABLMANAGER ───────────────────────────────────────────────
+
 
 dsk.ablManager = jv.Dialog.create(250, 120);
 const am = dsk.ablManager;
+
 
 dsk.setCmd('/abl', () => {
   const visible = !am.visible;
   am.visible = visible;
   dsk.localMsg(`AblManager: ${visible ? 'Ativado' : 'Desativado'}`, visible ? '#5f5' : '#f55');
 });
+
 
 am.header = jv.text('Abilities', {
   font: '18px Verdana',
@@ -2415,20 +3097,25 @@ am.addChild(am.header);
 jv.center(am.header);
 jv.top(am.header, 4);
 
+
 am.close = jv.Button.create(0, 0, 24, 'X', am, 24);
 jv.top(am.close, 4);
 jv.right(am.close, 4);
 am.close.on_click = () => (am.visible = 0);
+
 
 // Botão de mover (igual ao invManager)
 am.move = jv.Button.create(0, 0, 24, '@', am, 24);
 jv.top(am.move, 4);
 jv.right(am.move, 28);
 
+
 am._px = 0;
 am._py = 0;
 window.addEventListener('mousemove', e => { am._px = e.clientX; am._py = e.clientY; });
+window.addEventListener('touchmove', e => { if (e.touches.length > 0) { am._px = e.touches[0].clientX; am._py = e.touches[0].clientY; } }, { passive: true });
 window.addEventListener('touchmove', e => { am._px = e.touches[0].clientX; am._py = e.touches[0].clientY; });
+
 
 am.updatePosition = () => {
   if (am.move.is_pressed) {
@@ -2446,10 +3133,12 @@ am.updatePosition = () => {
 };
 dsk.on('postLoop', am.updatePosition);
 
+
 am.slots = [];
 am.marginLeft = 10;
 am.marginTop = 60;
 am.drag = null;
+
 
 am.dragMove = e => {
   if (am.drag && e) {
@@ -2457,6 +3146,7 @@ am.dragMove = e => {
     am.drag.y = e.data.getLocalPosition(am).y - 16;
   }
 };
+
 
 am.endDrag = () => {
   if (!am.drag) return;
@@ -2470,6 +3160,7 @@ am.endDrag = () => {
   am.drag = null;
 };
 
+
 am.dragEnd = e => {
   const tX = e.data.getLocalPosition(am).x - am.marginLeft;
   const tY = e.data.getLocalPosition(am).y - am.marginTop;
@@ -2482,6 +3173,7 @@ am.dragEnd = e => {
   am.endDrag();
 };
 
+
 am.setDrag = w => {
   am.drag = w;
   am.drag.on('pointermove', am.dragMove);
@@ -2492,9 +3184,11 @@ am.setDrag = w => {
   am.children.sort(zCompare);
 };
 
+
 am.clearSlots = () => {
   am.slots.forEach(s => (s.texture = dsk.textureById(791)));
 };
+
 
 am.drawInv = function () {
   for (let i = 1; i < 7; i++) {
@@ -2518,6 +3212,7 @@ am.drawInv = function () {
 };
 am.drawInv();
 
+
 am.updateInv = () => {
       if (!jv.abl) return; // ← adiciona essa linha
   am.clearSlots();
@@ -2530,17 +3225,22 @@ am.updateInv = () => {
 am.updateInv();
 dsk.on('postPacket:abl', am.updateInv);
 
+
 // ── GUI ──────────────────────────────────────────────────────
+
 
 dsk.initGui = () => {
   // Botão de eval removido por segurança
 };
 
+
 dsk.init = () => {
   // nada por enquanto
 };
 
+
 // ── ARMAS BOT ─────────────────────────────────────────────────
+
 
 window.autoArmas    = false;
 window.emTroca      = false;
@@ -2552,10 +3252,13 @@ window.xGoing       = new Array(10).fill(false);
 window.xCurrentTool = undefined;
 window.acao         = [];
 
+
 // ── SKILL TRACKER ─────────────────────────────────────────────
+
 
 window.skillName  = '';
 window.skillLevel = 0;
+
 
 dsk.on('postPacket:pkg', packet => {
   if (!packet?.data) return;
@@ -2563,6 +3266,7 @@ dsk.on('postPacket:pkg', packet => {
     const arr = JSON.parse(packet.data);
     arr.forEach(raw => {
       const item = JSON.parse(raw);
+
 
       // Atualiza skillName pelo packet de hit
       if (item.type === 's' && item.t) {
@@ -2576,6 +3280,7 @@ dsk.on('postPacket:pkg', packet => {
           skillLevel = Math.floor(jv.skills[skillName][1]);
         }
       }
+
 
       // Captura level up pela mensagem no chat — fonte mais confiável
       if (item.type === 'message') {
@@ -2593,6 +3298,7 @@ dsk.on('postPacket:pkg', packet => {
   } catch (e) {}
 });
 
+
 // Lê jv.skills continuamente no loop — não depende de abrir a aba
 dsk.on('postLoop', () => {
   if (!skillName) return;
@@ -2601,7 +3307,9 @@ dsk.on('postLoop', () => {
   }
 });
 
+
 // ── SKILL HUD ─────────────────────────────────────────────────
+
 
 dsk.skillHud = {
   enabled: false,
@@ -2609,6 +3317,7 @@ dsk.skillHud = {
   ox: 0,
   oy: 0,
 };
+
 
 dsk.skillHud.label = jv.text('', {
   font: '13px Verdana',
@@ -2624,6 +3333,7 @@ dsk.skillHud.label.visible = false;
 dsk.skillHud.label.interactive = true;
 dsk.skillHud.label.buttonMode = true;
 ui_container.addChild(dsk.skillHud.label);
+
 
 // Drag
 dsk.skillHud.label.on('pointerdown', e => {
@@ -2641,6 +3351,7 @@ dsk.skillHud.label.on('pointermove', e => {
 dsk.skillHud.label.on('pointerup', () => { dsk.skillHud.dragging = false; });
 dsk.skillHud.label.on('pointerupoutside', () => { dsk.skillHud.dragging = false; });
 
+
 dsk.on('postLoop', () => {
   if (!dsk.skillHud.enabled) return;
   const name   = skillName  || '---';
@@ -2650,177 +3361,267 @@ dsk.on('postLoop', () => {
   dsk.skillHud.label.text = `⚔ ${name}: ${level}.${pct}${target}`;
 });
 
+
 dsk.setCmd('/skills', () => {
   dsk.skillHud.enabled = !dsk.skillHud.enabled;
   dsk.skillHud.label.visible = dsk.skillHud.enabled;
   dsk.localMsg(`Skill HUD: ${dsk.skillHud.enabled ? 'Ativado' : 'Desativado'}`, dsk.skillHud.enabled ? '#5f5' : '#f55');
 });
 
+
 // ── ARMAS CONFIG MANAGER ──────────────────────────────────────
 
 
-dsk.armasManager = jv.Dialog.create(260, 220);
-const acm = dsk.armasManager;
-acm.visible = false;
 
-acm.header = jv.text('Armas Bot Config', {
-  font: '14px Verdana',
-  fill: 0xFFD700,
-  stroke: 0x555555,
-  strokeThickness: 2,
-});
-acm.addChild(acm.header);
-jv.center(acm.header);
-jv.top(acm.header, 4);
 
-acm.close = jv.Button.create(0, 0, 24, 'X', acm, 24);
-jv.top(acm.close, 4);
-jv.right(acm.close, 4);
-acm.close.on_click = () => (acm.visible = 0);
+// ── Armas Bot Config (HTML overlay) ──────────────────────────
 
-acm.move = jv.Button.create(0, 0, 24, '@', acm, 24);
-jv.top(acm.move, 4);
-jv.right(acm.move, 28);
 
-acm._px = 0;
-acm._py = 0;
-window.addEventListener('mousemove', e => { acm._px = e.clientX; acm._py = e.clientY; });
-window.addEventListener('touchmove', e => { acm._px = e.touches[0].clientX; acm._py = e.touches[0].clientY; });
+(function () {
+  let acmPanel = null;
 
-acm.updatePosition = () => {
-  if (acm.move.is_pressed) {
-    const canvas = document.querySelector('canvas');
-    const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: jv.game_width, height: jv.game_height };
-    acm.x = (acm._px - rect.left) * (jv.game_width / rect.width) - acm.w / 2;
-    acm.y = (acm._py - rect.top) * (jv.game_height / rect.height) - 12;
+
+  // Compat: outros módulos usam acm.visible, acm.refresh()
+  const acm = {
+    get visible() { return !!acmPanel; },
+    set visible(v) { if (!v && acmPanel) removePanel(); else if (v && !acmPanel) createPanel(); },
+    refresh: () => renderValues(),
+    enabled: false,
+  };
+  dsk.armasManager = acm;
+
+
+  function renderValues() {
+    if (!acmPanel) return;
+    const elLvl   = acmPanel.querySelector('[data-acm="level"]');
+    const elSlot  = acmPanel.querySelector('[data-acm="slot"]');
+    const elSkill = acmPanel.querySelector('[data-acm="skill"]');
+    const elCurSk = acmPanel.querySelector('[data-acm="curskill"]');
+    const elCurLv = acmPanel.querySelector('[data-acm="curlvl"]');
+    if (elLvl)   elLvl.textContent   = `atual: ${window.currentLevel ?? 0}`;
+    if (elSlot)  elSlot.textContent  = `atual: ${window.slotAtual ?? 1}`;
+    if (elSkill) elSkill.textContent = `atual: ${window.skillName || 'none'}`;
+    if (elCurSk) elCurSk.textContent = `skill: ${window.skillName || 'none'}`;
+    if (elCurLv) elCurLv.textContent = `nivel: ${window.skillLevel ?? 0}`;
   }
-  if (acm.x < 0) acm.x = 0;
-  if (acm.y < 0) acm.y = 0;
-  if (acm.x + acm.w > jv.game_width)  acm.x = jv.game_width - acm.w;
-  if (acm.y + acm.h > jv.game_height) acm.y = jv.game_height - acm.h;
-};
-dsk.on('postLoop', acm.updatePosition);
 
-// ── Labels ──
-const makeLabel = (text, y) => {
-  const l = jv.text(text, { font: '11px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  l.x = 10;
-  l.y = y;
-  acm.addChild(l);
-  return l;
-};
 
-makeLabel('Nivel alvo:', 40);
-makeLabel('Slot inicial:', 80);
-makeLabel('Skill name:', 120);
+  // Atualiza em tempo real
+  dsk.on('postLoop', () => { if (acmPanel) renderValues(); });
 
-// ── Status labels (valores atuais) ──
-acm.lblLevel = makeLabel(`atual: ${window.currentLevel ?? 0}`, 55);
-acm.lblSlot  = makeLabel(`atual: ${window.slotAtual ?? 1}`, 95);
-acm.lblSkill = makeLabel(`atual: ${window.skillName || 'none'}`, 135);
 
-acm.refresh = () => {
-  acm.lblLevel.text = `atual: ${currentLevel}`;
-  acm.lblSlot.text  = `atual: ${slotAtual}`;
-  acm.lblSkill.text = `atual: ${skillName || 'none'}`;
-};
-// ── Labels em tempo real ──
-acm.lblSkillCurrent = makeLabel('skill: -', 158);
-acm.lblSkillLvl     = makeLabel('nivel: -', 173);
+  function createPanel() {
+    if (acmPanel) { removePanel(); return; }
 
-// Atualiza em tempo real no postLoop
-dsk.on('postLoop', () => {
-  if (!acm.visible) return;
-  acm.lblSkillCurrent.text = `skill: ${skillName || 'none'}`;
-  acm.lblSkillLvl.text     = `nivel: ${skillLevel ?? 0}`;
-});
-// ── Botões +/- para nivel alvo ──
-const baseX = 130;
-const y = 38;
-const spacing = 25;
 
-// 🔻 -10
-const btnLevelDown10 = jv.Button.create(0, 0, 30, '-10', acm, 20);
-btnLevelDown10.x = baseX;
-btnLevelDown10.y = y;
-btnLevelDown10.on_click = () => { 
-  currentLevel = Math.max(0, currentLevel - 10); 
-  acm.refresh(); 
-};
+    acmPanel = document.createElement('div');
+    Object.assign(acmPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '280px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
 
-// 🔻 -1
-const btnLevelDown = jv.Button.create(0, 0, 20, '-', acm, 20);
-btnLevelDown.x = baseX + spacing;
-btnLevelDown.y = y;
-btnLevelDown.on_click = () => { 
-  if (currentLevel > 0) currentLevel--; 
-  acm.refresh(); 
-};
 
-// 🔺 +1
-const btnLevelUp = jv.Button.create(0, 0, 20, '+', acm, 20);
-btnLevelUp.x = baseX + spacing * 2;
-btnLevelUp.y = y;
-btnLevelUp.on_click = () => { 
-  currentLevel++; 
-  acm.refresh(); 
-};
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '⚔️ Armas Bot Config';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
 
-// 🔺 +10
-const btnLevelUp10 = jv.Button.create(0, 0, 30, '+10', acm, 20);
-btnLevelUp10.x = baseX + spacing * 3;
-btnLevelUp10.y = y;
-btnLevelUp10.on_click = () => { 
-  currentLevel = Math.min(100, currentLevel + 10); 
-  acm.refresh(); 
-};
 
-// ── Botões +/- para slot inicial ──
-const btnSlotDown = jv.Button.create(0, 0, 20, '-', acm, 20);
-btnSlotDown.x = 130; btnSlotDown.y = 78;
-btnSlotDown.on_click = () => { if (slotAtual > 2) slotAtual--; acm.refresh(); };
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - acmPanel.getBoundingClientRect().left;
+      oy = _xy.y - acmPanel.getBoundingClientRect().top;
+      acmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); acmPanel.style.left = (_xy.x - ox) + 'px'; acmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
 
-const btnSlotUp = jv.Button.create(0, 0, 20, '+', acm, 20);
-btnSlotUp.x = 155; btnSlotUp.y = 78;
-btnSlotUp.on_click = () => { slotAtual++; acm.refresh(); };
 
-// ── Botões de skill name ──
-const skills = ['repairing'];
-let skillIdx = 0;
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
 
-const btnSkill = jv.Button.create(0, 0, 80, skills[0], acm, 20);
-btnSkill.x = 130; btnSkill.y = 118;
-btnSkill.on_click = () => {
-  skillIdx = (skillIdx + 1) % skills.length;
-  skillName = skills[skillIdx];
-  btnSkill.label.text = skillName;
-  acm.refresh();
-};
 
-// ── Botão skip water no painel skill config ───────────────────
-const btnSkipWater = jv.Button.create(0, 0, 150, 'Ignorar Água [OFF]', acm, 20);
-btnSkipWater.x = 100;
-btnSkipWater.y = 148; // abaixo dos botões existentes
+    // Helper: linha com label + valor + botões
+    function makeRow(labelTxt, dataKey, makeControls) {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        background: '#2a2a3e', borderRadius: '7px',
+        padding: '7px 10px', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between', gap: '6px',
+      });
+      const info = document.createElement('div');
+      const lbl = document.createElement('div');
+      lbl.textContent = labelTxt;
+      Object.assign(lbl.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+      const val = document.createElement('div');
+      val.dataset.acm = dataKey;
+      val.textContent = '-';
+      Object.assign(val.style, { color: '#FFD700', fontSize: '11px', fontWeight: 'bold' });
+      info.appendChild(lbl); info.appendChild(val);
+      row.appendChild(info);
+      if (makeControls) row.appendChild(makeControls());
+      return row;
+    }
 
-btnSkipWater.on_click = () => {
-  dsk.farm.skipWater = !dsk.farm.skipWater;
-  btnSkipWater.title.text = `Ignorar Água [${dsk.farm.skipWater ? 'ON' : 'OFF'}]`;
-  btnSkipWater.style.fill = dsk.farm.skipWater ? 0x44bb44 : 0xbb4444;
-  dsk.localMsg(`Farm skipWater: ${dsk.farm.skipWater ? 'ON' : 'OFF'}`, dsk.farm.skipWater ? '#5f5' : '#f55');
-};
 
-// Atualiza cor em tempo real
-dsk.on('postLoop', () => {
-  if (!acm.visible) return;
-  btnSkipWater.tint = dsk.farm.skipWater ? 0x44bb44 : 0xbb4444;
-});
+    // Botão estilo mod
+    function makeBtn(txt, onclick) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        padding: '3px 8px', borderRadius: '5px', border: '1px solid #555',
+        background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '11px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = onclick;
+      return b;
+    }
 
-// ── Comando ──
-dsk.setCmd('/skillconfig', () => {
-  acm.visible = !acm.visible;
-  if (acm.visible) acm.refresh();
-  dsk.localMsg(`Skill Config: ${acm.visible ? 'Aberto' : 'Fechado'}`, acm.visible ? '#5f5' : '#f55');
-});
+
+    // Nivel alvo
+    body.appendChild(makeRow('Nivel alvo', 'level', () => {
+      const wrap = document.createElement('div');
+      Object.assign(wrap.style, { display: 'flex', gap: '3px' });
+      wrap.appendChild(makeBtn('-10', () => { window.currentLevel = Math.max(0, (window.currentLevel ?? 0) - 10); renderValues(); }));
+      wrap.appendChild(makeBtn('-',   () => { if ((window.currentLevel ?? 0) > 0) window.currentLevel--; renderValues(); }));
+      wrap.appendChild(makeBtn('+',   () => { window.currentLevel = (window.currentLevel ?? 0) + 1; renderValues(); }));
+      wrap.appendChild(makeBtn('+10', () => { window.currentLevel = Math.min(100, (window.currentLevel ?? 0) + 10); renderValues(); }));
+      return wrap;
+    }));
+
+
+    // Slot inicial
+    body.appendChild(makeRow('Slot inicial', 'slot', () => {
+      const wrap = document.createElement('div');
+      Object.assign(wrap.style, { display: 'flex', gap: '3px' });
+      wrap.appendChild(makeBtn('-', () => { if ((window.slotAtual ?? 2) > 2) window.slotAtual--; renderValues(); }));
+      wrap.appendChild(makeBtn('+', () => { window.slotAtual = (window.slotAtual ?? 1) + 1; renderValues(); }));
+      return wrap;
+    }));
+
+
+    // Skill name
+    const skills = ['repairing'];
+    let skillIdx = 0;
+    body.appendChild(makeRow('Skill name', 'skill', () => {
+      const btn = makeBtn(skills[0], () => {
+        skillIdx = (skillIdx + 1) % skills.length;
+        window.skillName = skills[skillIdx];
+        btn.textContent = window.skillName;
+        renderValues();
+      });
+      return btn;
+    }));
+
+
+    // ── Status ao vivo ─────────────────────────────────────────
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px',
+      padding: '7px 10px', display: 'flex', gap: '16px',
+    });
+    [['curskill', 'Skill atual'], ['curlvl', 'Nível atual']].forEach(([key, lbl]) => {
+      const col = document.createElement('div');
+      const l = document.createElement('div');
+      l.textContent = lbl;
+      Object.assign(l.style, { color: '#aaa', fontSize: '9px', marginBottom: '2px' });
+      const v = document.createElement('div');
+      v.dataset.acm = key;
+      v.textContent = '-';
+      Object.assign(v.style, { color: '#fff', fontSize: '11px' });
+      col.appendChild(l); col.appendChild(v);
+      statusBox.appendChild(col);
+    });
+    body.appendChild(statusBox);
+
+
+    // ── Skip Water toggle ─────────────────────────────────────
+    const skipRow = document.createElement('div');
+    Object.assign(skipRow.style, {
+      background: '#2a2a3e', borderRadius: '7px',
+      padding: '7px 10px', display: 'flex',
+      alignItems: 'center', justifyContent: 'space-between',
+    });
+    const skipLbl = document.createElement('span');
+    skipLbl.textContent = 'Ignorar Água';
+    Object.assign(skipLbl.style, { color: '#ddd', fontSize: '11px' });
+
+
+    const skipBtn = document.createElement('button');
+    function updateSkipBtn() {
+      const on = !!dsk.farm?.skipWater;
+      skipBtn.textContent = on ? '✅ ON' : '❌ OFF';
+      skipBtn.style.borderColor = on ? '#5f5' : '#f55';
+      skipBtn.style.color       = on ? '#5f5' : '#f55';
+    }
+    Object.assign(skipBtn.style, {
+      padding: '3px 12px', borderRadius: '5px', border: '1px solid #f55',
+      background: '#1a1a2e', color: '#f55', cursor: 'pointer', fontSize: '11px',
+    });
+    skipBtn.onclick = () => {
+      dsk.farm.skipWater = !dsk.farm.skipWater;
+      updateSkipBtn();
+      dsk.localMsg(`Farm skipWater: ${dsk.farm.skipWater ? 'ON' : 'OFF'}`, dsk.farm.skipWater ? '#5f5' : '#f55');
+    };
+    updateSkipBtn();
+    skipRow.appendChild(skipLbl); skipRow.appendChild(skipBtn);
+    body.appendChild(skipRow);
+
+
+    acmPanel.appendChild(header);
+    acmPanel.appendChild(body);
+    document.body.appendChild(acmPanel);
+    renderValues();
+  }
+
+
+  function removePanel() {
+    if (acmPanel) { acmPanel.remove(); acmPanel = null; }
+  }
+
+
+  dsk.setCmd('/skillconfig', () => {
+    if (acmPanel) {
+      removePanel();
+      dsk.localMsg('Skill Config: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Skill Config: Aberto', '#5f5');
+    }
+  });
+})();
+
 
 function xGetWallByPos(x, y) {
   for (let i in objects.items) {
@@ -2832,6 +3633,7 @@ function xGetWallByPos(x, y) {
   return null;
 }
 
+
 function xGetWallHp(x, y) {
   const wall = xGetWallByPos(x, y);
   if (wall && wall.hpbar) {
@@ -2840,11 +3642,13 @@ function xGetWallHp(x, y) {
   return -1;
 }
 
+
 function xGetSlotByID(id) {
   for (let i in inv) {
     if (inv[i]?.sprite == id) return parseInt(i);
   }
 }
+
 
 function xGetItemNameBySlot(id) {
   for (let i in item_data) {
@@ -2852,15 +3656,18 @@ function xGetItemNameBySlot(id) {
   }
 }
 
+
 async function xDoDropSlot(amount, slot) {
   send({ type: "d", slot: slot - 1, amt: amount });
   await xDelay(269);
 }
 
+
 async function xDoDropByID(amount, id) {
   send({ type: "d", slot: xGetSlotByID(id), amt: amount });
   await xDelay(267);
 }
+
 
 async function xLookUp() {
   await xDelay(263);
@@ -2872,6 +3679,7 @@ async function xLookUp() {
   await xDelay(262);
 }
 
+
 async function xLookDown() {
   await xDelay(266);
   await xDoKeyDown(4);
@@ -2881,6 +3689,7 @@ async function xLookDown() {
   await xDoKeyUp(4);
   await xDelay(268);
 }
+
 
 async function Armas() {
   if (dskPaused) return; // ← adiciona isso
@@ -2895,7 +3704,8 @@ async function Armas() {
     return;
   }
 
-  if (skillLevel >= currentLevel && currentLevel > 0 && skillName !== 'repairing' && !emTroca) {
+
+  if (skillLevel >= currentLevel && currentLevel > 0 && skillName !== 'repairing' && skillName !== 'questing' && !emTroca) {
     emTroca = true;
     await xDoKeyUp(6);
     await xDelay(600);
@@ -2913,16 +3723,18 @@ async function Armas() {
     return;
   }
 
+
   if (xIfChatHas("Disconnected (Packet Spamming)")) {
     await xDelay(500);
     keySpace.isDown = false;
-	xGoing[0] = false;
+        xGoing[0] = false;
     await xDoClearChat("Disconnected (Packet Spamming)");
     await xDelay(500);
     await xDoKeyUp(6);
     await xDelay(500);
     return;
   }
+
 
   if (xIfChatHas("Welcome back ")) {
     await xDelay(800);
@@ -2932,17 +3744,21 @@ async function Armas() {
     await xDelay(500);
   }
 
+
   if (xGoing[0] === true) return;
   xGoing[0] = true;
+
 
   if (inv[0].sprite === 719) {
     // ── COM REPAIR KIT ──────────────────────────────
 
+
     if (inv[0].equip === 2) {
 
+
       if (dsk.armas.repairingTarget === 'dummy') {
-		await xDoKeyUp(6);
-	    await xDelay(630);
+                await xDoKeyUp(6);
+            await xDelay(630);
         await xDoMove(myself.x - 1, myself.y);
         await xDelay(820);
         await xDoDropSlot(1, 1);
@@ -2957,11 +3773,12 @@ async function Armas() {
         await xDelay(805);
         await xDoChangeDir(0);
         await xDelay(604);
-		await xDoKeyUp(6);
+                await xDoKeyUp(6);
+
 
       } else {
-		await xDoKeyUp(6);
-	    await xDelay(630);
+                await xDoKeyUp(6);
+            await xDelay(630);
         await xDoMove(myself.x - 2, myself.y);
         await xDelay(1205);
         await xDoDropSlot(1, 1);
@@ -2974,27 +3791,31 @@ async function Armas() {
         await xDelay(502);
         await xDoChangeDir(3);
         await xDelay(506);
-		await xDoKeyUp(6);
+                await xDoKeyUp(6);
       }
+
 
       dsk.armas.repairingTarget = null;
       xGoing[0] = false;
       return;
     }
-	await xDelay(567);
-	await xDoKeyPress(6, 189);
+        await xDelay(567);
+        await xDoKeyPress(6, 189);
+
 
     if (xIfChatHas("is in perfect condition")) {
       xDoClearChat("is in perfect condition");
       dsk.armas.repairing = false;
-	  dsk.armas.repairingTarget = 'dummy'; // ← novo
+          dsk.armas.repairingTarget = 'dummy'; // ← novo
+
 
       // Volta pra x → vira pra cima
-	  await xDelay(630);
+          await xDelay(630);
       await xDoMove(myself.x - 1, myself.y);
       await xDelay(608);
       await xDoChangeDir(0);
       await xDelay(612);
+
 
       // Repara Dummy N — 1 toque para revelar HP, depois repara enquanto < 90%
       await xDoKeyPress(6, 185); await xDelay(560);
@@ -3003,15 +3824,17 @@ async function Armas() {
         await xDelay(561);
       }
 
+
       // Vai pra x+1 → dropa kit
-	  await xDelay(630);
+          await xDelay(630);
       await xDoMove(myself.x + 1, myself.y);
       await xDelay(560);
       await xDoDropSlot(1, 1);
       await xDelay(652);
 
+
       // Volta pra x → pega arma → equipa → vira pra cima
-	  await xDelay(630);
+          await xDelay(630);
       await xDoMove(myself.x - 1, myself.y);
       await xDelay(560);
       await xDoPickUp();
@@ -3019,7 +3842,8 @@ async function Armas() {
       await xDoUseSlot(0);
       await xDelay(540);
       await xDoChangeDir(0); 
-	  await xDelay(510);
+          await xDelay(510);
+
 
     } else if (dsk.armas.repairing) {
       // Aguardando "is in perfect condition"
@@ -3027,8 +3851,10 @@ async function Armas() {
       return;
     }
 
+
   } else {
     // ── COM ARMA ──────────────────────────────────
+
 
     // Equipa slot 0 se desequipado
     if (inv[0].equip === 0) {
@@ -3036,46 +3862,54 @@ async function Armas() {
       await xDelay(610);
     }
 
+
     // Dummy com HP baixo → inicia reparo do dummy
     if (xGetWallHp(myself.x, myself.y - 1) <= 20 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
       dsk.armas.repairing = true;
-	  await xDelay(545);
-	  await xDoKeyUp(6);
-	  await xDelay(567);
+          await xDelay(545);
+          await xDoKeyUp(6);
+          await xDelay(567);
       await xDoDropSlot(1, 1);
-	  await xDelay(630);
+          await xDelay(630);
+
 
       await xDoMove(myself.x + 1, myself.y);
       await xDelay(632);
       await xDoPickUp();
       await xDelay(610);
 
+
       await xDoChangeDir(3);
       await xDelay(610);
       await xDoUseSlot(0);
       await xDelay(630);
 
+
       xGoing[0] = false;
       return;
     }
+
 
     // Arma gasta (equip == 2) — inicia sequência de reparo da arma
     if (inv[0].equip === 2) {
       dsk.armas.repairing = true;
       dsk.armas.repairingTarget = 'arma'; // ← novo
 
+
       // Dropa arma em x
-	  await xDoKeyUp(6);
-	  await xDelay(649);
+          await xDoKeyUp(6);
+          await xDelay(649);
       await xDoDropSlot(1, 1);
       await xDelay(630);
 
+
       // Vai pra x+1 → pega kit
-	  await xDelay(630);
+          await xDelay(630);
       await xDoMove(myself.x + 1, myself.y);
       await xDelay(633);
       await xDoPickUp();
       await xDelay(540);
+
 
       // Vira pra esquerda → equipa kit
       await xDelay(620);
@@ -3084,9 +3918,11 @@ async function Armas() {
       await xDoUseSlot(0);
       await xDelay(610);
 
+
       xGoing[0] = false;
       return;
     }
+
 
     // Ataca se parado e com arma equipada
     if (!keySpace.isDown && inv[0].sprite !== undefined && inv[0].equip === 1) {
@@ -3095,13 +3931,17 @@ async function Armas() {
     }
   }
 
+
   xGoing[0] = false;
 }
 
+
 dsk.armas = { enabled: false, repairing: false };
+
 
 dsk.setCmd('/armas', () => {
   dsk.armas.enabled = !dsk.armas.enabled;
+
 
   if (dsk.armas.enabled) {
     dsk.armas.repairing = false;
@@ -3120,52 +3960,60 @@ dsk.setCmd('/armas', () => {
   }
 });
 
+
 // ── DESTRUCTION BOT ────────────────────────────────────────────
+
 
 window.destructPosX = 0;
 window.destructPosY = 0;
 dsk.destruction = { enabled: false };
 
+
 async function Destruction() {
-	if (dskPaused) return; // ← adiciona isso
+        if (dskPaused) return; // ← adiciona isso
     if (!myself || game_state !== 2) return;
 
-	if (currentLevel > 0 && skillLevel >= currentLevel && ['destruction'].includes(skillName)) {
-	await xDoKeyUp(6);
+
+        if (currentLevel > 0 && skillLevel >= currentLevel && ['destruction'].includes(skillName)) {
+        await xDoKeyUp(6);
     await xDelay(1621);
-	xGoing[110] = false;
-	dsk.destruction.enabled = false;
-	dsk.localMsg('Destruction: Desativado', '#f55');
+        xGoing[110] = false;
+        dsk.destruction.enabled = false;
+        dsk.localMsg('Destruction: Desativado', '#f55');
     return;
-	}
+        }
+
 
   if (xGoing[110] != true) {
     xGoing[110] = true;
 
+
     // Sem item no slot 0 — pega repair kit
     if (inv[0].sprite == undefined) {
       if (xGetSlotByID(719) == undefined) {
-		  await xDelay(535);
-		  await xDoPickUp();
-		  await xDelay(537);
-	  }
+                  await xDelay(535);
+                  await xDoPickUp();
+                  await xDelay(537);
+          }
       await xDoUseSlotByID(xGetSlotByID(719));
       await xDelay(559);
     }
 
+
     // Equipa se desequipado
     if (inv[0].equip == 0) {
       if (keySpace.isDown) keySpace.isDown = false;
-	  await xDelay(624);
+          await xDelay(624);
       await xDoUseSlot(0);
       await xDelay(615);
     }
 
+
     if (myself.x == destructPosX - 1 && myself.y == destructPosY && inv[0].sprite == 719) {
       try {
-		  await xDelay(523);
-		  await xDoKeyPress(6, 218);
-		  await xDelay(523);
+                  await xDelay(523);
+                  await xDoKeyPress(6, 218);
+                  await xDelay(523);
         if (xIfChatHas("is in perfect condition")) {
           xDoClearChat("is in perfect condition");
           await xDelay(613);
@@ -3179,27 +4027,28 @@ async function Destruction() {
       await xDelay(453);
     } else if (inv[0].sprite == 719) {
 
+
       // Repara parede oeste
       if (xGetWallHp(myself.x + 1, myself.y) >= 90) {
-		await xDelay(623);
-		await xDoKeyPress(6, 186);
-		await xDelay(623);
+                await xDelay(623);
+                await xDoKeyPress(6, 186);
+                await xDelay(623);
         await xDoChangeDir(0);
         await xDelay(645);
       }
       // Repara parede norte
       if (xGetWallHp(myself.x, myself.y - 1) >= 90) {
-		await xDelay(623);
-		await xDoKeyPress(6, 187);
-		await xDelay(623);
+                await xDelay(623);
+                await xDoKeyPress(6, 187);
+                await xDelay(623);
         await xDoChangeDir(2);
         await xDelay(630);
       }
       // Repara parede sul
       if (xGetWallHp(myself.x, myself.y + 1) >= 90) {
-		await xDelay(623);
-		await xDoKeyPress(6, 188);
-		await xDelay(623);
+                await xDelay(623);
+                await xDoKeyPress(6, 188);
+                await xDelay(623);
         await xDoMove(myself.x - 1, myself.y);
         await xDelay(415);
         await xDoDropSlot(1, 1);
@@ -3211,8 +4060,8 @@ async function Destruction() {
       }
       // Kit gasto
       if (inv[0].equip == 2) {
-		if (keySpace.isDown) keySpace.isDown = false;
-		await xDelay(423);
+                if (keySpace.isDown) keySpace.isDown = false;
+                await xDelay(423);
         await xDoMove(myself.x - 2, myself.y);
         await xDelay(635);
         await xDoDropSlot(1, 1);
@@ -3229,9 +4078,9 @@ async function Destruction() {
     } else {
       // Sem repair kit — dropa arma gasta
       if (inv[0].equip == 2) {
-		  await xDelay(523);
-		if (keySpace.isDown) keySpace.isDown = false;
-		await xDelay(634);
+                  await xDelay(523);
+                if (keySpace.isDown) keySpace.isDown = false;
+                await xDelay(634);
         await xDoDropSlot(1, 1);
         await xDelay(756);
         await xDoMove(myself.x - 1, myself.y);
@@ -3243,16 +4092,17 @@ async function Destruction() {
       const wallEast = xGetWallByPos(myself.x + 1, myself.y);
       if (wallEast?.hpbar?.val <= 25) {
         await xDelay(523);
-		if (keySpace.isDown) keySpace.isDown = false;
+                if (keySpace.isDown) keySpace.isDown = false;
         await xDelay(626);
         await xDoDropSlot(1, 1);
         await xDelay(636);
         await xDoMove(myself.x - 1, myself.y);
         await xDelay(748);
-		await xDoChangeDir(1);
-		await xDelay(746);
+                await xDoChangeDir(1);
+                await xDelay(746);
       }
     }
+
 
     // Ataca se parado e com arma equipada
     if (!keySpace.isDown && inv[0].sprite != undefined && inv[0].equip == 1) {
@@ -3260,18 +4110,22 @@ async function Destruction() {
       await xDelay(840);
     }
 
+
     xGoing[110] = false;
   }
 }
 
+
 dsk.setCmd('/destru', () => {
   dsk.destruction.enabled = !dsk.destruction.enabled;
+
 
   if (dsk.destruction.enabled) {
     // Captura posição atual ao ligar
     destructPosX = myself.x;
     destructPosY = myself.y;
     dsk.localMsg(`Destruction: Ativado @ (${destructPosX}, ${destructPosY})`, '#5f5');
+
 
     (async function loop() {
       while (dsk.destruction.enabled) {
@@ -3286,12 +4140,15 @@ dsk.setCmd('/destru', () => {
   }
 });
 
+
 // ── ECHO MANDOKA ─────────────────────────────────────────────
+
 
 dsk.echo = {
   enabled: false,
   targetName: 'Mandoka'
 };
+
 
 dsk.setCmd('/echo', (context) => {
   if (context) {
@@ -3301,6 +4158,7 @@ dsk.setCmd('/echo', (context) => {
     return;
   }
 
+
   dsk.echo.enabled = !dsk.echo.enabled;
   dsk.localMsg(
     `Echo: ${dsk.echo.enabled ? `Ativado (${dsk.echo.targetName})` : 'Desativado'}`,
@@ -3308,9 +4166,11 @@ dsk.setCmd('/echo', (context) => {
   );
 });
 
+
 dsk.on('postPacket:pkg', packet => {
   if (!dsk.echo.enabled) return;
   if (!packet?.data) return;
+
 
   try {
     const arr = JSON.parse(packet.data);
@@ -3319,26 +4179,32 @@ dsk.on('postPacket:pkg', packet => {
       if (item.type !== 'message') return;
       if (!item.name) return;
 
+
       if (item.name.toLowerCase() !== dsk.echo.targetName.toLowerCase()) return;
 
+
       const text = dsk.stripHTMLTags(item.text).trim();
-	  if (!text) return;
+          if (!text) return;
 
-	  // Remove o prefixo "Nome: " se existir
-	  const cleaned = text.replace(/^.*?:\s*/, '');
-	  if (!cleaned) return;
 
-	  setTimeout(() => {
-	    _originalSend({ type: 'chat', data: `/b ${cleaned}` });
-	  }, 300);
+          // Remove o prefixo "Nome: " se existir
+          const cleaned = text.replace(/^.*?:\s*/, '');
+          if (!cleaned) return;
+
+
+          setTimeout(() => {
+            _originalSend({ type: 'chat', data: `/b ${cleaned}` });
+          }, 300);
     });
   } catch (e) {}
 });
+
 
 //--COOKING----//
 dsk.cooking = { enabled: false };
 window.cookPositionX = 0;
 window.cookPositionY = 0;
+
 
 function xGetAvailableID(ids) {
   return ids.find(id => xGetSlotByID(id) != undefined);
@@ -3357,8 +4223,10 @@ function xGetGroundItemByPos(x, y, ids) {
   return null;
 }
 
+
 const WOOD_IDS = [249, 648];
 const FOOD_IDS = [227, 593, 776, 486];
+
 
 function xHasWood() {
   return WOOD_IDS.some(id => xGetSlotByID(id) != undefined);
@@ -3366,6 +4234,7 @@ function xHasWood() {
 function xHasFood() {
   return FOOD_IDS.some(id => xGetSlotByID(id) != undefined);
 }
+
 
 async function xCollectResources() {
   // --- Coleta madeira ---
@@ -3388,13 +4257,14 @@ async function xCollectResources() {
     }
   }
 
+
   // --- Coleta comida (1 sqm acima do cook position) ---
   if (!xHasFood()) {
     if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) {
       await xDoMove(cookPositionX, cookPositionY - 1);
       return;
     }
-	if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) return;
+        if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) return;
     let tries = 0;
     while (!xHasFood() && tries < 10) {
       await xDoPickUp();
@@ -3406,6 +4276,7 @@ async function xCollectResources() {
   }
 }
 
+
 function xHasFirePit(direction) {
   const dy = direction === 'up' ? -1 : 1;
   return objects.items.find(el =>
@@ -3414,11 +4285,14 @@ function xHasFirePit(direction) {
   );
 }
 
+
 async function cook() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
 
+
   await xDelay(500);
+
 
   // --- Fogueira de cima ---
   await xLookUp();
@@ -3437,6 +4311,7 @@ async function cook() {
   await xDelay(150);
   await xDropAvailable(1, FOOD_IDS);
   await xDelay(200);
+
 
   // --- Fogueira de baixo ---
   await xLookDown();
@@ -3457,9 +4332,11 @@ async function cook() {
   await xDelay(300);
 }
 
+
 async function xCook() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
 
   if (currentLevel > 0 && skillLevel >= currentLevel && ['cooking'].includes(skillName)) {
     await xDelay(1000);
@@ -3469,11 +4346,14 @@ async function xCook() {
     return;
   }
 
+
   if (xGoing[1] != true) {
     xGoing[1] = true;
 
+
     // Verifica e coleta recursos antes de cozinhar
     await xCollectResources();
+
 
     // Se mesmo assim não tiver os dois, aborta o ciclo
     if (!xHasWood() || !xHasFood()) {
@@ -3482,8 +4362,10 @@ async function xCook() {
       return;
     }
 
+
     await xDoMove(myself.x - 1, myself.y);
     await cook();
+
 
     const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
     if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
@@ -3491,9 +4373,11 @@ async function xCook() {
       await xDelay(800);
     }
 
+
     xGoing[1] = false;
   }
 }
+
 
 dsk.setCmd('/cook', () => {
   dsk.cooking.enabled = !dsk.cooking.enabled;
@@ -3512,17 +4396,21 @@ dsk.setCmd('/cook', () => {
   }
 });
 
+
 //--SMELTING--//
 dsk.smelting = { enabled: false };
 window.smeltPositionX = 0;
 window.smeltPositionY = 0;
 
+
 const ORE_IDS  = [539, 538];
 // WOOD_IDS já definido no cooking: [249, 648]
+
 
 function xHasOre() {
   return ORE_IDS.some(id => xGetSlotByID(id) != undefined);
 }
+
 
 async function xCollectSmeltResources() {
   // --- Coleta madeira ---
@@ -3531,9 +4419,9 @@ async function xCollectSmeltResources() {
       await xDoMove(smeltPositionX, smeltPositionY);
       return;
     }
-	
-	if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) return;
-	
+        
+        if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) return;
+        
     let tries = 0;
     while (!xHasWood() && tries < 10) {
       if (xGetGroundItemByPos(myself.x, myself.y, WOOD_IDS)) {
@@ -3546,15 +4434,16 @@ async function xCollectSmeltResources() {
     }
   }
 
+
   // --- Coleta minério (1 sqm acima do smelt position) ---
   if (!xHasOre()) {
-	if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) {
+        if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) {
       await xDoMove(smeltPositionX, smeltPositionY - 1);
       return;
     }
-	
-	if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) return;
-	
+        
+        if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) return;
+        
     let tries = 0;
     while (!xHasOre() && tries < 10) {
       await xDoPickUp();
@@ -3565,11 +4454,14 @@ async function xCollectSmeltResources() {
   }
 }
 
+
 async function smelt() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
 
+
   await xDelay(500);
+
 
   // --- Fogueira de cima ---
   await xLookUp();
@@ -3581,9 +4473,9 @@ async function smelt() {
   }
   await xDelay(150);
   await xDoKeyPress(6, 100);
-  await xDelay(350);
+  await xDelay(380);
   await xDoDropByID(1, 694);
-  await xDelay(350);
+  await xDelay(380);
   await xDropAvailable(1, ORE_IDS);
   await xDelay(300);
   await xDoPickUp();
@@ -3592,6 +4484,7 @@ async function smelt() {
   await xDelay(200);
   await xDoDropByID(1, 711);
   await xDelay(200);
+
 
   // --- Fogueira de baixo ---
   await xLookDown();
@@ -3603,9 +4496,9 @@ async function smelt() {
   }
   await xDelay(150);
   await xDoKeyPress(6, 100);
-  await xDelay(350);
+  await xDelay(380);
   await xDoDropByID(1, 694);
-  await xDelay(350);
+  await xDelay(380);
   await xDropAvailable(1, ORE_IDS);
   await xDelay(300);
   await xDoPickUp();
@@ -3616,9 +4509,11 @@ async function smelt() {
   await xDelay(200);
 }
 
+
 async function xSmelt() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
 
   if (currentLevel > 0 && skillLevel >= currentLevel && ['smelting'].includes(skillName)) {
     await xDelay(1000);
@@ -3628,10 +4523,13 @@ async function xSmelt() {
     return;
   }
 
+
   if (xGoing[2] != true) {
     xGoing[2] = true;
 
+
     await xCollectSmeltResources();
+
 
     if (!xHasWood() || !xHasOre()) {
       dsk.localMsg('Smelt: sem madeira ou minério, aguardando...', '#fa5');
@@ -3639,8 +4537,10 @@ async function xSmelt() {
       return;
     }
 
+
     await xDoMove(myself.x - 1, myself.y);
     await smelt();
+
 
     const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
     if (allowedNames.includes(xGetWallByPos(myself.x - 1, myself.y)?.name)) {
@@ -3648,9 +4548,11 @@ async function xSmelt() {
       await xDelay(800);
     }
 
+
     xGoing[2] = false;
   }
 }
+
 
 dsk.setCmd('/smelt', () => {
   dsk.smelting.enabled = !dsk.smelting.enabled;
@@ -3669,7 +4571,9 @@ dsk.setCmd('/smelt', () => {
   }
 });
 
+
 // ── TOP LVL HUD ───────────────────────────────────────────────
+
 
 dsk.topHud = {
   enabled:    false,
@@ -3682,6 +4586,7 @@ dsk.topHud = {
   _listening: false,
   _interval:  null,
 };
+
 
 dsk.topHud.label = jv.text('🏆 Top Skill: ---', {
   font:            '13px Verdana',
@@ -3697,6 +4602,7 @@ dsk.topHud.label.visible = false;
 dsk.topHud.label.interactive = true;
 dsk.topHud.label.buttonMode  = true;
 ui_container.addChild(dsk.topHud.label);
+
 
 // Drag
 dsk.topHud.label.on('pointerdown', e => {
@@ -3714,6 +4620,7 @@ dsk.topHud.label.on('pointermove', e => {
 dsk.topHud.label.on('pointerup',        () => { dsk.topHud.dragging = false; });
 dsk.topHud.label.on('pointerupoutside', () => { dsk.topHud.dragging = false; });
 
+
 // Listener de mensagem (registrado uma vez só)
 dsk.topHud._onMessage = function(e) {
   try {
@@ -3721,8 +4628,10 @@ dsk.topHud._onMessage = function(e) {
     if (data.type !== 'pkg') return;
     const parsed = JSON.parse(JSON.parse(data.data)[0]);
 
+
     if (parsed.type === 'stat')  dsk.topHud._statObj  = parsed.obj;
     if (parsed.type === 'reinc') dsk.topHud._reincObj = parsed.obj;
+
 
     if (dsk.topHud._statObj && dsk.topHud._reincObj) {
       dsk.topHud._topSkill = dsk.topHud._reincObj.skill || '---';
@@ -3731,6 +4640,7 @@ dsk.topHud._onMessage = function(e) {
     }
   } catch (_) {}
 };
+
 
 // Busca os dados do servidor
 dsk.topHud.fetch = () => {
@@ -3742,15 +4652,18 @@ dsk.topHud.fetch = () => {
   setTimeout(() => send({ type: 'c', r: 'rn' }), 1000);
 };
 
+
 // Atualiza o label no postLoop
 dsk.on('postLoop', () => {
   if (!dsk.topHud.enabled) return;
   dsk.topHud.label.text = `🏆 Top Skill: ${dsk.topHud._topSkill}`;
 });
 
+
 dsk.setCmd('/top', () => {
   dsk.topHud.enabled = !dsk.topHud.enabled;
   dsk.topHud.label.visible = dsk.topHud.enabled;
+
 
   if (dsk.topHud.enabled) {
     // Busca imediata ao ativar
@@ -3770,8 +4683,10 @@ dsk.setCmd('/top', () => {
 
 // ── MENU PRINCIPAL ─────────────────────────────────────────────
 
+
 dsk.menu = jv.Dialog.create(200, 320);
 dsk.menu.visible = false;
+
 
 dsk.menu.header = jv.text('Pablo Mod', {
   font: '14px Verdana',
@@ -3783,19 +4698,24 @@ dsk.menu.addChild(dsk.menu.header);
 jv.center(dsk.menu.header);
 jv.top(dsk.menu.header, 4);
 
+
 dsk.menu.close = jv.Button.create(0, 0, 24, 'X', dsk.menu, 24);
 jv.top(dsk.menu.close, 4);
 jv.right(dsk.menu.close, 4);
 dsk.menu.close.on_click = () => (dsk.menu.visible = 0);
 
+
 dsk.menu.move = jv.Button.create(0, 0, 24, '@', dsk.menu, 24);
 jv.top(dsk.menu.move, 4);
 jv.right(dsk.menu.move, 28);
 
+
 dsk.menu._px = 0;
 dsk.menu._py = 0;
 window.addEventListener('mousemove', e => { dsk.menu._px = e.clientX; dsk.menu._py = e.clientY; });
+window.addEventListener('touchmove', e => { if (e.touches.length > 0) { dsk.menu._px = e.touches[0].clientX; dsk.menu._py = e.touches[0].clientY; } }, { passive: true });
 window.addEventListener('touchmove', e => { dsk.menu._px = e.touches[0].clientX; dsk.menu._py = e.touches[0].clientY; });
+
 
 dsk.menu.updatePosition = () => {
   if (dsk.menu.move.is_pressed) {
@@ -3811,56 +4731,67 @@ dsk.menu.updatePosition = () => {
 };
 dsk.on('postLoop', dsk.menu.updatePosition);
 
+
 // Lista de bots com referência ao objeto de estado
 dsk.menu.items = [
-	{ label: 'Speed',       state: () => dsk.speed?.enabled,       toggle: () => dsk.commands['/speed']() },
-	{ label: 'Skills',   state: () => dsk.skillHud?.enabled,   toggle: () => dsk.commands['/skills']() },
-	{ label: 'Skills Config',   state: () => dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
-	{ label: 'Coocking',    state: () => dsk.cooking?.enabled,     toggle: () => dsk.commands['/cook']() },
-	{ label: 'Smelting',   state: () => dsk.smelting?.enabled,    toggle: () => dsk.commands['/smelt']() },
-	{ label: 'Farming', state: () => dsk.farm?.enabled, toggle: () => dsk.commands['/farm']() },
-	{ label: 'Sword',       state: () => dsk.sword?.enabled, toggle: () => dsk.commands['/sword']() },
-	{ label: 'Hammer',       state: () => dsk.hammer?.enabled, toggle: () => dsk.commands['/hammer']() },
-	{ label: 'Armas Bot',   state: () => dsk.armas?.enabled,       toggle: () => dsk.commands['/armas']() },
-	{ label: 'Destruction', state: () => dsk.destruction?.enabled, toggle: () => dsk.commands['/destru']() },
-	{ label: 'AutoCraft',   state: () => dsk.craft?.enabled,       toggle: () => dsk.commands['/craft']() },
-	{ label: 'Fishing',    state: () => dsk.fish?.enabled, toggle: () => dsk.commands['/fish']() },
-	{ label: 'Knitting',   state: () => dsk.knit?.enabled,   toggle: () => dsk.commands['/knit']() },
-	{ label: 'Newbi Config', state: () => mm?.visible,       toggle: () => dsk.commands['/newbiconfig']() },
-	{ label: 'Newbi Myst',    state: () => dsk.myst?.enabled, toggle: () => dsk.commands['/newbi']() },
-	{ label: 'Reconnect',   state: () => dsk.reconnect?.enabled,   toggle: () => dsk.commands['/reconnect']() },
-	{ label: 'Bússola',     state: () => dsk.ginfo?.label?.visible, toggle: () => dsk.commands['/compass']() },
-	{ label: '% Barras',        state: () => dsk.bars?.enabled,        toggle: () => dsk.commands['/bars']() },
-	{ label: 'Habilidades',   state: () => dsk.ablManager?.enabled,   toggle: () => dsk.commands['/abl']() },
-	{ label: 'Inventario',   state: () => dsk.invManager?.enabled,   toggle: () => dsk.commands['/inv']() },
-	{ label: 'WC Config', state: () => wcm?.visible,       toggle: () => dsk.commands['/wcaveconfig']() },
-	{ label: 'WC Myst',        state: () => dsk.wcave?.enabled, toggle: () => dsk.commands['/wcave']() },
-	{ label: 'Auto Heal', state: () => dsk.heal?.enabled,  toggle: () => dsk.commands['/heal']() },
-	{ label: 'Auto Food', state: () => dsk.food?.enabled,  toggle: () => dsk.commands['/food']() },
-	{ label: 'Diso', state: () => dsk.diso?.enabled, toggle: () => dsk.commands['/diso']() },
-	{ label: 'WW',   state: () => dsk.ww?.enabled,   toggle: () => dsk.commands['/ww']() },
-	{ label: 'Follow',      state: () => dsk.follow?.enabled,      toggle: () => dsk.commands['/follow']() },
-	{ label: 'Radar',   state: () => dsk.radar?.enabled,   toggle: () => dsk.commands['/radar']() },
-	{ label: 'Onlines',   state: () => dsk.whoManager?.enabled,   toggle: () => dsk.commands['/on']() },
-	{ label: 'Tribe List',   state: () => dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
-	{ label: 'Mining/SSD Config', state: () => minm?.visible,       toggle: () => dsk.commands['/miningconfig']() },
-	{ label: 'Mining Bot',    state: () => dsk.mining?.enabled, toggle: () => dsk.commands['/mining']() },
-	{ label: 'SSD Bot',       state: () => dsk.ssd?.enabled,    toggle: () => dsk.commands['/ssd']() },
-	{ label: 'Rotation Config',state: () => rm?.visible,           toggle: () => dsk.commands['/rotationconfig']() },
-	{ label: 'Rotation',       state: () => dsk.rotation?.enabled, toggle: () => dsk.commands['/rotation']() },
-	{ label: 'Hide Name',   state: () => dsk.hide?.enabled,   toggle: () => dsk.commands['/hide']() },
-	{ label: 'Cavar',   state: () => dsk.cavar?.enabled,   toggle: () => dsk.commands['/cavar']() },
-	{ label: 'Discord Config', state: () => dcm?.visible, toggle: () => dsk.commands['/discordconfig']() },
-	{ label: 'Discord',     state: () => dsk.discord?.enabled,     toggle: () => dsk.commands['/discord']() },
-	{ label: 'Clay Bot', state: () => dsk.clay?.enabled, toggle: () => dsk.commands['/clay']() },
-	{ label: 'HealBot', state: () => dsk.healbot?.enabled, toggle: () => dsk.commands['/healbot']() },
-	{ label: 'Aloe Bot', state: () => dsk.aloe?.enabled, toggle: () => dsk.commands['/aloe']() },
+        { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
+    { label: 'Skills',             state: () => !!dsk.skillHud?.enabled,       toggle: () => dsk.commands['/skills']() },
+    { label: 'Skills Config',      state: () => !!dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
+    { label: 'Cooking',            state: () => !!dsk.cooking?.enabled,        toggle: () => dsk.commands['/cook']() },
+    { label: 'Smelting',           state: () => !!dsk.smelting?.enabled,       toggle: () => dsk.commands['/smelt']() },
+    { label: 'Farming',            state: () => !!dsk.farm?.enabled,           toggle: () => dsk.commands['/farm']() },
+    { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
+    { label: 'Sword',              state: () => !!dsk.sword?.enabled,          toggle: () => dsk.commands['/sword']() },
+    { label: 'Hammer',             state: () => !!dsk.hammer?.enabled,         toggle: () => dsk.commands['/hammer']() },
+    { label: 'Armas Bot',          state: () => !!dsk.armas?.enabled,          toggle: () => dsk.commands['/armas']() },
+    { label: 'Destruction',        state: () => !!dsk.destruction?.enabled,    toggle: () => dsk.commands['/destru']() },
+    { label: 'Craft Config',        state: () => !!dsk.craftManager?.visible,   toggle: () => dsk.commands['/craftconfig']() },
+    { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
+    { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
+    { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
+    { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
+    { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
+        { label: '⛏️ Mine Hub',        state: () => !!window.minm?.visible,  toggle: () => dsk.commands['/minehub']() },
+        { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
+    { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
+    { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
+    { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
+    { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
+    { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
+    { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
+    { label: 'Auto Explo',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
+    { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
+    { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
+    { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
+    { label: 'Rotation Config',    state: () => !!rm?.visible,                 toggle: () => dsk.commands['/rotationconfig']() },
+    { label: 'Reconnect',          state: () => !!dsk.reconnect?.enabled,      toggle: () => dsk.commands['/reconnect']() },
+    { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
+    { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
+    { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
+    { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
+    { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
+    { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
+    { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
+    { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
+    { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
+    { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
+    { label: 'Hide Name',          state: () => !!dsk.hide?.enabled,           toggle: () => dsk.commands['/hide']() },
+    { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
+    { label: 'Zoom 1.5x',          state: () => !!dsk.zoom?.enabled,           toggle: () => dsk.commands['/zoom']() },
+    { label: 'Color Picker',       state: () => !!cp?.visible,                 toggle: () => dsk.commands['/colorpicker']() },
+    { label: 'Top Skill Calc',     state: () => !!tscD?.visible,               toggle: () => dsk.commands['/topskill']() },
+    { label: 'Discord Config',     state: () => !!dcm?.visible,                toggle: () => dsk.commands['/discordconfig']() },
+    { label: 'Discord',            state: () => !!dsk.discord?.enabled,        toggle: () => dsk.commands['/discord']() },
+    { label: 'Buy (use /buy N)',   state: () => false,                          toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+
 
 ];
+
 
 dsk.menu.page = 0;
 dsk.menu.perPage = 10;
 dsk.menu.btns = [];
+
 
 // Cria os botões de página
 dsk.menu.btnPrev = jv.Button.create(0, 0, 24, '<', dsk.menu, 22);
@@ -3870,6 +4801,7 @@ dsk.menu.btnPrev.on_click = () => {
   if (dsk.menu.page > 0) { dsk.menu.page--; dsk.menu.rebuild(); }
 };
 
+
 dsk.menu.btnNext = jv.Button.create(0, 0, 24, '>', dsk.menu, 22);
 jv.bottom(dsk.menu.btnNext, 4);
 dsk.menu.btnNext.x = dsk.menu.w - 30;
@@ -3877,6 +4809,7 @@ dsk.menu.btnNext.on_click = () => {
   const maxPage = Math.ceil(dsk.menu.items.length / dsk.menu.perPage) - 1;
   if (dsk.menu.page < maxPage) { dsk.menu.page++; dsk.menu.rebuild(); }
 };
+
 
 dsk.menu.pageLabel = jv.text('', {
   font: '11px Verdana',
@@ -3888,18 +4821,22 @@ dsk.menu.pageLabel.x = dsk.menu.w - 100;
 jv.bottom(dsk.menu.pageLabel, 8);
 dsk.menu.addChild(dsk.menu.pageLabel);
 
+
 dsk.menu.rebuild = () => {
   dsk.menu.btns.forEach(b => dsk.menu.removeChild(b));
   dsk.menu.btns = [];
+
 
   const start = dsk.menu.page * dsk.menu.perPage;
   const slice = dsk.menu.items.slice(start, start + dsk.menu.perPage);
   const maxPage = Math.ceil(dsk.menu.items.length / dsk.menu.perPage);
 
+
   slice.forEach((item, i) => {
     const btn = jv.Button.create(0, 0, 160, '', dsk.menu, 22);
     btn.x = 20;
     btn.y = 35 + i * 26;
+
 
     // label do nome (branco fixo)
     const lbl = jv.text(item.label, {
@@ -3913,6 +4850,7 @@ dsk.menu.rebuild = () => {
     btn.addChild(lbl);
     btn.lbl = lbl;
 
+
     // label do status (ON/OFF colorido)
     const status = jv.text('OFF', {
       font: '11px Verdana',
@@ -3924,6 +4862,7 @@ dsk.menu.rebuild = () => {
     status.y = 4;
     btn.addChild(status);
     btn.status = status;
+
 
     btn.item = item;
     btn.on_click = () => {
@@ -3941,9 +4880,11 @@ dsk.menu.rebuild = () => {
     dsk.menu.btns.push(btn);
   });
 
+
   dsk.menu.pageLabel.text = `${dsk.menu.page + 1}/${maxPage}`;
   dsk.menu.refresh();
 };
+
 
 dsk.menu.refresh = () => {
   dsk.menu.btns.forEach(btn => {
@@ -3955,17 +4896,21 @@ dsk.menu.refresh = () => {
   });
 };
 
+
 dsk.menu.rebuild();
+
 
 dsk.on('postLoop', () => {
   if (!dsk.menu.visible) return;
 });
+
 
 // Atualiza o tint em tempo real no postLoop
 dsk.on('postLoop', () => {
   if (!dsk.menu.visible) return;
   dsk.menu.refresh();
 });
+
 
 // Botão flutuante para abrir/fechar o menu
 dsk.menu.toggleBtn = jv.Button.create(0, 0, 60, '☰ Menu', ui_container, 22);
@@ -3978,12 +4923,365 @@ dsk.menu.toggleBtn.on_click = () => {
   if (dsk.menu.visible) dsk.menu.refresh();
 };
 
-dsk.setCmd('/menu', () => {
-  dsk.menu.toggleBtn.visible = !dsk.menu.toggleBtn.visible;
-  dsk.localMsg(`Menu: ${dsk.menu.toggleBtn.visible ? 'Ativado' : 'Desativado'}`, dsk.menu.toggleBtn.visible ? '#5f5' : '#f55');
-});
+
+// ── MENU HUB HTML ─────────────────────────────────────────────
+
+
+(function () {
+  let panel = null;
+  let refreshInterval = null;
+
+
+  const DISCORD_URL = 'https://discord.gg/XkVhYENK7k';
+
+
+  const ITEMS = [
+    { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
+    { label: 'Skills',             state: () => !!dsk.skillHud?.enabled,       toggle: () => dsk.commands['/skills']() },
+    { label: 'Skills Config',      state: () => !!dsk.armasManager?.enabled,   toggle: () => dsk.commands['/skillconfig']() },
+    { label: 'Cooking',            state: () => !!dsk.cooking?.enabled,        toggle: () => dsk.commands['/cook']() },
+    { label: 'Smelting',           state: () => !!dsk.smelting?.enabled,       toggle: () => dsk.commands['/smelt']() },
+    { label: 'Farming',            state: () => !!dsk.farm?.enabled,           toggle: () => dsk.commands['/farm']() },
+    { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
+    { label: 'Sword',              state: () => !!dsk.sword?.enabled,          toggle: () => dsk.commands['/sword']() },
+    { label: 'Hammer',             state: () => !!dsk.hammer?.enabled,         toggle: () => dsk.commands['/hammer']() },
+    { label: 'Armas Bot',          state: () => !!dsk.armas?.enabled,          toggle: () => dsk.commands['/armas']() },
+    { label: 'Destruction',        state: () => !!dsk.destruction?.enabled,    toggle: () => dsk.commands['/destru']() },
+    { label: 'Craft Config',        state: () => !!dsk.craftManager?.visible,   toggle: () => dsk.commands['/craftconfig']() },
+    { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
+    { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
+    { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
+    { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
+    { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
+        { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
+        { label: '⛏️ Mine Hub',        state: () => !!window.minm?.visible,  toggle: () => dsk.commands['/minehub']() },
+    { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
+    { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
+    { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
+    { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
+    { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
+    { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
+    { label: 'Auto Explo',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
+    { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
+    { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
+    { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
+    { label: 'Rotation Config',    state: () => !!rm?.visible,                 toggle: () => dsk.commands['/rotationconfig']() },
+    { label: 'Reconnect',          state: () => !!dsk.reconnect?.enabled,      toggle: () => dsk.commands['/reconnect']() },
+    { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
+    { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
+    { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
+    { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
+    { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
+    { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
+    { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
+    { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
+    { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
+    { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
+    { label: 'Hide Name',          state: () => !!dsk.hide?.enabled,           toggle: () => dsk.commands['/hide']() },
+    { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
+    { label: 'Zoom 1.5x',          state: () => !!dsk.zoom?.enabled,           toggle: () => dsk.commands['/zoom']() },
+    { label: 'Color Picker',       state: () => !!cp?.visible,                 toggle: () => dsk.commands['/colorpicker']() },
+    { label: 'Top Skill Calc',     state: () => !!tscD?.visible,               toggle: () => dsk.commands['/topskill']() },
+    { label: 'Discord Config',     state: () => !!dcm?.visible,                toggle: () => dsk.commands['/discordconfig']() },
+    { label: 'Discord',            state: () => !!dsk.discord?.enabled,        toggle: () => dsk.commands['/discord']() },
+    { label: 'Buy (use /buy N)',   state: () => false,                          toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
+  ];
+
+
+  function createPanel() {
+    if (panel) { removePanel(); return; }
+
+
+    panel = document.createElement('div');
+    panel.id = 'pablo-hub';
+    Object.assign(panel.style, {
+      position:      'fixed',
+      top:           '60px',
+      left:          '10px',
+      width:         '200px',
+      maxHeight:     '70vh',
+      background:    '#1a1a2e',
+      border:        '1px solid #555',
+      borderRadius:  '10px',
+      boxShadow:     '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex:        '99997',
+      fontFamily:    'Verdana, sans-serif',
+      display:       'flex',
+      flexDirection: 'column',
+      userSelect:    'none',
+    });
+
+
+    // ── Header (drag) ──────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display:        'flex',
+      alignItems:     'center',
+      justifyContent: 'space-between',
+      padding:        '8px 10px',
+      background:     '#2a2a3e',
+      borderRadius:   '10px 10px 0 0',
+      cursor:         'move',
+      borderBottom:   '1px solid #444',
+      flexShrink:     '0',
+    });
+
+
+    const title = document.createElement('span');
+    title.textContent = '☰ Pablo Mod';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px', lineHeight: '1',
+    });
+    closeBtn.onclick = () => removePanel();
+
+
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown',  _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - panel.getBoundingClientRect().left;
+      oy = _xy.y - panel.getBoundingClientRect().top;
+      panel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); panel.style.left = (_xy.x - ox) + 'px'; panel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+	// ── Alça de resize ────────────────────────────────────────────
+	const resizeHandle = document.createElement('div');
+	Object.assign(resizeHandle.style, {
+	  position:  'absolute',
+	  bottom:    '0',
+	  right:     '0',
+	  width:     '16px',
+	  height:    '16px',
+	  cursor:    'nwse-resize',
+	  zIndex:    '1',
+	  // triângulo decorativo
+	  background: 'linear-gradient(135deg, transparent 50%, #555 50%)',
+	  borderBottomRightRadius: '10px',
+	});
+	panel.style.position = 'fixed'; // garante
+	panel.appendChild(resizeHandle);
+
+	// ── Lógica de resize ──────────────────────────────────────────
+	let resizing = false;
+	let rStartX = 0, rStartY = 0;
+	let rStartW = 0, rStartH = 0;
+
+	const MIN_W = 160, MIN_H = 200;
+	const MAX_W = () => window.innerWidth  * 0.9;
+	const MAX_H = () => window.innerHeight * 0.9;
+
+	resizeHandle.addEventListener('mousedown',  _startResize);
+	resizeHandle.addEventListener('touchstart', _startResize, { passive: false });
+	function _startResize(e) {
+	  e.preventDefault();
+	  e.stopPropagation();
+	  resizing = true;
+	  const _xy = _getXY(e);
+	  rStartX = _xy.x;
+	  rStartY = _xy.y;
+	  const rect = panel.getBoundingClientRect();
+	  rStartW = rect.width;
+	  rStartH = rect.height;
+	}
+
+	window.addEventListener('mousemove',  _onResizeMove);
+	window.addEventListener('touchmove',  _onResizeMove, { passive: false });
+	window.addEventListener('mouseup',  _onResizeEnd);
+	window.addEventListener('touchend', _onResizeEnd);
+	function _onResizeMove(e) {
+	  if (!resizing) return;
+	  const _xy = _getXY(e);
+	  const newW = Math.min(MAX_W(), Math.max(MIN_W, rStartW + (_xy.x - rStartX)));
+	  const newH = Math.min(MAX_H(), Math.max(MIN_H, rStartH + (_xy.y - rStartY)));
+	  panel.style.width     = newW + 'px';
+	  panel.style.height    = newH + 'px';
+	  panel.style.maxHeight = 'none';
+	}
+	function _onResizeEnd() { resizing = false; }
+
+
+
+    // ── Lista com scroll ───────────────────────────────────────
+    const list = document.createElement('div');
+    Object.assign(list.style, {
+      overflowY:     'auto',
+      padding:       '6px',
+      display:       'flex',
+      flexDirection: 'column',
+      gap:           '3px',
+      flex:          '1',
+    });
+
+
+    const updateFns = [];
+
+
+    ITEMS.forEach(item => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display:        'flex',
+        alignItems:     'center',
+        justifyContent: 'space-between',
+        padding:        '5px 8px',
+        borderRadius:   '6px',
+        background:     '#2a2a3e',
+        cursor:         'pointer',
+        transition:     'background 0.1s',
+      });
+      row.onmouseenter = () => row.style.background = '#3a3a5e';
+      row.onmouseleave = () => row.style.background = '#2a2a3e';
+
+
+      const lbl = document.createElement('span');
+      lbl.textContent = item.label;
+      Object.assign(lbl.style, { color: '#ddd', fontSize: '11px' });
+
+
+      const status = document.createElement('span');
+      Object.assign(status.style, {
+        fontSize: '10px', fontWeight: 'bold',
+        minWidth: '28px', textAlign: 'right',
+      });
+
+
+      function update() {
+        try {
+          const on = item.state();
+          status.textContent = on ? 'ON' : 'OFF';
+          status.style.color = on ? '#2ecc71' : '#e74c3c';
+        } catch (_) {}
+      }
+      update();
+
+
+      row.onclick = () => { try { item.toggle(); } catch (_) {} setTimeout(update, 150); };
+      row.appendChild(lbl);
+      row.appendChild(status);
+      list.appendChild(row);
+      updateFns.push(update);
+    });
+
+
+    // Refresh de estado a cada 500ms
+    refreshInterval = setInterval(() => {
+      if (!panel) { clearInterval(refreshInterval); return; }
+      updateFns.forEach(u => u());
+    }, 500);
+
+
+    // ── Botão Discord ──────────────────────────────────────────
+    const footer = document.createElement('div');
+    Object.assign(footer.style, {
+      padding:      '8px 6px',
+      borderTop:    '1px solid #333',
+      flexShrink:   '0',
+    });
+
+
+    const btnDiscord = document.createElement('button');
+    btnDiscord.textContent = '💬 DISCORD';
+    Object.assign(btnDiscord.style, {
+      width:        '100%',
+      padding:      '7px 0',
+      borderRadius: '7px',
+      border:       '1px solid #00ff99',
+      background:   '#0a0a1a',
+      color:        '#00ff99',
+      fontFamily:   'Verdana, sans-serif',
+      fontSize:     '12px',
+      fontWeight:   'bold',
+      cursor:       'pointer',
+      letterSpacing:'1px',
+      textShadow:   '0 0 8px #00ff99',
+      boxShadow:    '0 0 8px rgba(0,255,153,0.3)',
+      transition:   'all 0.15s',
+    });
+    btnDiscord.onmouseenter = () => {
+      btnDiscord.style.background  = '#00ff99';
+      btnDiscord.style.color       = '#0a0a1a';
+      btnDiscord.style.textShadow  = 'none';
+      btnDiscord.style.transform   = 'scale(1.03)';
+    };
+    btnDiscord.onmouseleave = () => {
+      btnDiscord.style.background  = '#0a0a1a';
+      btnDiscord.style.color       = '#00ff99';
+      btnDiscord.style.textShadow  = '0 0 8px #00ff99';
+      btnDiscord.style.transform   = 'scale(1)';
+    };
+    btnDiscord.onmousedown = () => { btnDiscord.style.transform = 'scale(0.97)'; };
+    btnDiscord.onmouseup   = () => { btnDiscord.style.transform = 'scale(1)'; };
+    btnDiscord.onclick = () => {
+      const win = window.open(DISCORD_URL, '_blank');
+      if (!win) window.location.href = DISCORD_URL;
+    };
+
+
+    footer.appendChild(btnDiscord);
+
+
+    panel.appendChild(header);
+    panel.appendChild(list);
+    panel.appendChild(footer);
+    document.body.appendChild(panel);
+  }
+
+
+  function removePanel() {
+    clearInterval(refreshInterval);
+    refreshInterval = null;
+    if (panel) { panel.remove(); panel = null; }
+  }
+
+
+  // /hub — abre/fecha o painel HTML
+  dsk.setCmd('/hub', () => {
+    if (panel) {
+      removePanel();
+      dsk.localMsg('Hub: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Hub: Aberto', '#5f5');
+    }
+  });
+
+
+  // /menu — continua mostrando/escondendo o botão físico original
+  dsk.setCmd('/menu', () => {
+    if (dsk.menu?.toggleBtn) {
+      dsk.menu.toggleBtn.visible = !dsk.menu.toggleBtn.visible;
+      dsk.localMsg(`Menu: ${dsk.menu.toggleBtn.visible ? 'Ativado' : 'Desativado'}`, dsk.menu.toggleBtn.visible ? '#5f5' : '#f55');
+    }
+  });
+
+
+})();
+
+
+
 
 // ── RADAR ─────────────────────────────────────────────
+
 
 dsk.radar = {
   enabled: false,
@@ -3991,8 +5289,10 @@ dsk.radar = {
   textos: []
 };
 
+
 dsk.setCmd('/radar', () => {
   dsk.radar.enabled = !dsk.radar.enabled;
+
 
   if (dsk.radar.enabled) {
     dsk.radar.start();
@@ -4003,11 +5303,13 @@ dsk.setCmd('/radar', () => {
   }
 });
 
+
 dsk.radar.start = () => {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   dsk.radar.intervalo = setInterval(dsk.radar.renderizar, 1000); // atualiza a cada 1s
 };
+
 
 dsk.radar.stop = () => {
   clearInterval(dsk.radar.intervalo);
@@ -4015,14 +5317,17 @@ dsk.radar.stop = () => {
   dsk.radar.limpar();
 };
 
+
 dsk.radar.limpar = () => {
   dsk.radar.textos.forEach(txt => ui_container.removeChild(txt));
   dsk.radar.textos = [];
 };
 
+
 // Usa sua função de renderização adaptada
 dsk.radar.renderizar = () => {
   dsk.radar.limpar();
+
 
   var coisasperto = objects.items.filter(el => el && (
     el.name == "Altar" || el.name == "Stairs Up" || el.name == "Hole" ||
@@ -4030,9 +5335,11 @@ dsk.radar.renderizar = () => {
     el.name == "Deep Recall" || el.name == "Glowing Altar" || el.name == "Shiny Rock"
   ));
 
+
   for (var i = 0; i < Math.min(coisasperto.length, 30); i++) {
     var obj = coisasperto[i];
     var novoNome;
+
 
     switch (obj.name) {
       case "Altar": novoNome = "Altar"; break;
@@ -4046,6 +5353,7 @@ dsk.radar.renderizar = () => {
       case "Shiny Rock": novoNome = "Gold Stone"; break;
     }
 
+
     var texto = jv.text(" " + novoNome + " " + obj.x + " " + obj.y, {
       font: "11px Verdana",
       fill: 16777096,
@@ -4055,6 +5363,7 @@ dsk.radar.renderizar = () => {
       align: "right"
     });
 
+
     texto.x = 420;
     texto.y = 30 + i * 18;
     ui_container.addChild(texto);
@@ -4062,15 +5371,19 @@ dsk.radar.renderizar = () => {
   }
 };
 
+
 // ── KNITBOT ─────────────────────────────────────────────
+
 
 dsk.knit = {
   enabled: false,
   loop: null
 };
 
+
 dsk.setCmd('/knit', () => {
   dsk.knit.enabled = !dsk.knit.enabled;
+
 
   if (dsk.knit.enabled) {
     dsk.knit.start();
@@ -4081,6 +5394,7 @@ dsk.setCmd('/knit', () => {
   }
 });
 
+
 dsk.knit.start = () => {
   // loop automático
   (function loop() {
@@ -4090,6 +5404,7 @@ dsk.knit.start = () => {
   })();
 };
 
+
 dsk.knit.stop = () => {
   if (dsk.knit.loop) {
     cancelAnimationFrame(dsk.knit.loop);
@@ -4097,16 +5412,18 @@ dsk.knit.stop = () => {
   }
 };
 
+
 // sua função original continua igual
 async function KnitBot() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
     if (currentLevel > 0 && skillLevel >= currentLevel && ['knitting'].includes(skillName)) {
-	await xDelay(1000);
-	dsk.knit.enabled = false;
-	dsk.localMsg('Knit: Desativado', '#f55');
+        await xDelay(1000);
+        dsk.knit.enabled = false;
+        dsk.localMsg('Knit: Desativado', '#f55');
     return;
-	}
+        }
+
 
   if (xIfChatHas("Click the Knit button")) {
     xDoClearChat("Click the Knit button");
@@ -4116,11 +5433,13 @@ async function KnitBot() {
     await xDelay(400);
   }
 
+
   if (xIfChatHas("You are all ready to knit")) {
     xDoClearChat("You are all ready to knit");
     await xDoKeyDown(6);
     await xDelay(400);
   }
+
 
   if (xIfChatHas("You are working on")) {
     xDoClearChat("You are working on");
@@ -4130,7 +5449,9 @@ async function KnitBot() {
   }
 }
 
+
 // ── CAVAR ─────────────────────────────────────────────
+
 
 dsk.cavar = {
   enabled: false,
@@ -4138,8 +5459,10 @@ dsk.cavar = {
   dir: null
 };
 
+
 dsk.setCmd('/cavar', (context) => {
   dsk.cavar.enabled = !dsk.cavar.enabled;
+
 
   if (context) {
     const map = { up:0, right:1, down:2, left:3 };
@@ -4150,6 +5473,7 @@ dsk.setCmd('/cavar', (context) => {
     dsk.cavar.dir = null;
   }
 
+
   if (dsk.cavar.enabled) {
     dsk.cavar.start();
     dsk.localMsg(`Cavar: Ativado ${dsk.cavar.dir !== null ? `(dir=${dsk.cavar.dir})` : ''}`, '#5f5');
@@ -4159,6 +5483,7 @@ dsk.setCmd('/cavar', (context) => {
   }
 });
 
+
 dsk.cavar.start = async () => {
   while (dsk.cavar.enabled) {
     await cavar(dsk.cavar.dir ?? myself.dir);
@@ -4166,14 +5491,17 @@ dsk.cavar.start = async () => {
   }
 };
 
+
 dsk.cavar.stop = () => {
   dsk.cavar.enabled = false;
 };
+
 
 // Função genérica de cavar
 async function cavar(dir) {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
+
 
   const offsets = {
     0: { dx: 0, dy: -1 }, // cima
@@ -4182,17 +5510,21 @@ async function cavar(dir) {
     3: { dx: -1, dy: 0 }  // esquerda
   };
 
+
   const off = offsets[dir];
   if (!off) return;
+
 
   const x1 = myself.x + off.dx;
   const y1 = myself.y + off.dy;
   const x2 = myself.x + off.dx * 2;
   const y2 = myself.y + off.dy * 2;
 
+
   // tile atrás
   const backX = myself.x - off.dx;
   const backY = myself.y - off.dy;
+
 
   if (occupied(x2, y2) == 0) {
     // anda 1 sqm para frente
@@ -4205,52 +5537,59 @@ async function cavar(dir) {
       await xDelay(200);
     }
     await xDoKeyPress(6, 100);
-	}
-	  else if (occupied(x1, y1) == 1 && occupied(x2, y2) == 1) {
-	  const backDir = (dir + 2) % 4; // direção oposta
+        }
+          else if (occupied(x1, y1) == 1 && occupied(x2, y2) == 1) {
+          const backDir = (dir + 2) % 4; // direção oposta
 
-	  if (occupied(backX, backY) == 0) {
-		// atrás livre → anda para trás, vira e bate
-		myself.move(backX, backY);
-		await xDelay(300);
 
-		if (myself.dir != dir) {
-		  send({ type: 'm', x: myself.x, y: myself.y, d: dir });
-		  await xDelay(200);
-		}
-		await xDoKeyPress(6, 100);
-	  } else {
-		// atrás ocupado → insiste até liberar
-		if (myself.dir != backDir) {
-		  send({ type: 'm', x: myself.x, y: myself.y, d: backDir });
-		  await xDelay(200);
-		}
+          if (occupied(backX, backY) == 0) {
+                // atrás livre → anda para trás, vira e bate
+                myself.move(backX, backY);
+                await xDelay(300);
 
-		let tries = 0;
-		while (occupied(backX, backY) == 1 && tries < 20) {
-		  await xDoKeyPress(6, 100);
-		  await xDelay(400);
-		  tries++;
-		  // opcional: mostrar no chat quantas vezes já tentou
-		  dsk.localMsg(`Tentando liberar atrás... (${tries})`, '#ff0');
-		}
 
-		// só anda para trás se realmente liberou
-		if (occupied(backX, backY) == 0) {
-		  myself.move(backX, backY);
-		  await xDelay(300);
+                if (myself.dir != dir) {
+                  send({ type: 'm', x: myself.x, y: myself.y, d: dir });
+                  await xDelay(200);
+                }
+                await xDoKeyPress(6, 100);
+          } else {
+                // atrás ocupado → insiste até liberar
+                if (myself.dir != backDir) {
+                  send({ type: 'm', x: myself.x, y: myself.y, d: backDir });
+                  await xDelay(200);
+                }
 
-		  if (myself.dir != dir) {
-			send({ type: 'm', x: myself.x, y: myself.y, d: dir });
-			await xDelay(200);
-		  }
-		  await xDoKeyPress(6, 100);
-		}
-	  }
-	}
+
+                let tries = 0;
+                while (occupied(backX, backY) == 1 && tries < 20) {
+                  await xDoKeyPress(6, 100);
+                  await xDelay(400);
+                  tries++;
+                  // opcional: mostrar no chat quantas vezes já tentou
+                  dsk.localMsg(`Tentando liberar atrás... (${tries})`, '#ff0');
+                }
+
+
+                // só anda para trás se realmente liberou
+                if (occupied(backX, backY) == 0) {
+                  myself.move(backX, backY);
+                  await xDelay(300);
+
+
+                  if (myself.dir != dir) {
+                        send({ type: 'm', x: myself.x, y: myself.y, d: dir });
+                        await xDelay(200);
+                  }
+                  await xDoKeyPress(6, 100);
+                }
+          }
+        }
 }
 
+
 // ── WCAVE BOT ─────────────────────────────────────────────────
+
 
 window.xWCID1         = 0;
 window.xWCID2         = 0;
@@ -4260,11 +5599,13 @@ window.RepTimer       = 0;
 window.repItem        = '';
 window.WCPosListX     = new Array(20).fill(0);
 window.WCPosListY     = new Array(20).fill(0);
-window.wcaveRepVoltas = 5;
+window.wcaveRepVoltas = 3;
 window.xCombatEndTimer = null;
 window.xRecentCombat = false;
 
+
 // ── Helpers ───────────────────────────────────────────────────
+
 
 dsk.on('postLoop', () => {
   if (!myself) return;
@@ -4284,6 +5625,7 @@ dsk.on('postLoop', () => {
   }
 });
 
+
 function xGetItemByID(id) {
   for (let i in objects.items) {
     if (objects.items[i]?.sprite === id) return objects.items[i];
@@ -4291,40 +5633,50 @@ function xGetItemByID(id) {
   return undefined;
 }
 
+
 function xGetSlotFood() {
   const foodIds = [220, 204, 188, 236, 487, 725];
   return foodIds.find(id => xGetSlotByID(id) !== undefined);
 }
 
+
 async function xDoLogOff() { //dsk.fquit();
-	if (inv[5]?.sprite === undefined) { dsk.localMsg('OFF: slot 6 vazio', '#f00'); return; }
+        if (inv[5]?.sprite === undefined) { dsk.localMsg('OFF: slot 6 vazio', '#f00'); return; }
 
-	const foodSlot = xGetSlotFood();
-	if (foodSlot === undefined) { dsk.localMsg('OFF: sem comida', '#f00'); return; }
 
-	if (inv[0]?.sprite === undefined) { dsk.localMsg('OFF: slot 1 vazio', '#f00'); return; }
-	if (inv[1]?.sprite === undefined) { dsk.localMsg('OFF: slot 2 vazio', '#f00'); return; }
-	if (inv[2]?.sprite === undefined) { dsk.localMsg('OFF: slot 3 vazio', '#f00'); return; }
+        const foodSlot = xGetSlotFood();
+        if (foodSlot === undefined) { dsk.localMsg('OFF: sem comida', '#f00'); return; }
+
+
+        if (inv[0]?.sprite === undefined) { dsk.localMsg('OFF: slot 1 vazio', '#f00'); return; }
+        if (inv[1]?.sprite === undefined) { dsk.localMsg('OFF: slot 2 vazio', '#f00'); return; }
+        if (inv[2]?.sprite === undefined) { dsk.localMsg('OFF: slot 3 vazio', '#f00'); return; }
+
 
 }
+
 
 async function xDoChangeDir(dir) {
   send({ type: 'm', x: myself.x, y: myself.y, d: dir });
   await xDelay(239);
 }
 
+
 async function xGetMobByName(...names) {
   xTemp[13] = myself;
   xTemp[15] = myself;
   let bestDist = Infinity;
+
 
   for (let i in mobs.items) {
     const mob = mobs.items[i];
     if (!mob || mob === myself) continue;
     if (xPlyrTest(mob)) continue;
 
+
     // ← Ignora mobs na blacklist
     if (xTemp[100]?.[mob.id] && xTemp[100][mob.id] > Date.now()) continue;
+
 
     const mobName = mob.name.toLowerCase().replace(/ /g, '');
     const nameMatch = names.some(n => {
@@ -4332,7 +5684,9 @@ async function xGetMobByName(...names) {
       return mobName.includes(search) || search.includes(mobName);
     });
 
+
     if (!nameMatch) continue;
+
 
     const dist = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
     if (dist > 7) continue;
@@ -4342,23 +5696,27 @@ async function xGetMobByName(...names) {
     }
   }
 
+
   xTemp[13] = xTemp[15];
   return xTemp[13];
 }
 
+
 function xPlyrTest(mob) {
   return mob?.type === 'player' || mob?.is_player === true;
 }
+
 
 async function xHeal() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   if (xGoing[104] === true) return;
 
+
   xGoing[104] = true;
   const slot = xGetSlotByID(242);
   if (slot !== undefined && hp_status.val <= 70 && hp_status.val >= 0.1) {
-	await xDelay(600);
+        await xDelay(600);
     await xDoUseSlotByID(slot);
     // cooldown em background — não bloqueia o bot
     setTimeout(() => { xGoing[104] = false; }, 20000);
@@ -4367,20 +5725,25 @@ async function xHeal() {
   }
 }
 
+
 function xChangeStatus(msg) { dsk.localMsg(msg, '#0ff'); }
 
+
 // ── Lógica principal ──────────────────────────────────────────
+
 
 async function xWCave() {
   if (connection !== undefined && connection.readyState === 3) xMovingNow = false;
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
 
+
   if (game_state !== 2) {
     xMovingNow = false;
     target.id = me;
     return;
   }
+
 
   if (xIfChatHas('Welcome back ')) {
     await xDelay(600);
@@ -4391,10 +5754,13 @@ async function xWCave() {
     return;
   }
 
+
   if (xGoing[110] === true) return;
   xGoing[110] = true;
 
+
   // ── MODO REPARO ──────────────────────────────────────────
+
 
   if (xNeedsRep) {
     if (xGetSlotByID(719) === undefined) {
@@ -4404,8 +5770,8 @@ async function xWCave() {
         xChangeStatus('Buscando item para reparar...');
         await xDoMove(xGetItemByID(xWCID3).x, xGetItemByID(xWCID3).y);
         xDoPickUp();
-		xDoPickUp();
-		xDoPickUp();
+                xDoPickUp();
+                xDoPickUp();
       } else {
         xChangeStatus('Sem kit de reparo, desconectando...');
         xDoLogOff();
@@ -4413,10 +5779,12 @@ async function xWCave() {
       return;
     }
 
+
     for (let i in mobs.items) {
       const mob = mobs.items[i];
       if (!mob || mob === myself) continue;
       const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
 
       if (dist <= 6) {
         if (xGetItemByID(xWCID3) !== undefined) {
@@ -4441,13 +5809,14 @@ async function xWCave() {
         xGoing[110] = false;
         return;
 
+
       } else if (xPlyrTest(mob)) {
         xChangeStatus('Jogador detectado! Fugindo...');
         if (xGetItemByID(xWCID3) !== undefined) {
           await xDoMove(xGetItemByID(xWCID3).x, xGetItemByID(xWCID3).y);
           xDoPickUp();
-		  xDoPickUp();
-		  xDoPickUp();
+                  xDoPickUp();
+                  xDoPickUp();
         }
         if (inv[2]?.sprite !== undefined) {
           if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
@@ -4467,6 +5836,7 @@ async function xWCave() {
         return;
       }
     }
+
 
     if (inv[0]?.sprite !== undefined) {
       if (myself.x === 94 && myself.y === 93) {
@@ -4491,6 +5861,8 @@ async function xWCave() {
             if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
             xNeedsRep = false;
             RepTimer  = 0;
+            wcStat.repairoTotal++;
+            dsk.localMsg(`WCave: reparo ${wcStat.repairoTotal} completo ✅`, '#5f5');
           }
         } else {
           xDoKeyDown(6);
@@ -4504,9 +5876,11 @@ async function xWCave() {
       }
     }
 
+
     xGoing[110] = false;
     return;
   }
+
 
   // ── MODO NORMAL ──────────────────────────────────────────
 // ← bloqueia tudo se precisar reparar
@@ -4514,6 +5888,7 @@ async function xWCave() {
     xGoing[110] = false;
     return;
   }
+
 
   const foodId = xGetSlotFood();
   if (foodId !== undefined) {
@@ -4527,13 +5902,16 @@ async function xWCave() {
     xDoLogOff();
   }
 
+
   if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
   if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
   if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
 
+
   if (inv[0]?.equip === 2) { xDoLogOff(); await xDelay(150); }
   if (inv[1]?.equip === 2) { xDoLogOff(); await xDelay(150); }
   if (inv[2]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+
 
   if (hp_status.val <= 70 && hp_status.val >= 0.1) {
     xChangeStatus('HP baixo, curando...');
@@ -4545,9 +5923,10 @@ async function xWCave() {
     }
   }
 
+
   const temMob = xTemp[13] !== undefined && xTemp[13] !== myself;
   const emCombate = xRecentCombat;
-	if (!temMob && !emCombate && hp_status.val >= 80 && hp_status.val <= 92) {
+        if (!temMob && !emCombate && hp_status.val >= 80 && hp_status.val <= 92) {
     if (!xGoing[105]) {
       const slotBandagem = xGetSlotByID(767);
       if (slotBandagem !== undefined) {
@@ -4559,16 +5938,19 @@ async function xWCave() {
     }
   }
 
+
   const pickAll = async () => {
     if (xGetItemByID(xWCID3) !== undefined) { await xDoMove(xGetItemByID(xWCID3).x, xGetItemByID(xWCID3).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
     if (xGetItemByID(xWCID1) !== undefined) { await xDoMove(xGetItemByID(xWCID1).x, xGetItemByID(xWCID1).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
     if (xGetItemByID(xWCID2) !== undefined) { await xDoMove(xGetItemByID(xWCID2).x, xGetItemByID(xWCID2).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
   };
 
+
   if (inv[0]?.sprite === undefined) { xChangeStatus('Slot 1 vazio, coletando...'); await pickAll(); xDoLogOff(); }
   if (inv[1]?.sprite === undefined) { xChangeStatus('Slot 2 vazio, coletando...'); await pickAll(); xDoLogOff(); }
   if (inv[2]?.sprite === undefined) { xChangeStatus('Slot 3 vazio, coletando...'); await pickAll(); xDoLogOff(); }
   if (inv[5]?.sprite === undefined) { xChangeStatus('Slot 6 vazio, desconectando...'); xDoLogOff(); }
+
 
   // ── Waypoints ────────────────────────────────────────────
   if (xTemp[70] === undefined) {
@@ -4582,25 +5964,29 @@ async function xWCave() {
     }
   }
 
+
   // ── Busca mob ────────────────────────────────────────────
 await xGetMobByName('Dire Wolf', 'Ice Elemental'); // ← nomes que quiser
 
+
 if (xTemp[13] !== undefined && xTemp[13] !== myself) {
   const dist = xGetDistance(myself.x, myself.y, xTemp[13].x, xTemp[13].y);
+
 
   if (target.id !== xTemp[13].id) {
     target.id = xTemp[13].id;
     send({ type: 't', t: target.id });
   }
 
+
   if (dist <= 1) {
     // adjacente → ataca
-	await xDoMove(xTemp[13].x, xTemp[13].y);
+        await xDoMove(xTemp[13].x, xTemp[13].y);
     xDelay(200);
-	xDoMove(xTemp[13].x, xTemp[13].y - 1);
-	xDelay(200);
-	xDoMove(xTemp[13].x, xTemp[13].y + 1);
-	xDelay(200);
+        xDoMove(xTemp[13].x, xTemp[13].y - 1);
+        xDelay(200);
+        xDoMove(xTemp[13].x, xTemp[13].y + 1);
+        xDelay(200);
   } else if (dist <= 7) {
     // longe → move até o mob
     await xDoMove(xTemp[13].x, xTemp[13].y);
@@ -4611,11 +5997,13 @@ if (xTemp[13] !== undefined && xTemp[13] !== myself) {
   }
 }
 
+
   // ── Patrulha ─────────────────────────────────────────────
   if (xTemp[13] === myself || xTemp[13] === undefined) {
     const wpX = WCPosListX[xTemp[70]];
     const wpY = WCPosListY[xTemp[70]];
     const distToWP = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+
 
     if (distToWP <= 2) {
       if (xTemp[70] >= xTemp[71]) {
@@ -4634,103 +6022,2068 @@ if (xTemp[13] !== undefined && xTemp[13] !== myself) {
     }
   }
 
+
   xGoing[110] = false;
 }
 
+
 // ── WCAVE CONFIG PANEL ────────────────────────────────────────
 
-dsk.wcave = { enabled: false }; // ← inicialização que faltava
 
-dsk.wcaveManager = jv.Dialog.create(260, 220);
-const wcm = dsk.wcaveManager;
-wcm.visible = false;
+dsk.wcave = { enabled: false };
 
-wcm.header = jv.text('WCave Config', {
-  font: '14px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
-});
-wcm.addChild(wcm.header);
-jv.center(wcm.header);
-jv.top(wcm.header, 4);
 
-wcm.close = jv.Button.create(0, 0, 24, 'X', wcm, 24);
-jv.top(wcm.close, 4); jv.right(wcm.close, 4);
-wcm.close.on_click = () => (wcm.visible = 0);
+// ── Estado persistente do WCave (não reseta ao pausar) ────────
+window.wcStat = window.wcStat ?? {
+  startMyst:    0,         // jv.upgrade_number ao ativar
+  totalMyst:    0,         // myst acumulada (persiste ao pausar)
+  mystPerHour:  0,         // calculado em tempo real
+  timerStart:   0,         // timestamp do início (ou resume)
+  totalTime:    0,         // ms acumulados antes do último pause
+  timerRunning: false,
+  repairoTotal: 0,         // quantas vezes completou o ciclo de reparo
+};
 
-wcm.move = jv.Button.create(0, 0, 24, '@', wcm, 24);
-jv.top(wcm.move, 4); jv.right(wcm.move, 28);
 
-wcm._px = 0; wcm._py = 0;
-window.addEventListener('mousemove', e => { wcm._px = e.clientX; wcm._py = e.clientY; });
-window.addEventListener('touchmove', e => { wcm._px = e.touches[0].clientX; wcm._py = e.touches[0].clientY; });
+// ── WCave Config (HTML overlay) ──────────────────────────────
 
-wcm.updatePosition = () => {
-  if (wcm.move.is_pressed) {
-    const canvas = document.querySelector('canvas');
-    const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: jv.game_width, height: jv.game_height };
-    wcm.x = (wcm._px - rect.left) * (jv.game_width / rect.width) - wcm.w / 2;
-    wcm.y = (wcm._py - rect.top) * (jv.game_height / rect.height) - 12;
+
+(function () {
+  let wcmPanel = null;
+
+
+  const wcm = {
+    get visible() { return !!wcmPanel; },
+    set visible(v) { if (!v && wcmPanel) removePanel(); else if (v && !wcmPanel) createPanel(); },
+  };
+  dsk.wcaveManager = wcm;
+
+
+  // Atualiza labels em tempo real
+  dsk.on('postLoop', () => {
+    if (!wcmPanel) return;
+    const q = k => wcmPanel.querySelector(`[data-wcm="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    const wp = xTemp[70] ?? 0, maxWp = xTemp[71] ?? 19;
+    set('status', dsk.wcave?.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('wp',     `WP: ${wp} / ${maxWp}`);
+    set('rep',    `Voltas: ${window.RepTimer ?? 0} / ${window.wcaveRepVoltas ?? 1}`);
+    set('needs',  window.xNeedsRep ? '🔧 Reparando...' : '✅ OK');
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('hunger', `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`);
+    set('mob',    `Mob: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('repairs',`Reparos: ${window.wcStat?.repairoTotal ?? 0}`);
+    set('myst',   `Myst: +${window.wcStat?.totalMyst ?? 0}`);
+    const mph = window.wcStat?.mystPerHour ?? 0;
+    // mph já está em k (calculado como raw/ms * 3600 = raw * 3600 / ms = k/h)
+    set('mph', mph >= 1000 ? `Myst/h: ${(mph/1000).toFixed(1)}M` : `Myst/h: ${mph}k`);
+    if (window.wcStat?.timerRunning) {
+      const elapsed = Math.floor((window.wcStat.totalTime + (Date.now() - window.wcStat.timerStart)) / 1000);
+      const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
+      set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
+    }
+  });
+
+
+  function createPanel() {
+    if (wcmPanel) { removePanel(); return; }
+
+
+    wcmPanel = document.createElement('div');
+    Object.assign(wcmPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '270px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '🦊 WCave Config';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - wcmPanel.getBoundingClientRect().left;
+      oy = _xy.y - wcmPanel.getBoundingClientRect().top;
+      wcmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); wcmPanel.style.left = (_xy.x - ox) + 'px'; wcmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // ── Status ────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    const statusKeys = [
+      ['status', '🔴 Pausado'],
+      ['wp',     'WP: 0 / 19'],
+      ['rep',    'Voltas: 0 / 3'],
+      ['needs',  '✅ OK'],
+      ['hp',     'HP: -'],
+      ['hunger', 'Fome: -'],
+      ['mob',    'Mob: -'],
+      ['repairs','Reparos: 0'],
+      ['myst',   'Myst: +0'],
+      ['mph',    'Myst/h: 0k'],
+      ['time',   'Tempo: 0m 0s'],
+    ];
+
+
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '3px',
+    });
+    statusKeys.forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.wcm = key;
+      el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+
+    // ── Voltas p/ reparar ─────────────────────────────────────
+    const voltasRow = document.createElement('div');
+    Object.assign(voltasRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+    const voltasLbl = document.createElement('div');
+    const voltasTitle = document.createElement('div');
+    voltasTitle.textContent = 'Voltas p/ reparar';
+    Object.assign(voltasTitle.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const voltasVal = document.createElement('div');
+    voltasVal.dataset.wcm = 'voltas';
+    voltasVal.textContent = `Voltas p/ reparar: ${window.wcaveRepVoltas ?? 1}`;
+    Object.assign(voltasVal.style, { color: '#FFD700', fontSize: '11px' });
+    voltasLbl.appendChild(voltasTitle); voltasLbl.appendChild(voltasVal);
+
+
+    const voltasBtns = document.createElement('div');
+    Object.assign(voltasBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        padding: '3px 10px', borderRadius: '5px', border: '1px solid #555',
+        background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.wcaveRepVoltas ?? 1) > 1) window.wcaveRepVoltas--; }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 1) + 1; }));
+    voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
+    body.appendChild(voltasRow);
+
+
+    // ── Botões de ação ────────────────────────────────────────
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+
+
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        flex: '1', padding: '7px 0', borderRadius: '7px',
+        border: `1px solid ${color}`, background: '#1a1a2e',
+        color: color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px',
+      });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+
+
+    actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
+      window.wcStat = { startMyst: jv.upgrade_number??0, totalMyst:0, mystPerHour:0,
+                         timerStart: Date.now(), totalTime:0, timerRunning: !!dsk.wcave?.enabled,
+                         repairoTotal:0 };
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('WCave: stats resetados! (waypoint mantido)', '#ff0');
+    }));
+    actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
+      xTemp[70] = undefined; // força reinit completo dos waypoints
+      window.WCPosListX = new Array(20).fill(0);
+      window.WCPosListY = new Array(20).fill(0);
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('WCave: waypoint resetado! Vai reiniciar no WP 0.', '#fa5');
+    }));
+    actRow.appendChild(makeActionBtn('🔧 Forçar Reparo', '#0cf', () => {
+      window.xNeedsRep = true;
+      dsk.localMsg('WCave: reparo forçado!', '#ff0');
+    }));
+    body.appendChild(actRow);
+
+
+    wcmPanel.appendChild(header);
+    wcmPanel.appendChild(body);
+    document.body.appendChild(wcmPanel);
   }
-  if (wcm.x < 0) wcm.x = 0;
-  if (wcm.y < 0) wcm.y = 0;
-  if (wcm.x + wcm.w > jv.game_width)  wcm.x = jv.game_width - wcm.w;
-  if (wcm.y + wcm.h > jv.game_height) wcm.y = jv.game_height - wcm.h;
+
+
+  function removePanel() {
+    if (wcmPanel) { wcmPanel.remove(); wcmPanel = null; }
+  }
+
+
+  dsk.setCmd('/wcaveconfig', () => {
+    if (wcmPanel) {
+      removePanel();
+      dsk.localMsg('WCave Config: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('WCave Config: Aberto', '#5f5');
+    }
+  });
+})();
+
+
+
+
+// ══════════════════════════════════════════════════════════════
+// 🐍  SNAKE PIT BOT  ─  by Pablo Mod
+// Mobs: Snake, Serpent, Nether Leech
+// Reparo: WP 6 (40,38) → move 43,41 dropa → move 43,40 vira baixo repara → move 43,41 pega
+// ══════════════════════════════════════════════════════════════
+
+
+// ── Variáveis globais Snake Pit ───────────────────────────────
+window.xSPID1            = 0;
+window.xSPID2            = 0;
+window.xSPID3            = 0;
+window.xSPNeedsRep       = false;
+window.SPRepTimer         = 0;
+window.spRepItem          = '';
+window.SPPosListX         = new Array(50).fill(0);
+window.SPPosListY         = new Array(50).fill(0);
+window.spRepVoltas        = 3;
+window.xSPCombatEndTimer  = null;
+window.xSPRecentCombat    = false;
+
+
+// ── Estado de stats Snake Pit (persiste ao pausar) ────────────
+window.spStat = window.spStat ?? {
+  startMyst:    0,
+  totalMyst:    0,
+  mystPerHour:  0,
+  timerStart:   0,
+  totalTime:    0,
+  timerRunning: false,
+  repairoTotal: 0,
 };
-dsk.on('postLoop', wcm.updatePosition);
 
-// ← wcLbl declarado ANTES de ser usado
-const wcLbl = (txt, y) => {
-  const l = jv.text(txt, { font: '11px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  l.x = 10; l.y = y; wcm.addChild(l); return l;
+
+// ── Detecta combate ───────────────────────────────────────────
+dsk.on('postLoop', () => {
+  if (!myself) return;
+  if (myself.hpbar?.visible === true) {
+    if (xSPCombatEndTimer) { clearTimeout(xSPCombatEndTimer); xSPCombatEndTimer = null; }
+    xSPRecentCombat = true;
+  } else if (xSPRecentCombat) {
+    if (!xSPCombatEndTimer) {
+      xSPCombatEndTimer = setTimeout(() => {
+        xSPRecentCombat = false;
+        xSPCombatEndTimer = null;
+      }, 1000);
+    }
+  }
+});
+// Move direto sem pathfinding (para escadas/portais)
+async function xDoMoveRaw(x, y) {
+  xMovingNow = false;
+  myself.move(x, y);
+  await xDelay(800);
+}
+// ── Lógica principal ──────────────────────────────────────────
+
+
+async function xSnakePit() {
+  if (connection !== undefined && connection.readyState === 3) xMovingNow = false;
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
+
+  if (xIfChatHas('Welcome back ')) {
+    await xDelay(600);
+    xDoClearChat('Welcome back ');
+    await xDelay(600);
+    target.id = me;
+    xMovingNow = false;
+    return;
+  }
+
+
+  if (xGoing[130] === true) return;
+  xGoing[130] = true;
+
+
+  // ── MODO REPARO ──────────────────────────────────────────────
+  if (xSPNeedsRep) {
+
+
+    // Sem kit de reparo → tenta pegar item dropado ou desconecta
+    if (xGetSlotByID(719) === undefined) {
+      xGoing[130] = false;
+      await xDelay(150);
+      if (xGetItemByID(xSPID3) !== undefined) {
+        xChangeStatus('[SP] Buscando item para reparar...');
+        await xDoMove(xGetItemByID(xSPID3).x, xGetItemByID(xSPID3).y);
+        xDoPickUp(); xDoPickUp(); xDoPickUp();
+      } else {
+        xChangeStatus('[SP] Sem kit de reparo, desconectando...');
+        xDoLogOff();
+      }
+      return;
+    }
+
+
+    // Verifica mobs próximos durante reparo
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself) continue;
+      const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
+
+      if (dist <= 6 && !xPlyrTest(mob)) {
+        if (xGetItemByID(xSPID3) !== undefined) {
+          await xDoMove(xGetItemByID(xSPID3).x, xGetItemByID(xSPID3).y);
+          xDoPickUp();
+        }
+        if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+        if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); await xDelay(2000); }
+        xChangeStatus('[SP] Mob próximo durante reparo! Reagindo...');
+        await xGetMobByName('Snake', 'Serpent', 'Nether Leech');
+        if (xTemp[13] !== undefined && xTemp[13] !== myself) {
+          if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+          const md = Math.abs(xTemp[13].x - myself.x) + Math.abs(myself.y - xTemp[13].y);
+          if (md >= 1 && md > 2) target.id = me;
+        }
+        xGoing[130] = false;
+        return;
+
+
+      } else if (xPlyrTest(mob)) {
+        xChangeStatus('[SP] Jogador detectado! Protegendo...');
+        if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+        if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
+        xGoing[130] = false;
+        return;
+      }
+    }
+
+
+    // ── Fluxo de reparo ──────────────────────────────────────
+    // Passo 1: tem itens equipados → vai para 43,41 e dropa
+    if (inv[0]?.sprite !== undefined) {
+      if (myself.x === 43 && myself.y === 41) {
+        xChangeStatus('[SP] Dropando itens para reparar...');
+        if      (inv[2]?.sprite !== undefined) { await xDelay(300); xDoDropSlot(0, 3); }
+        else if (inv[1]?.sprite !== undefined) { xDoDropSlot(0, 2); }
+        else                                   { xDoDropSlot(0, 1); }
+      } else {
+        xChangeStatus('[SP] Indo para posição de drop (43,41)...');
+        await xDoMove(43, 41);
+        await xDelay(300);
+      }
+    } else {
+      // Passo 2: slots vazios → vai para 43,40, vira baixo (dir 2) e repara
+      if (myself.x === 43 && myself.y === 40 && myself.dir === 2 && inv[xGetSlotByID(719)]?.equip !== 0) {
+        if (xIfChatHas('The ' + spRepItem + ' is in perfect condition.')) {
+          xDoClearChat('The ' + spRepItem + ' is in perfect condition.');
+          xDoKeyUp(6);
+          // Passo 3: reparo OK → vai buscar itens em 43,41
+          if (xGetItemByID(xSPID3) !== undefined) {
+            xChangeStatus('[SP] Coletando itens reparados...');
+            await xDoMove(xGetItemByID(xSPID3).x, xGetItemByID(xSPID3).y);
+            for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
+          } else {
+            await xDoMove(43, 41);
+            for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
+          }
+          if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(300); }
+          if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(300); }
+          if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
+          xSPNeedsRep  = false;
+          SPRepTimer   = 0;
+          spStat.repairoTotal++;
+          dsk.localMsg(`Snake Pit: reparo ${spStat.repairoTotal} completo ✅`, '#5f5');
+        } else {
+          xDoKeyDown(6);
+        }
+      } else {
+        xChangeStatus('[SP] Indo para posição de reparo (43,40)...');
+        await xDoMove(43, 40);
+        await xDoChangeDir(2);
+        await xDoUseSlot(xGetSlotByID(719));
+        await xDelay(500);
+      }
+    }
+
+
+    xGoing[130] = false;
+    return;
+  }
+
+
+  // ── MODO NORMAL ───────────────────────────────────────────────
+
+
+  // Comida
+  const foodId = xGetSlotFood();
+  if (foodId !== undefined) {
+    if (hunger_status.val <= 65) {
+      xChangeStatus('[SP] Comendo...');
+      await xDoUseSlotByID(xGetSlotByID(foodId));
+      await xDelay(2000);
+    }
+  } else {
+    xDoLogOff();
+  }
+
+
+  // Equipa itens se desequipados
+  if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+  if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+  if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
+
+
+  // Logoff se item quebrado
+  if (inv[0]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+  if (inv[1]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+  if (inv[2]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+
+
+  // HP baixo
+  if (hp_status.val <= 70 && hp_status.val >= 0.1) {
+    xChangeStatus('[SP] HP baixo, curando...');
+    xHeal();
+    if (hp_status.val <= 40) {
+      xChangeStatus('[SP] HP crítico! Desconectando...');
+      xDoLogOff();
+      await xDelay(1000);
+    }
+  }
+
+
+  // Bandagem fora de combate
+  const spTemMob  = xTemp[13] !== undefined && xTemp[13] !== myself;
+  const spCombate = xSPRecentCombat;
+  if (!spTemMob && !spCombate && hp_status.val >= 80 && hp_status.val <= 92) {
+    if (!xGoing[135]) {
+      const slotBandagem = xGetSlotByID(767);
+      if (slotBandagem !== undefined) {
+        xGoing[135] = true;
+        xDoUseSlotByID(slotBandagem);
+        xDoUseSlotByID(slotBandagem);
+        setTimeout(() => { xGoing[135] = false; }, 10000);
+      }
+    }
+  }
+
+
+  // Coleta itens + logoff se slot vazio
+  const spPickAll = async () => {
+    if (xGetItemByID(xSPID3) !== undefined) { await xDoMove(xGetItemByID(xSPID3).x, xGetItemByID(xSPID3).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+    if (xGetItemByID(xSPID1) !== undefined) { await xDoMove(xGetItemByID(xSPID1).x, xGetItemByID(xSPID1).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+    if (xGetItemByID(xSPID2) !== undefined) { await xDoMove(xGetItemByID(xSPID2).x, xGetItemByID(xSPID2).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+  };
+
+
+  if (inv[0]?.sprite === undefined) { xChangeStatus('[SP] Slot 1 vazio, coletando...'); await spPickAll(); xDoLogOff(); }
+  if (inv[1]?.sprite === undefined) { xChangeStatus('[SP] Slot 2 vazio, coletando...'); await spPickAll(); xDoLogOff(); }
+  if (inv[2]?.sprite === undefined) { xChangeStatus('[SP] Slot 3 vazio, coletando...'); await spPickAll(); xDoLogOff(); }
+  if (inv[5]?.sprite === undefined) { xChangeStatus('[SP] Slot 6 vazio, desconectando...'); xDoLogOff(); }
+
+
+  // ── Waypoints Snake Pit ───────────────────────────────────────
+  // 43 waypoints, WP índice 5 = (40,38) → trigger de reparo
+  if (xTemp[90] === undefined) {
+    xTemp[90] = 0;
+        xTemp[91] = 45;  // ← era 42, correto é 45
+        const posX = [26,41,41,25,25,40,24, 7,13,12,10, 9, 8, 9,18,18,21,30,30,31,39,38,37,18,18, 9,19,20,37,37,39,30,30,29,24,18,18,16, 9, 9, 8,12,12,25,41,41];
+        const posY = [10,10,24,25,37,38,38,38,38,25,10,23,23,40,38,30,38,38,32,39,39,24,12,10,16,15,15, 9, 9,24,39,39,32,39,39,39,31,38,40,23,23,38,25,38,25,10];
+        for (let i = 0; i < 46; i++) {  // ← era 43, correto é 46
+      SPPosListX[i] = posX[i];
+      SPPosListY[i] = posY[i];
+    }
+  }
+
+
+  // ── Busca mob ─────────────────────────────────────────────────
+  await xGetMobByName('Snake', 'Serpent', 'Nether Leech');
+
+
+  if (xTemp[13] !== undefined && xTemp[13] !== myself) {
+    const dist = xGetDistance(myself.x, myself.y, xTemp[13].x, xTemp[13].y);
+    if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+
+
+    if (dist <= 1) {
+      await xDoMove(xTemp[13].x, xTemp[13].y);
+      xDelay(200);
+      xDoMove(xTemp[13].x, xTemp[13].y - 1);
+      xDelay(200);
+      xDoMove(xTemp[13].x, xTemp[13].y + 1);
+      xDelay(200);
+    } else if (dist <= 4) {
+      await xDoMove(xTemp[13].x, xTemp[13].y);
+      await xDelay(800);
+    } else {
+      target.id = me;
+    }
+  }
+
+
+  // ── Patrulha ──────────────────────────────────────────────────
+  if (xTemp[13] === myself || xTemp[13] === undefined) {
+    const wpX = SPPosListX[xTemp[90]];
+    const wpY = SPPosListY[xTemp[90]];
+
+
+    // WPs 12 e 40 = escada (8,23): espera estar NO tile exato antes de avançar
+    if (xTemp[90] === 12 || xTemp[90] === 40) {
+      if (myself.x === wpX && myself.y === wpY) {
+        // chegou na escada → avança índice normalmente
+        if (xTemp[90] >= xTemp[91]) { xTemp[90] = 0; SPRepTimer++; }
+        else { xTemp[90]++; }
+      } else {
+        // ainda não chegou → move direto sem A*
+        xChangeStatus('[SP] Indo para escada...');
+        xMovingNow = false;
+        myself.move(wpX, wpY);
+        await xDelay(700);
+      }
+    } else {
+      const distToWP = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+      if (distToWP <= 2) {
+        if (xTemp[90] >= xTemp[91]) { xTemp[90] = 0; SPRepTimer++; }
+        else { xTemp[90]++; }
+        if (SPRepTimer >= spRepVoltas && xTemp[90] === 5) {
+          xChangeStatus('[SP] Hora de reparar!');
+          xSPNeedsRep = true;
+        }
+      } else {
+        xDoMove(wpX, wpY, 3);
+      }
+    }
+  }
+
+
+  xGoing[130] = false;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  SNAKE PIT CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+
+dsk.snakepit = { enabled: false };
+
+
+(function () {
+  let spPanel = null;
+
+
+  const spm = {
+    get visible() { return !!spPanel; },
+    set visible(v) { if (!v && spPanel) removePanel(); else if (v && !spPanel) createPanel(); },
+  };
+  dsk.snakepitManager = spm;
+
+
+  // Atualiza labels em tempo real
+  dsk.on('postLoop', () => {
+    if (!spPanel) return;
+    const q   = k => spPanel.querySelector(`[data-spm="${k}"]`);
+    const set  = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    const wp    = xTemp[90] ?? 0;
+    const maxWp = xTemp[91] ?? 42;
+    set('status', dsk.snakepit?.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('wp',     `WP: ${wp} / ${maxWp}`);
+    set('rep',    `Voltas: ${window.SPRepTimer ?? 0} / ${window.spRepVoltas ?? 3}`);
+    set('needs',  window.xSPNeedsRep ? '🔧 Reparando...' : '✅ OK');
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('hunger', `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`);
+    set('mob',    `Mob: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('repairs',`Reparos: ${window.spStat?.repairoTotal ?? 0}`);
+    set('myst',   `Myst: +${window.spStat?.totalMyst ?? 0}`);
+    const mph = window.spStat?.mystPerHour ?? 0;
+    set('mph', mph >= 1000 ? `Myst/h: ${(mph/1000).toFixed(1)}M` : `Myst/h: ${mph}k`);
+    if (window.spStat?.timerRunning) {
+      const elapsed = Math.floor((window.spStat.totalTime + (Date.now() - window.spStat.timerStart)) / 1000);
+      const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
+      set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
+    }
+  });
+
+
+  function createPanel() {
+    if (spPanel) { removePanel(); return; }
+
+
+    spPanel = document.createElement('div');
+    Object.assign(spPanel.style, {
+      position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)',
+      width: '270px', background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '🐍 Snake Pit Config';
+    Object.assign(title.style, { color: '#4ade80', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - spPanel.getBoundingClientRect().left;
+      oy = _xy.y - spPanel.getBoundingClientRect().top;
+      spPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); spPanel.style.left = (_xy.x - ox) + 'px'; spPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    // Status box
+    const statusKeys = [
+      ['status','🔴 Pausado'], ['wp','WP: 0 / 42'], ['rep','Voltas: 0 / 3'],
+      ['needs','✅ OK'], ['hp','HP: -'], ['hunger','Fome: -'], ['mob','Mob: -'],
+      ['repairs','Reparos: 0'], ['myst','Myst: +0'], ['mph','Myst/h: 0k'], ['time','Tempo: 0m 0s'],
+    ];
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, { background: '#12121e', borderRadius: '7px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '3px' });
+    statusKeys.forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.spm = key;
+      el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+
+    // Voltas p/ reparar
+    const voltasRow = document.createElement('div');
+    Object.assign(voltasRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const voltasLbl = document.createElement('div');
+    const voltasTit = document.createElement('div');
+    voltasTit.textContent = 'Voltas p/ reparar';
+    Object.assign(voltasTit.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const voltasVal = document.createElement('div');
+    voltasVal.dataset.spm = 'voltas';
+    voltasVal.textContent = `Voltas p/ reparar: ${window.spRepVoltas ?? 3}`;
+    Object.assign(voltasVal.style, { color: '#4ade80', fontSize: '11px' });
+    voltasLbl.appendChild(voltasTit); voltasLbl.appendChild(voltasVal);
+    dsk.on('postLoop', () => { if (!spPanel) return; const el = spPanel.querySelector('[data-spm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.spRepVoltas ?? 3}`; });
+
+
+    const voltasBtns = document.createElement('div');
+    Object.assign(voltasBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, { padding: '3px 10px', borderRadius: '5px', border: '1px solid #555', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px' });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.spRepVoltas ?? 3) > 1) window.spRepVoltas--; }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.spRepVoltas = (window.spRepVoltas ?? 3) + 1; }));
+    voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
+    body.appendChild(voltasRow);
+
+
+    // Botões de ação
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, { flex: '1', padding: '7px 0', borderRadius: '7px', border: `1px solid ${color}`, background: '#1a1a2e', color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px' });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+    actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
+      window.spStat = { startMyst: jv.upgrade_number??0, totalMyst:0, mystPerHour:0, timerStart: Date.now(), totalTime:0, timerRunning: !!dsk.snakepit?.enabled, repairoTotal:0 };
+      window.SPRepTimer = 0; window.xSPNeedsRep = false;
+      dsk.localMsg('Snake Pit: stats resetados!', '#ff0');
+    }));
+    actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
+      xTemp[90] = undefined;
+      window.SPPosListX = new Array(50).fill(0);
+      window.SPPosListY = new Array(50).fill(0);
+      window.SPRepTimer = 0; window.xSPNeedsRep = false;
+      dsk.localMsg('Snake Pit: waypoints resetados!', '#fa5');
+    }));
+    actRow.appendChild(makeActionBtn('🔧 Forçar Reparo', '#0cf', () => {
+      window.xSPNeedsRep = true;
+      dsk.localMsg('Snake Pit: reparo forçado!', '#ff0');
+    }));
+    body.appendChild(actRow);
+
+
+    spPanel.appendChild(header);
+    spPanel.appendChild(body);
+    document.body.appendChild(spPanel);
+  }
+
+
+  function removePanel() { if (spPanel) { spPanel.remove(); spPanel = null; } }
+
+
+  dsk.setCmd('/snakepitconfig', () => {
+    if (spPanel) { removePanel(); dsk.localMsg('Snake Pit Config: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Snake Pit Config: Aberto', '#5f5'); }
+  });
+})();
+
+
+// ── Comando /snakepit ─────────────────────────────────────────
+
+
+dsk.setCmd('/snakepit', () => {
+  dsk.snakepit.enabled = !dsk.snakepit.enabled;
+
+
+  if (dsk.snakepit.enabled) {
+    xSPID1    = inv[0]?.sprite;
+    xSPID2    = inv[1]?.sprite;
+    xSPID3    = inv[2]?.sprite;
+    spRepItem = xGetItemNameBySlot(0) ?? '';
+
+
+    if (!xSPID1 || !xSPID2 || !xSPID3) {
+      dsk.localMsg('Snake Pit: coloque itens nos slots 1, 2 e 3 primeiro!', '#f55');
+      dsk.snakepit.enabled = false;
+      return;
+    }
+
+
+    spStat.timerStart   = Date.now();
+    spStat.timerRunning = true;
+    if (spStat.totalMyst === 0 && spStat.totalTime === 0) {
+      spStat.startMyst = jv.upgrade_number ?? 0;
+    }
+
+
+    if (!window.SPPosListX || SPPosListX.every(v => v === 0)) {
+      window.SPPosListX = new Array(50).fill(0);
+      window.SPPosListY = new Array(50).fill(0);
+      xTemp[90] = undefined;
+    }
+
+
+    dsk.localMsg(`Snake Pit: Ativado | ID1=${xSPID1} ID2=${xSPID2} ID3=${xSPID3}`, '#5f5');
+
+
+    (async function loop() {
+      while (dsk.snakepit.enabled) {
+        const curMyst = (jv.upgrade_number ?? 0) - spStat.startMyst;
+        spStat.totalMyst = curMyst;
+        const elapsed = spStat.totalTime + (Date.now() - spStat.timerStart);
+        if (elapsed > 5000) spStat.mystPerHour = Math.round(curMyst / elapsed * 3600);
+        await xSnakePit();
+        await xDelay(500);
+      }
+    })();
+  } else {
+    if (spStat.timerRunning) {
+      spStat.totalTime  += Date.now() - spStat.timerStart;
+      spStat.timerRunning = false;
+    }
+    xGoing[130]    = false;
+    target.id      = me;
+    xSPNeedsRep    = false;
+    dsk.localMsg('Snake Pit: Desativado', '#f55');
+  }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+// ❄️  SNOW BOT  ─  by Pablo Mod
+// Mobs: Ice Elemental, Polar Bear, Penguin, Wolf
+// Reparo: WP 10 (57,10) → move 50,6 dropa → move 50,7 vira cima repara → move 50,6 pega
+// ══════════════════════════════════════════════════════════════
+
+
+window.xSNID1            = 0;
+window.xSNID2            = 0;
+window.xSNID3            = 0;
+window.xSNNeedsRep       = false;
+window.SNRepTimer         = 0;
+window.snRepItem          = '';
+window.SNPosListX         = new Array(60).fill(0);
+window.SNPosListY         = new Array(60).fill(0);
+window.snRepVoltas        = 3;
+window.xSNCombatEndTimer  = null;
+window.xSNRecentCombat    = false;
+
+
+window.snStat = window.snStat ?? {
+  startMyst:    0,
+  totalMyst:    0,
+  mystPerHour:  0,
+  timerStart:   0,
+  totalTime:    0,
+  timerRunning: false,
+  repairoTotal: 0,
 };
 
-wcm.lblWP     = wcLbl('Waypoint: -',        38);
-wcm.lblRep    = wcLbl('RepTimer: 0',         53);
-wcm.lblNeeds  = wcLbl('Needs Repair: não',   68);
-wcm.lblHP     = wcLbl('HP: -',               83);
-wcm.lblHunger = wcLbl('Fome: -',             98);
-wcm.lblMob    = wcLbl('Mob alvo: -',        113);
-
-wcLbl('Voltas p/ reparar:', 133);
-wcm.lblVoltas = wcLbl(`atual: ${wcaveRepVoltas}`, 148);
-
-const btnVoltasDown = jv.Button.create(0, 0, 20, '-', wcm, 20);
-btnVoltasDown.x = 140; btnVoltasDown.y = 131;
-btnVoltasDown.on_click = () => { if (wcaveRepVoltas > 1) wcaveRepVoltas--; };
-
-const btnVoltasUp = jv.Button.create(0, 0, 20, '+', wcm, 20);
-btnVoltasUp.x = 165; btnVoltasUp.y = 131;
-btnVoltasUp.on_click = () => { wcaveRepVoltas++; };
 
 dsk.on('postLoop', () => {
-  if (!wcm.visible) return;
-  wcm.lblWP.text     = `Waypoint: ${xTemp[70] ?? 0} / ${xTemp[71] ?? 19}`;
-  wcm.lblRep.text    = `RepTimer: ${RepTimer ?? 0}`;
-  wcm.lblNeeds.text  = `Needs Repair: ${xNeedsRep ? 'SIM ⚠' : 'não'}`;
-  wcm.lblVoltas.text = `atual: ${wcaveRepVoltas}`;
-  wcm.lblHP.text     = `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`;
-  wcm.lblHunger.text = `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`;
-  wcm.lblMob.text    = `Mob alvo: ${xTemp[13]?.name ?? 'nenhum'}`;
+  if (!myself) return;
+  if (myself.hpbar?.visible === true) {
+    if (xSNCombatEndTimer) { clearTimeout(xSNCombatEndTimer); xSNCombatEndTimer = null; }
+    xSNRecentCombat = true;
+  } else if (xSNRecentCombat) {
+    if (!xSNCombatEndTimer) {
+      xSNCombatEndTimer = setTimeout(() => {
+        xSNRecentCombat = false;
+        xSNCombatEndTimer = null;
+      }, 1000);
+    }
+  }
 });
 
-const btnResetWP = jv.Button.create(0, 0, 115, 'Reset Waypoint', wcm, 20);
-btnResetWP.x = 10; btnResetWP.y = 165;
-btnResetWP.on_click = () => { xTemp[70] = 0; RepTimer = 0; xNeedsRep = false; dsk.localMsg('WCave: reset!', '#ff0'); };
 
-const btnForceRep = jv.Button.create(0, 0, 115, 'Forçar Reparo', wcm, 20);
-btnForceRep.x = 130; btnForceRep.y = 165;
-btnForceRep.on_click = () => { xNeedsRep = true; dsk.localMsg('WCave: reparo forçado!', '#ff0'); };
+async function xSnow() {
+  if (connection !== undefined && connection.readyState === 3) xMovingNow = false;
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
 
-// ── Comandos ─────────────────────────────────────────────────
+
+  if (xIfChatHas('Welcome back ')) {
+    await xDelay(600);
+    xDoClearChat('Welcome back ');
+    await xDelay(600);
+    target.id = me;
+    xMovingNow = false;
+    return;
+  }
+
+
+  if (xGoing[150] === true) return;
+  xGoing[150] = true;
+
+
+  // ── MODO REPARO ──────────────────────────────────────────────
+  if (xSNNeedsRep) {
+
+
+    if (xGetSlotByID(719) === undefined) {
+      xGoing[150] = false;
+      await xDelay(150);
+      if (xGetItemByID(xSNID3) !== undefined) {
+        xChangeStatus('[SN] Buscando item para reparar...');
+        await xDoMove(xGetItemByID(xSNID3).x, xGetItemByID(xSNID3).y);
+        xDoPickUp(); xDoPickUp(); xDoPickUp();
+      } else {
+        xChangeStatus('[SN] Sem kit de reparo, desconectando...');
+        xDoLogOff();
+      }
+      return;
+    }
+
+
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself) continue;
+      const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
+
+      if (dist <= 6 && !xPlyrTest(mob)) {
+        if (xGetItemByID(xSNID3) !== undefined) {
+          await xDoMove(xGetItemByID(xSNID3).x, xGetItemByID(xSNID3).y);
+          xDoPickUp();
+        }
+        if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+        if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); await xDelay(2000); }
+        xChangeStatus('[SN] Mob próximo durante reparo!');
+        await xGetMobByName('Ice Elemental', 'Polar Bear', 'Penguin', 'Wolf');
+        if (xTemp[13] !== undefined && xTemp[13] !== myself) {
+          if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+          const md = Math.abs(xTemp[13].x - myself.x) + Math.abs(myself.y - xTemp[13].y);
+          if (md >= 1 && md > 2) target.id = me;
+        }
+        xGoing[150] = false;
+        return;
+      } else if (xPlyrTest(mob)) {
+        xChangeStatus('[SN] Jogador detectado!');
+        if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+        if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
+        xGoing[150] = false;
+        return;
+      }
+    }
+
+
+    // Passo 1: tem itens → vai para 50,6 e dropa
+    if (inv[0]?.sprite !== undefined) {
+      if (myself.x === 50 && myself.y === 6) {
+        xChangeStatus('[SN] Dropando itens para reparar...');
+        if      (inv[2]?.sprite !== undefined) { await xDelay(300); xDoDropSlot(0, 3); }
+        else if (inv[1]?.sprite !== undefined) { xDoDropSlot(0, 2); }
+        else                                   { xDoDropSlot(0, 1); }
+      } else {
+        xChangeStatus('[SN] Indo para posição de drop (50,6)...');
+        await xDoMove(50, 6);
+        await xDelay(300);
+      }
+    } else {
+      // Passo 2: slots vazios → vai para 50,7 vira cima e repara
+      if (myself.x === 50 && myself.y === 7 && myself.dir === 0 && inv[xGetSlotByID(719)]?.equip !== 0) {
+        if (xIfChatHas('The ' + snRepItem + ' is in perfect condition.')) {
+          xDoClearChat('The ' + snRepItem + ' is in perfect condition.');
+          xDoKeyUp(6);
+          // Passo 3: reparo OK → vai buscar itens em 50,6
+          xChangeStatus('[SN] Coletando itens reparados...');
+          await xDoMove(50, 6);
+          for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
+          if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(300); }
+          if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(300); }
+          if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
+          xSNNeedsRep  = false;
+          SNRepTimer   = 0;
+          snStat.repairoTotal++;
+          dsk.localMsg(`Snow: reparo ${snStat.repairoTotal} completo ✅`, '#5f5');
+        } else {
+          xDoKeyDown(6);
+        }
+      } else {
+        xChangeStatus('[SN] Indo para posição de reparo (50,7)...');
+        await xDoMove(50, 7);
+        await xDoChangeDir(0);
+        await xDoUseSlot(xGetSlotByID(719));
+        await xDelay(500);
+      }
+    }
+
+
+    xGoing[150] = false;
+    return;
+  }
+
+
+  // ── MODO NORMAL ───────────────────────────────────────────────
+
+
+  const foodId = xGetSlotFood();
+  if (foodId !== undefined) {
+    if (hunger_status.val <= 65) {
+      xChangeStatus('[SN] Comendo...');
+      await xDoUseSlotByID(xGetSlotByID(foodId));
+      await xDelay(2000);
+    }
+  } else {
+    xDoLogOff();
+  }
+
+
+  if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+  if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+  if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
+
+
+  if (inv[0]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+  if (inv[1]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+  if (inv[2]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+
+
+  if (hp_status.val <= 70 && hp_status.val >= 0.1) {
+    xChangeStatus('[SN] HP baixo, curando...');
+    xHeal();
+    if (hp_status.val <= 40) {
+      xChangeStatus('[SN] HP crítico! Desconectando...');
+      xDoLogOff();
+      await xDelay(1000);
+    }
+  }
+
+
+  const snTemMob  = xTemp[13] !== undefined && xTemp[13] !== myself;
+  const snCombate = xSNRecentCombat;
+  if (!snTemMob && !snCombate && hp_status.val >= 72 && hp_status.val <= 92) {
+    if (!xGoing[155]) {
+      const slotBandagem = xGetSlotByID(767);
+      if (slotBandagem !== undefined) {
+        xGoing[155] = true;
+        xDoUseSlotByID(slotBandagem);
+        xDoUseSlotByID(slotBandagem);
+        setTimeout(() => { xGoing[155] = false; }, 10000);
+      }
+    }
+  }
+
+
+  const snPickAll = async () => {
+    if (xGetItemByID(xSNID3) !== undefined) { await xDoMove(xGetItemByID(xSNID3).x, xGetItemByID(xSNID3).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+    if (xGetItemByID(xSNID1) !== undefined) { await xDoMove(xGetItemByID(xSNID1).x, xGetItemByID(xSNID1).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+    if (xGetItemByID(xSNID2) !== undefined) { await xDoMove(xGetItemByID(xSNID2).x, xGetItemByID(xSNID2).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+  };
+
+
+  if (inv[0]?.sprite === undefined) { xChangeStatus('[SN] Slot 1 vazio, coletando...'); await snPickAll(); xDoLogOff(); }
+  if (inv[1]?.sprite === undefined) { xChangeStatus('[SN] Slot 2 vazio, coletando...'); await snPickAll(); xDoLogOff(); }
+  if (inv[2]?.sprite === undefined) { xChangeStatus('[SN] Slot 3 vazio, coletando...'); await snPickAll(); xDoLogOff(); }
+
+
+
+
+  // ── Waypoints ─────────────────────────────────────────────────
+  if (xTemp[160] === undefined) {
+    xTemp[160] = 0;
+    xTemp[161] = 37;
+    const posX = [57,43,39,25,22,15,31,31,43,57,57,59,59,76,90,75,75,82,75,75,82,82,82,91,83,82,89,75,75,81,74,74,53,53,57,43,39,25];
+    const posY = [22,20,23,23,16,16,16,23,23,23,10,13,31,31,31,31,20,20,20,36,36,51,59,70,57,31,30,30,19,19,24,30,30,23,22,20,23,23];
+    for (let i = 0; i < posX.length; i++) {
+      SNPosListX[i] = posX[i];
+      SNPosListY[i] = posY[i];
+    }
+  }
+
+
+  // ── Busca mob ─────────────────────────────────────────────────
+  await xGetMobByName('Ice Elemental', 'Polar Bear', 'Penguin', 'Wolf');
+
+
+  if (xTemp[13] !== undefined && xTemp[13] !== myself) {
+    const dist = xGetDistance(myself.x, myself.y, xTemp[13].x, xTemp[13].y);
+    if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+
+
+    if (dist <= 1) {
+      await xDoMove(xTemp[13].x, xTemp[13].y);
+      xDelay(200);
+      xDoMove(xTemp[13].x, xTemp[13].y - 1);
+      xDelay(200);
+      xDoMove(xTemp[13].x, xTemp[13].y + 1);
+      xDelay(200);
+    } else if (dist <= 7) {
+      await xDoMove(xTemp[13].x, xTemp[13].y);
+      await xDelay(800);
+    } else {
+      target.id = me;
+    }
+  }
+
+
+  // ── Patrulha ──────────────────────────────────────────────────
+  if (xTemp[13] === myself || xTemp[13] === undefined) {
+    const wpX = SNPosListX[xTemp[160]];
+    const wpY = SNPosListY[xTemp[160]];
+    const distToWP = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+
+
+    if (distToWP <= 2) {
+      if (xTemp[160] >= xTemp[161]) { xTemp[160] = 0; SNRepTimer++; }
+      else { xTemp[160]++; }
+
+
+      if (SNRepTimer >= snRepVoltas && xTemp[160] === 10) {
+        xChangeStatus('[SN] Hora de reparar!');
+        xSNNeedsRep = true;
+        await xDoMove(50, 6);
+      }
+    } else {
+      xDoMove(wpX, wpY, 3);
+    }
+  }
+
+
+  xGoing[150] = false;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  SNOW CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+
+dsk.snow = { enabled: false };
+
+
+(function () {
+  let snPanel = null;
+
+
+  const snm = {
+    get visible() { return !!snPanel; },
+    set visible(v) { if (!v && snPanel) removePanel(); else if (v && !snPanel) createPanel(); },
+  };
+  dsk.snowManager = snm;
+
+
+  dsk.on('postLoop', () => {
+    if (!snPanel) return;
+    const q   = k => snPanel.querySelector(`[data-snm="${k}"]`);
+    const set  = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    const wp    = xTemp[160] ?? 0;
+    const maxWp = xTemp[161] ?? 37;
+    set('status', dsk.snow?.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('wp',     `WP: ${wp} / ${maxWp}`);
+    set('rep',    `Voltas: ${window.SNRepTimer ?? 0} / ${window.snRepVoltas ?? 3}`);
+    set('needs',  window.xSNNeedsRep ? '🔧 Reparando...' : '✅ OK');
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('hunger', `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`);
+    set('mob',    `Mob: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('repairs',`Reparos: ${window.snStat?.repairoTotal ?? 0}`);
+    set('myst',   `Myst: +${window.snStat?.totalMyst ?? 0}`);
+    const mph = window.snStat?.mystPerHour ?? 0;
+    set('mph', mph >= 1000 ? `Myst/h: ${(mph/1000).toFixed(1)}M` : `Myst/h: ${mph}k`);
+    if (window.snStat?.timerRunning) {
+      const elapsed = Math.floor((window.snStat.totalTime + (Date.now() - window.snStat.timerStart)) / 1000);
+      const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
+      set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
+    }
+  });
+
+
+  function createPanel() {
+    if (snPanel) { removePanel(); return; }
+
+
+    snPanel = document.createElement('div');
+    Object.assign(snPanel.style, {
+      position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)',
+      width: '270px', background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '❄️ Snow Config';
+    Object.assign(title.style, { color: '#a8d8ff', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - snPanel.getBoundingClientRect().left;
+      oy = _xy.y - snPanel.getBoundingClientRect().top;
+      snPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); snPanel.style.left = (_xy.x - ox) + 'px'; snPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    const statusKeys = [
+      ['status','🔴 Pausado'], ['wp','WP: 0 / 37'], ['rep','Voltas: 0 / 3'],
+      ['needs','✅ OK'], ['hp','HP: -'], ['hunger','Fome: -'], ['mob','Mob: -'],
+      ['repairs','Reparos: 0'], ['myst','Myst: +0'], ['mph','Myst/h: 0k'], ['time','Tempo: 0m 0s'],
+    ];
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, { background: '#12121e', borderRadius: '7px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '3px' });
+    statusKeys.forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.snm = key;
+      el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+
+    // Voltas p/ reparar
+    const voltasRow = document.createElement('div');
+    Object.assign(voltasRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const voltasLbl = document.createElement('div');
+    const voltasTit = document.createElement('div');
+    voltasTit.textContent = 'Voltas p/ reparar';
+    Object.assign(voltasTit.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const voltasVal = document.createElement('div');
+    voltasVal.dataset.snm = 'voltas';
+    voltasVal.textContent = `Voltas p/ reparar: ${window.snRepVoltas ?? 3}`;
+    Object.assign(voltasVal.style, { color: '#a8d8ff', fontSize: '11px' });
+    voltasLbl.appendChild(voltasTit); voltasLbl.appendChild(voltasVal);
+    dsk.on('postLoop', () => { if (!snPanel) return; const el = snPanel.querySelector('[data-snm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.snRepVoltas ?? 3}`; });
+
+
+    const voltasBtns = document.createElement('div');
+    Object.assign(voltasBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, { padding: '3px 10px', borderRadius: '5px', border: '1px solid #555', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px' });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.snRepVoltas ?? 3) > 1) window.snRepVoltas--; }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.snRepVoltas = (window.snRepVoltas ?? 3) + 1; }));
+    voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
+    body.appendChild(voltasRow);
+
+
+    // Botões de ação
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, { flex: '1', padding: '7px 0', borderRadius: '7px', border: `1px solid ${color}`, background: '#1a1a2e', color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px' });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+    actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
+      window.snStat = { startMyst: jv.upgrade_number??0, totalMyst:0, mystPerHour:0, timerStart: Date.now(), totalTime:0, timerRunning: !!dsk.snow?.enabled, repairoTotal:0 };
+      window.SNRepTimer = 0; window.xSNNeedsRep = false;
+      dsk.localMsg('Snow: stats resetados!', '#ff0');
+    }));
+    actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
+      xTemp[160] = undefined;
+      window.SNPosListX = new Array(60).fill(0);
+      window.SNPosListY = new Array(60).fill(0);
+      window.SNRepTimer = 0; window.xSNNeedsRep = false;
+      dsk.localMsg('Snow: waypoints resetados!', '#fa5');
+    }));
+    actRow.appendChild(makeActionBtn('🔧 Forçar Reparo', '#0cf', () => {
+      window.xSNNeedsRep = true;
+      dsk.localMsg('Snow: reparo forçado!', '#ff0');
+    }));
+    body.appendChild(actRow);
+
+
+    snPanel.appendChild(header);
+    snPanel.appendChild(body);
+    document.body.appendChild(snPanel);
+  }
+
+
+  function removePanel() { if (snPanel) { snPanel.remove(); snPanel = null; } }
+
+
+  dsk.setCmd('/snowconfig', () => {
+    if (snPanel) { removePanel(); dsk.localMsg('Snow Config: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Snow Config: Aberto', '#5f5'); }
+  });
+})();
+
+
+// ── Comando /snow ─────────────────────────────────────────────
+
+
+dsk.setCmd('/snow', () => {
+  dsk.snow.enabled = !dsk.snow.enabled;
+
+
+  if (dsk.snow.enabled) {
+    xSNID1   = inv[0]?.sprite;
+    xSNID2   = inv[1]?.sprite;
+    xSNID3   = inv[2]?.sprite;
+    snRepItem = xGetItemNameBySlot(0) ?? '';
+
+
+    if (!xSNID1 || !xSNID2 || !xSNID3) {
+      dsk.localMsg('Snow: coloque itens nos slots 1, 2 e 3 primeiro!', '#f55');
+      dsk.snow.enabled = false;
+      return;
+    }
+
+
+    snStat.timerStart   = Date.now();
+    snStat.timerRunning = true;
+    if (snStat.totalMyst === 0 && snStat.totalTime === 0) {
+      snStat.startMyst = jv.upgrade_number ?? 0;
+    }
+
+
+    if (!window.SNPosListX || SNPosListX.every(v => v === 0)) {
+      window.SNPosListX = new Array(60).fill(0);
+      window.SNPosListY = new Array(60).fill(0);
+      xTemp[160] = undefined;
+    }
+
+
+    dsk.localMsg(`Snow: Ativado | ID1=${xSNID1} ID2=${xSNID2} ID3=${xSNID3}`, '#5f5');
+
+
+    (async function loop() {
+      while (dsk.snow.enabled) {
+        const curMyst = (jv.upgrade_number ?? 0) - snStat.startMyst;
+        snStat.totalMyst = curMyst;
+        const elapsed = snStat.totalTime + (Date.now() - snStat.timerStart);
+        if (elapsed > 5000) snStat.mystPerHour = Math.round(curMyst / elapsed * 3600);
+        await xSnow();
+        await xDelay(500);
+      }
+    })();
+  } else {
+    if (snStat.timerRunning) {
+      snStat.totalTime  += Date.now() - snStat.timerStart;
+      snStat.timerRunning = false;
+    }
+    xGoing[150]   = false;
+    target.id     = me;
+    xSNNeedsRep   = false;
+    dsk.localMsg('Snow: Desativado', '#f55');
+  }
+});
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚰️  CEMETERY BOT  ─  by Pablo Mod
+// Mobs: Ghost, Skeleton, Skeleton Lord
+// Reparo: WP 5 (29,48 → dropa → 29,47 vira baixo repara → pega)
+// ══════════════════════════════════════════════════════════════
+
+
+// ── Variáveis globais Cemetery ────────────────────────────────
+window.xCMID1            = 0;
+window.xCMID2            = 0;
+window.xCMID3            = 0;
+window.xCMNeedsRep       = false;
+window.CMRepTimer         = 0;
+window.cmRepItem          = '';
+window.CMPosListX         = new Array(20).fill(0);
+window.CMPosListY         = new Array(20).fill(0);
+window.cmRepVoltas        = 3;
+window.xCMCombatEndTimer  = null;
+window.xCMRecentCombat    = false;
+
+
+// ── Estado de stats Cemetery (persiste ao pausar) ─────────────
+window.cmStat = window.cmStat ?? {
+  startMyst:    0,
+  totalMyst:    0,
+  mystPerHour:  0,
+  timerStart:   0,
+  totalTime:    0,
+  timerRunning: false,
+  repairoTotal: 0,
+};
+
+
+// ── Detecta combate ───────────────────────────────────────────
+dsk.on('postLoop', () => {
+  if (!myself) return;
+  if (myself.hpbar?.visible === true) {
+    if (xCMCombatEndTimer) { clearTimeout(xCMCombatEndTimer); xCMCombatEndTimer = null; }
+    xCMRecentCombat = true;
+  } else if (xCMRecentCombat) {
+    if (!xCMCombatEndTimer) {
+      xCMCombatEndTimer = setTimeout(() => {
+        xCMRecentCombat = false;
+        xCMCombatEndTimer = null;
+      }, 1000);
+    }
+  }
+});
+
+
+// ── Lógica principal ──────────────────────────────────────────
+
+
+async function xCemetery() {
+  if (connection !== undefined && connection.readyState === 3) xMovingNow = false;
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
+
+  if (xIfChatHas('Welcome back ')) {
+    await xDelay(600);
+    xDoClearChat('Welcome back ');
+    await xDelay(600);
+    target.id = me;
+    xMovingNow = false;
+    return;
+  }
+
+
+  if (xGoing[120] === true) return;
+  xGoing[120] = true;
+
+
+  // ── MODO REPARO ──────────────────────────────────────────────
+  if (xCMNeedsRep) {
+
+
+    // Sem kit de reparo nos slots → tenta pegar item dropado ou desconecta
+    if (xGetSlotByID(719) === undefined) {
+      xGoing[120] = false;
+      await xDelay(150);
+      if (xGetItemByID(xCMID3) !== undefined) {
+        xChangeStatus('[CM] Buscando item para reparar...');
+        await xDoMove(xGetItemByID(xCMID3).x, xGetItemByID(xCMID3).y);
+        xDoPickUp(); xDoPickUp(); xDoPickUp();
+      } else {
+        xChangeStatus('[CM] Sem kit de reparo, desconectando...');
+        xDoLogOff();
+      }
+      return;
+    }
+
+
+    // Verifica mobs próximos durante reparo
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself) continue;
+      const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
+
+      if (dist <= 6 && !xPlyrTest(mob)) {
+        if (xGetItemByID(xCMID3) !== undefined) {
+          await xDoMove(xGetItemByID(xCMID3).x, xGetItemByID(xCMID3).y);
+          xDoPickUp();
+        }
+        if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+        if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); await xDelay(2000); }
+        xChangeStatus('[CM] Mob próximo durante reparo! Reagindo...');
+        await xGetMobByName('Ghost', 'Skeleton', 'Skeleton Lord');
+        if (xTemp[13] !== undefined && xTemp[13] !== myself) {
+          if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+          const md = Math.abs(xTemp[13].x - myself.x) + Math.abs(myself.y - xTemp[13].y);
+          if (md >= 1 && md > 2) target.id = me;
+        }
+        xGoing[120] = false;
+        return;
+
+
+      } else if (xPlyrTest(mob)) {
+        xChangeStatus('[CM] Jogador detectado! Protegendo...');
+        if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+        if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
+        xGoing[120] = false;
+        return;
+      }
+    }
+
+
+    // ── Fluxo de reparo ──
+    // Passo 1: tem itens equipados → vai para 29,48 e dropa
+    if (inv[0]?.sprite !== undefined) {
+      if (myself.x === 29 && myself.y === 48) {
+        xChangeStatus('[CM] Dropando itens para reparar...');
+        if      (inv[2]?.sprite !== undefined) { await xDelay(300); xDoDropSlot(0, 3); }
+        else if (inv[1]?.sprite !== undefined) { xDoDropSlot(0, 2); }
+        else                                   { xDoDropSlot(0, 1); }
+      } else {
+        xChangeStatus('[CM] Indo para posição de drop (29,48)...');
+        await xDoMove(29, 48);
+        await xDelay(300);
+      }
+    } else {
+      // Passo 2: slots vazios → vai para 29,47 vira baixo e repara
+      if (myself.x === 29 && myself.y === 47 && myself.dir === 2 && inv[xGetSlotByID(719)]?.equip !== 0) {
+        if (xIfChatHas('The ' + cmRepItem + ' is in perfect condition.')) {
+          xDoClearChat('The ' + cmRepItem + ' is in perfect condition.');
+          xDoKeyUp(6);
+          // Passo 3: reparo OK → vai buscar itens em 29,48
+          if (xGetItemByID(xCMID3) !== undefined) {
+            xChangeStatus('[CM] Coletando itens reparados...');
+            await xDoMove(xGetItemByID(xCMID3).x, xGetItemByID(xCMID3).y);
+            for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
+          } else {
+            // tenta 29,48 direto
+            await xDoMove(29, 48);
+            for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
+          }
+          if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(300); }
+          if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(300); }
+          if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
+          xCMNeedsRep  = false;
+          CMRepTimer   = 0;
+          cmStat.repairoTotal++;
+          dsk.localMsg(`Cemetery: reparo ${cmStat.repairoTotal} completo ✅`, '#5f5');
+        } else {
+          xDoKeyDown(6);
+        }
+      } else {
+        xChangeStatus('[CM] Indo para posição de reparo (29,47)...');
+        await xDoMove(29, 47);
+        await xDoChangeDir(2);
+        await xDoUseSlot(xGetSlotByID(719));
+        await xDelay(500);
+      }
+    }
+
+
+    xGoing[120] = false;
+    return;
+  }
+
+
+  // ── MODO NORMAL ───────────────────────────────────────────────
+
+
+  // Comida
+  const foodId = xGetSlotFood();
+  if (foodId !== undefined) {
+    if (hunger_status.val <= 65) {
+      xChangeStatus('[CM] Comendo...');
+      await xDoUseSlotByID(xGetSlotByID(foodId));
+      await xDelay(2000);
+    }
+  } else {
+    xDoLogOff();
+  }
+
+
+  // Equipa itens se desequipados
+  if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(150); }
+  if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(150); }
+  if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(150); }
+
+
+  // Logoff se item quebrado
+  if (inv[0]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+  if (inv[1]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+  if (inv[2]?.equip === 2) { xDoLogOff(); await xDelay(150); }
+
+
+  // HP baixo
+  if (hp_status.val <= 70 && hp_status.val >= 0.1) {
+    xChangeStatus('[CM] HP baixo, curando...');
+    xHeal();
+    if (hp_status.val <= 40) {
+      xChangeStatus('[CM] HP crítico! Desconectando...');
+      xDoLogOff();
+      await xDelay(1000);
+    }
+  }
+
+
+  // Bandagem se fora de combate
+  const cmTemMob  = xTemp[13] !== undefined && xTemp[13] !== myself;
+  const cmCombate = xCMRecentCombat;
+  if (!cmTemMob && !cmCombate && hp_status.val >= 80 && hp_status.val <= 92) {
+    if (!xGoing[125]) {
+      const slotBandagem = xGetSlotByID(767);
+      if (slotBandagem !== undefined) {
+        xGoing[125] = true;
+        xDoUseSlotByID(slotBandagem);
+        xDoUseSlotByID(slotBandagem);
+        setTimeout(() => { xGoing[125] = false; }, 10000);
+      }
+    }
+  }
+
+
+  // Coleta itens + logoff se slot vazio
+  const cmPickAll = async () => {
+    if (xGetItemByID(xCMID3) !== undefined) { await xDoMove(xGetItemByID(xCMID3).x, xGetItemByID(xCMID3).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+    if (xGetItemByID(xCMID1) !== undefined) { await xDoMove(xGetItemByID(xCMID1).x, xGetItemByID(xCMID1).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+    if (xGetItemByID(xCMID2) !== undefined) { await xDoMove(xGetItemByID(xCMID2).x, xGetItemByID(xCMID2).y); for (let p = 0; p < 5; p++) await xDoPickUp(); }
+  };
+
+
+  if (inv[0]?.sprite === undefined) { xChangeStatus('[CM] Slot 1 vazio, coletando...'); await cmPickAll(); xDoLogOff(); }
+  if (inv[1]?.sprite === undefined) { xChangeStatus('[CM] Slot 2 vazio, coletando...'); await cmPickAll(); xDoLogOff(); }
+  if (inv[2]?.sprite === undefined) { xChangeStatus('[CM] Slot 3 vazio, coletando...'); await cmPickAll(); xDoLogOff(); }
+  if (inv[5]?.sprite === undefined) { xChangeStatus('[CM] Slot 6 vazio, desconectando...'); xDoLogOff(); }
+
+
+  // ── Waypoints Cemetery ────────────────────────────────────────
+  // WP 5 (índice 4) é o ponto de reparo: 25,43
+  // Depois do WP 4, vai para reparar se CMRepTimer >= cmRepVoltas
+  if (xTemp[80] === undefined) {
+    xTemp[80] = 0;  // índice atual
+    xTemp[81] = 19; // índice máximo (19 waypoints, 0..15)
+    const posX = [29, 41, 42, 27, 25, 11, 15,  4, 5, 14, 11, 11, 6, 4,  9, 15, 16, 26, 27];
+    const posY = [28, 16, 43, 30, 43, 42, 31, 37, 11, 11, 4, 10, 11, 31, 41, 32, 43, 40, 30];
+    for (let i = 0; i < 19; i++) {
+      CMPosListX[i] = posX[i];
+      CMPosListY[i] = posY[i];
+    }
+  }
+
+
+  // ── Busca mob ─────────────────────────────────────────────────
+  await xGetMobByName('Ghost', 'Skeleton', 'Skeleton Lord');
+
+
+  if (xTemp[13] !== undefined && xTemp[13] !== myself) {
+    const dist = xGetDistance(myself.x, myself.y, xTemp[13].x, xTemp[13].y);
+
+
+    if (target.id !== xTemp[13].id) {
+      target.id = xTemp[13].id;
+      send({ type: 't', t: target.id });
+    }
+
+
+    if (dist <= 1) {
+      await xDoMove(xTemp[13].x, xTemp[13].y);
+      xDelay(200);
+      xDoMove(xTemp[13].x, xTemp[13].y - 1);
+      xDelay(200);
+      xDoMove(xTemp[13].x, xTemp[13].y + 1);
+      xDelay(200);
+    } else if (dist <= 7) {
+      await xDoMove(xTemp[13].x, xTemp[13].y);
+      await xDelay(800);
+    } else {
+      target.id = me;
+    }
+  }
+
+
+  // ── Patrulha ──────────────────────────────────────────────────
+  if (xTemp[13] === myself || xTemp[13] === undefined) {
+    const wpX = CMPosListX[xTemp[80]];
+    const wpY = CMPosListY[xTemp[80]];
+    const distToWP = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+
+
+    if (distToWP <= 2) {
+      if (xTemp[80] >= xTemp[81]) {
+        xTemp[80] = 0;
+        CMRepTimer++;
+      } else {
+        xTemp[80]++;
+      }
+
+
+      // Checa reparo no WP 4 (índice 4 = coordenada 25,43)
+      if (CMRepTimer >= cmRepVoltas && xTemp[80] === 4) {
+        xChangeStatus('[CM] Hora de reparar!');
+        xCMNeedsRep = true;
+      }
+    } else {
+      xDoMove(wpX, wpY, 3);
+    }
+  }
+
+
+  xGoing[120] = false;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  CEMETERY CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+
+dsk.cemetery = { enabled: false };
+
+
+(function () {
+  let cmPanel = null;
+
+
+  const cmm = {
+    get visible() { return !!cmPanel; },
+    set visible(v) { if (!v && cmPanel) removePanel(); else if (v && !cmPanel) createPanel(); },
+  };
+  dsk.cemeteryManager = cmm;
+
+
+  // Atualiza labels em tempo real
+  dsk.on('postLoop', () => {
+    if (!cmPanel) return;
+    const q  = k => cmPanel.querySelector(`[data-cmm="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+
+
+    const wp    = xTemp[80] ?? 0;
+    const maxWp = xTemp[81] ?? 15;
+    set('status', dsk.cemetery?.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('wp',     `WP: ${wp} / ${maxWp}`);
+    set('rep',    `Voltas: ${window.CMRepTimer ?? 0} / ${window.cmRepVoltas ?? 3}`);
+    set('needs',  window.xCMNeedsRep ? '🔧 Reparando...' : '✅ OK');
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('hunger', `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`);
+    set('mob',    `Mob: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('repairs',`Reparos: ${window.cmStat?.repairoTotal ?? 0}`);
+    set('myst',   `Myst: +${window.cmStat?.totalMyst ?? 0}`);
+
+
+    const mph = window.cmStat?.mystPerHour ?? 0;
+    set('mph', mph >= 1000 ? `Myst/h: ${(mph/1000).toFixed(1)}M` : `Myst/h: ${mph}k`);
+
+
+    if (window.cmStat?.timerRunning) {
+      const elapsed = Math.floor((window.cmStat.totalTime + (Date.now() - window.cmStat.timerStart)) / 1000);
+      const h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
+      set('time', `Tempo: ${h > 0 ? h + 'h ' : ''}${m}m ${s}s`);
+    }
+  });
+
+
+  function createPanel() {
+    if (cmPanel) { removePanel(); return; }
+
+
+    cmPanel = document.createElement('div');
+    Object.assign(cmPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '270px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '⚰️ Cemetery Config';
+    Object.assign(title.style, { color: '#c084fc', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - cmPanel.getBoundingClientRect().left;
+      oy = _xy.y - cmPanel.getBoundingClientRect().top;
+      cmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); cmPanel.style.left = (_xy.x - ox) + 'px'; cmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    // Status box
+    const statusKeys = [
+      ['status', '🔴 Pausado'],
+      ['wp',     'WP: 0 / 15'],
+      ['rep',    'Voltas: 0 / 3'],
+      ['needs',  '✅ OK'],
+      ['hp',     'HP: -'],
+      ['hunger', 'Fome: -'],
+      ['mob',    'Mob: -'],
+      ['repairs','Reparos: 0'],
+      ['myst',   'Myst: +0'],
+      ['mph',    'Myst/h: 0k'],
+      ['time',   'Tempo: 0m 0s'],
+    ];
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '3px',
+    });
+    statusKeys.forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.cmm = key;
+      el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+
+    // ── Voltas p/ reparar ────────────────────────────────────
+    const voltasRow = document.createElement('div');
+    Object.assign(voltasRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+    const voltasLbl = document.createElement('div');
+    const voltasTitle = document.createElement('div');
+    voltasTitle.textContent = 'Voltas p/ reparar';
+    Object.assign(voltasTitle.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const voltasVal = document.createElement('div');
+    voltasVal.dataset.cmm = 'voltas';
+    voltasVal.textContent = `Voltas p/ reparar: ${window.cmRepVoltas ?? 3}`;
+    Object.assign(voltasVal.style, { color: '#c084fc', fontSize: '11px' });
+    voltasLbl.appendChild(voltasTitle); voltasLbl.appendChild(voltasVal);
+
+
+    dsk.on('postLoop', () => {
+      if (!cmPanel) return;
+      const el = cmPanel.querySelector('[data-cmm="voltas"]');
+      if (el) el.textContent = `Voltas p/ reparar: ${window.cmRepVoltas ?? 3}`;
+    });
+
+
+    const voltasBtns = document.createElement('div');
+    Object.assign(voltasBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        padding: '3px 10px', borderRadius: '5px', border: '1px solid #555',
+        background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.cmRepVoltas ?? 3) > 1) window.cmRepVoltas--; }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.cmRepVoltas = (window.cmRepVoltas ?? 3) + 1; }));
+    voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
+    body.appendChild(voltasRow);
+
+
+    // ── Botões de ação ────────────────────────────────────────
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+
+
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        flex: '1', padding: '7px 0', borderRadius: '7px',
+        border: `1px solid ${color}`, background: '#1a1a2e',
+        color: color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px',
+      });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn;
+      return b;
+    }
+
+
+    actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
+      window.cmStat = {
+        startMyst: jv.upgrade_number ?? 0, totalMyst: 0, mystPerHour: 0,
+        timerStart: Date.now(), totalTime: 0,
+        timerRunning: !!dsk.cemetery?.enabled, repairoTotal: 0,
+      };
+      window.CMRepTimer  = 0;
+      window.xCMNeedsRep = false;
+      dsk.localMsg('Cemetery: stats resetados!', '#ff0');
+    }));
+
+
+    actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
+      xTemp[80] = undefined;
+      window.CMPosListX = new Array(20).fill(0);
+      window.CMPosListY = new Array(20).fill(0);
+      window.CMRepTimer  = 0;
+      window.xCMNeedsRep = false;
+      dsk.localMsg('Cemetery: waypoints resetados!', '#fa5');
+    }));
+
+
+    actRow.appendChild(makeActionBtn('🔧 Forçar Reparo', '#0cf', () => {
+      window.xCMNeedsRep = true;
+      dsk.localMsg('Cemetery: reparo forçado!', '#ff0');
+    }));
+
+
+    body.appendChild(actRow);
+
+
+    cmPanel.appendChild(header);
+    cmPanel.appendChild(body);
+    document.body.appendChild(cmPanel);
+  }
+
+
+  function removePanel() {
+    if (cmPanel) { cmPanel.remove(); cmPanel = null; }
+  }
+
+
+  dsk.setCmd('/cemeteryconfig', () => {
+    if (cmPanel) { removePanel(); dsk.localMsg('Cemetery Config: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Cemetery Config: Aberto', '#5f5'); }
+  });
+})();
+
+
+// ── Comando /cemetery ─────────────────────────────────────────
+
+
+dsk.setCmd('/cemetery', () => {
+  dsk.cemetery.enabled = !dsk.cemetery.enabled;
+
+
+  if (dsk.cemetery.enabled) {
+    xCMID1   = inv[0]?.sprite;
+    xCMID2   = inv[1]?.sprite;
+    xCMID3   = inv[2]?.sprite;
+    cmRepItem = xGetItemNameBySlot(0) ?? '';
+
+
+    if (!xCMID1 || !xCMID2 || !xCMID3) {
+      dsk.localMsg('Cemetery: coloque itens nos slots 1, 2 e 3 primeiro!', '#f55');
+      dsk.cemetery.enabled = false;
+      return;
+    }
+
+
+    cmStat.timerStart   = Date.now();
+    cmStat.timerRunning = true;
+    if (cmStat.totalMyst === 0 && cmStat.totalTime === 0) {
+      cmStat.startMyst = jv.upgrade_number ?? 0;
+    }
+
+
+    if (!window.CMPosListX || CMPosListX.every(v => v === 0)) {
+      window.CMPosListX = new Array(20).fill(0);
+      window.CMPosListY = new Array(20).fill(0);
+      xTemp[80] = undefined;
+    }
+
+
+    dsk.localMsg(`Cemetery: Ativado | ID1=${xCMID1} ID2=${xCMID2} ID3=${xCMID3}`, '#5f5');
+
+
+    (async function loop() {
+      while (dsk.cemetery.enabled) {
+        const curMyst = (jv.upgrade_number ?? 0) - cmStat.startMyst;
+        cmStat.totalMyst = curMyst;
+        const elapsed = cmStat.totalTime + (Date.now() - cmStat.timerStart);
+        if (elapsed > 5000) cmStat.mystPerHour = Math.round(curMyst / elapsed * 3600);
+        await xCemetery();
+        await xDelay(500);
+      }
+    })();
+  } else {
+    if (cmStat.timerRunning) {
+      cmStat.totalTime  += Date.now() - cmStat.timerStart;
+      cmStat.timerRunning = false;
+    }
+    xGoing[120]   = false;
+    target.id     = me;
+    xCMNeedsRep   = false;
+    dsk.localMsg('Cemetery: Desativado', '#f55');
+  }
+});
+
+
+
+
+// ── Comando /wcave ────────────────────────────────────────────
+
 
 dsk.setCmd('/wcave', () => {
   dsk.wcave.enabled = !dsk.wcave.enabled;
+
 
   if (dsk.wcave.enabled) {
     // Captura IDs dos itens nos slots 0, 1 e 2
     xWCID1 = inv[0]?.sprite;
     xWCID2 = inv[1]?.sprite;
     xWCID3 = inv[2]?.sprite;
-	repItem = xGetItemNameBySlot(0) ?? '';
+    repItem = xGetItemNameBySlot(0) ?? '';
 
 
     if (!xWCID1 || !xWCID2 || !xWCID3) {
@@ -4739,28 +8092,50 @@ dsk.setCmd('/wcave', () => {
       return;
     }
 
-    window.WCPosListX = new Array(20).fill(0);
-    window.WCPosListY = new Array(20).fill(0);
+
+    // Resume timer do ponto onde parou
+    wcStat.timerStart   = Date.now(); // sempre recomeça o segmento atual
+    wcStat.timerRunning = true;
+    // Só captura startMyst se for a primeira vez (totalMyst == 0 e totalTime == 0)
+    if (wcStat.totalMyst === 0 && wcStat.totalTime === 0) {
+      wcStat.startMyst = jv.upgrade_number ?? 0;
+    }
+
+
+    // Só reinicializa a lista se ainda não foi populada (primeiro start)
+    if (!window.WCPosListX || WCPosListX.every(v => v === 0)) {
+      window.WCPosListX = new Array(20).fill(0);
+      window.WCPosListY = new Array(20).fill(0);
+      xTemp[70] = undefined; // força init dos waypoints no xWCave
+    }
     dsk.localMsg(`WCave: Ativado | ID1=${xWCID1} ID2=${xWCID2} ID3=${xWCID3}`, '#5f5');
+
 
     (async function loop() {
       while (dsk.wcave.enabled) {
+        // Atualiza myst e tempo no estado
+        const curMyst = (jv.upgrade_number ?? 0) - wcStat.startMyst;
+        wcStat.totalMyst = curMyst;
+        const elapsed = wcStat.totalTime + (Date.now() - wcStat.timerStart);
+        // elapsed em ms, curMyst raw → myst/h em k: (myst/ms) * 3600000ms/h / 1000
+        if (elapsed > 5000) wcStat.mystPerHour = Math.round(curMyst / elapsed * 3600);
         await xWCave();
         await xDelay(500);
       }
     })();
   } else {
-    xGoing[110] = false;
-    xMovingNow  = false;
-    target.id   = me;
-    dsk.localMsg('WCave Bot: Desativado', '#f55');
+    // Pausa: salva tempo acumulado mas mantém waypoint
+    if (wcStat.timerRunning) {
+      wcStat.totalTime  += Date.now() - wcStat.timerStart;
+      wcStat.timerRunning = false;
+    }
+    xGoing[110]  = false;
+    xMovingNow   = false;
+    target.id    = me;
+    dsk.localMsg('WCave Bot: Pausado (waypoint mantido)', '#fa5');
   }
 });
 
-dsk.setCmd('/wcaveconfig', () => {
-  wcm.visible = !wcm.visible;
-  dsk.localMsg(`WCave Config: ${wcm.visible ? 'Aberto' : 'Fechado'}`, wcm.visible ? '#5f5' : '#f55');
-});
 
 function xGetPlayerByPos(x, y) {
   if (target.id !== me) xTemp[11] = target.id;
@@ -4774,6 +8149,7 @@ function xGetPlayerByPos(x, y) {
   return undefined;
 }
 
+
 function xGetSpellByID(id) {
   for (let i in jv.abl) {
     const spell = jv.abl[i];
@@ -4786,6 +8162,7 @@ function xGetSpellByID(id) {
   return undefined;
 }
 
+
 function xDoSpell(id) {
   const spell = xGetSpellByID(id);
   if (spell !== undefined) {
@@ -4797,11 +8174,13 @@ function xDoSpell(id) {
   }
 }
 
+
 async function xDiso() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   if (xGoing[106] === true) return;
   xGoing[106] = true;
+
 
   const spell = xGetSpellByID(909); // ← guarda o resultado
   if (spell !== undefined) {
@@ -4827,14 +8206,17 @@ async function xDiso() {
     }
   }
 
+
   xGoing[106] = false;
 }
+
 
 async function xWw() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   if (xGoing[230] === true) return;
   xGoing[230] = true;
+
 
   if (xGetSpellByID(911) !== undefined) {
     for (let dx = -2; dx <= 2; dx++) {
@@ -4851,15 +8233,20 @@ async function xWw() {
     }
   }
 
+
   xGoing[230] = false;
 }
 
+
 // ── DISO ─────────────────────────────────────────────────────
+
 
 dsk.diso = { enabled: false };
 
+
 dsk.setCmd('/diso', () => {
   dsk.diso.enabled = !dsk.diso.enabled;
+
 
   if (dsk.diso.enabled) {
     dsk.localMsg('Diso: Ativado', '#5f5');
@@ -4875,12 +8262,16 @@ dsk.setCmd('/diso', () => {
   }
 });
 
+
 // ── WW ───────────────────────────────────────────────────────
+
 
 dsk.ww = { enabled: false };
 
+
 dsk.setCmd('/ww', () => {
   dsk.ww.enabled = !dsk.ww.enabled;
+
 
   if (dsk.ww.enabled) {
     dsk.localMsg('WW: Ativado', '#5f5');
@@ -4896,12 +8287,16 @@ dsk.setCmd('/ww', () => {
   }
 });
 
+
 // ── FARM BOT ──────────────────────────────────────────────────
+
 
 dsk.farm = { enabled: false };
 
+
 dsk.setCmd('/farm', () => {
   dsk.farm.enabled = !dsk.farm.enabled;
+
 
   if (dsk.farm.enabled) {
     dsk.localMsg('Farm Bot: Ativado', '#5f5');
@@ -4918,6 +8313,7 @@ dsk.setCmd('/farm', () => {
 // ── FARM: opção de pular água raza ────────────────────────────
 dsk.farm.skipWater = false;
 
+
 // Wrapper: se skipWater, agua raza (0) vira 1 (bloqueado)
 function farmOcc(x, y) {
   const v = occupied(x, y);
@@ -4925,10 +8321,13 @@ function farmOcc(x, y) {
   return v;
 }
 
+
 async function FarmBot() {
+
 
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
 
   // Parar se atingir level
   if (currentLevel > 0 && skillLevel >= currentLevel && ['farming','foraging'].includes(skillName)) {
@@ -4937,27 +8336,34 @@ async function FarmBot() {
     return;
   }
 
+
   // Slots
   const shovelSlot = item_data.find(el => el?.n?.includes('Shovel'))?.slot;
   const seedSlot   = item_data.find(el => el?.n?.includes('Seed'))?.slot;
 
+
   if (shovelSlot === undefined || seedSlot === undefined) return;
 
+
   const allowedWalls = ['Animal Gate','Stone Wall','Tribe Gate','Signpost'];
+
 
   const hasWallRight = objects.items.find(el =>
     el && allowedWalls.includes(el.name) &&
     el.x === myself.x + 1 && el.y === myself.y
   );
 
+
   const hasWallLeft = objects.items.find(el =>
     el && allowedWalls.includes(el.name) &&
     el.x === myself.x - 1 && el.y === myself.y
   );
 
+
   // =========================
   // Funções auxiliares
   // =========================
+
 
   function getFrontTile(){
     if (myself.dir === 1) return {x: myself.x + 1, y: myself.y};
@@ -4966,12 +8372,14 @@ async function FarmBot() {
     if (myself.dir === 2) return {x: myself.x, y: myself.y + 1};
   }
 
+
   function getObstacle(x, y){
     return objects.items.find(el =>
       el && (el.name.includes('Tree') || el.name.includes('Bush') || el.name.includes('Rock')) &&
       el.x === x && el.y === y
     );
   }
+
 
   async function clearObstacle(x, y){
     let obstacle = getObstacle(x, y);
@@ -4984,10 +8392,12 @@ async function FarmBot() {
     }
   }
 
+
   async function digTile(){
     await xDoKeyPress(6, 211);
     await xDelay(441);
   }
+
 
   // ✅ NOVO: cava até o tile mudar de estado (ou atingir limite de tentativas)
   async function digUntilReady(x, y){
@@ -4999,6 +8409,7 @@ async function FarmBot() {
     }
   }
 
+
   async function plantSeed(){
     await xDelay(150);
     await xDoPickUp();
@@ -5007,26 +8418,30 @@ async function FarmBot() {
     await xDelay(110);
   }
 
+
   const front = getFrontTile();
   const obstacleFront = getObstacle(front.x, front.y);
+
 
   // =========================
   // WALL DIREITA >
   // =========================
   if (myself.dir === 1 && hasWallRight){
 
+
     // 1) cavar em cima
     if (farmOcc(myself.x, myself.y - 1) === 0){
       await xDelay(515);
       await xDoChangeDir(0);
-	  await xDelay(418);
-	  await xDoUseSlot(shovelSlot);
+          await xDelay(418);
+          await xDoUseSlot(shovelSlot);
       await digUntilReady(myself.x, myself.y - 1);
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1);
     }
+
 
     // 2) só depois limpar o bush
     await xDelay(423);
@@ -5034,51 +8449,58 @@ async function FarmBot() {
     await xDelay(418);
     await clearObstacle(myself.x, myself.y + 1);
 
+
     // 3) descer e plantar
     await xDelay(325);
     await xDoMove(myself.x, myself.y + 1);
     await xDelay(237);
     await plantSeed();
 
-	// 4) cavar embaixo (tile destino) antes do bush
+
+        // 4) cavar embaixo (tile destino) antes do bush
     if (farmOcc(myself.x, myself.y + 1) === 0){
       await xDelay(423);
       await xDoChangeDir(2);
       await xDelay(418);
-	  await xDoUseSlot(shovelSlot);
-	  await xDelay(418);
+          await xDoUseSlot(shovelSlot);
+          await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1);
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1);
     }
 
+
     // virar esquerda
     await xDelay(349);
     await xDoChangeDir(3);
 
+
     return;
   }
+
 
   // =========================
   // WALL ESQUERDA <
   // =========================
   if (myself.dir === 3 && hasWallLeft){
 
+
     // 1) cavar embaixo
     if (farmOcc(myself.x, myself.y + 1) === 0){
       await xDelay(549);
       await xDoChangeDir(2);
-	  await xDelay(418);
-	  await xDoUseSlot(shovelSlot);
-	  await xDelay(418);
+          await xDelay(418);
+          await xDoUseSlot(shovelSlot);
+          await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1);
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1);
     }
+
 
     // 2) só depois limpar o bush
     await xDelay(348);
@@ -5086,32 +8508,37 @@ async function FarmBot() {
     await xDelay(357);
     await clearObstacle(myself.x, myself.y - 1);
 
+
     // 3) subir e plantar
     await xDelay(361);
     await xDoMove(myself.x, myself.y - 1);
     await xDelay(262);
     await plantSeed();
 
-	// 4) cavar em cima (tile destino) antes do bush
+
+        // 4) cavar em cima (tile destino) antes do bush
     if (farmOcc(myself.x, myself.y - 1) === 0){
       await xDelay(348);
       await xDoChangeDir(0);
       await xDelay(357);
-	  await xDoUseSlot(shovelSlot);
-	  await xDelay(418);
+          await xDoUseSlot(shovelSlot);
+          await xDelay(418);
       await digUntilReady(myself.x, myself.y - 1);
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1);
     }
 
+
     // virar direita
     await xDelay(372);
     await xDoChangeDir(1);
 
+
     return;
   }
+
 
   // =========================
   // Movimento normal lateral
@@ -5119,11 +8546,11 @@ async function FarmBot() {
   if (myself.dir === 1){ // indo para a direita >
     if (farmOcc(myself.x, myself.y - 1) === 0){
       await xDoChangeDir(0);
-	  await xDelay(357);
-	  await xDoUseSlot(shovelSlot);
-	  await xDelay(418);
+          await xDelay(357);
+          await xDoUseSlot(shovelSlot);
+          await xDelay(418);
       await digUntilReady(myself.x, myself.y - 1); // ✅
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1)
@@ -5133,11 +8560,11 @@ async function FarmBot() {
   else if (myself.dir === 3){ // indo para a esquerda <
     if (farmOcc(myself.x, myself.y + 1) === 0){
       await xDoChangeDir(2);
-	  await xDelay(418);
-	  await xDoUseSlot(shovelSlot);
-	  await xDelay(418);
+          await xDelay(418);
+          await xDoUseSlot(shovelSlot);
+          await xDelay(418);
       await digUntilReady(myself.x, myself.y + 1); // ✅
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1)
@@ -5146,15 +8573,16 @@ async function FarmBot() {
   }
   else { // subindo ou descendo
     if (farmOcc(front.x, front.y) === 0){
-	  await xDelay(418);
-	  await xDoUseSlot(shovelSlot);
+          await xDelay(418);
+          await xDoUseSlot(shovelSlot);
       await digUntilReady(front.x, front.y); // ✅
-	  await xDelay(241);
+          await xDelay(241);
       await xDoUseSlot(0);
       await xDelay(141);
       await xDoUseSlot(1)
     }
   }
+
 
   // =========================
   // Obstáculo à frente (após cavar)
@@ -5165,18 +8593,23 @@ async function FarmBot() {
     return;
   }
 
+
   // mover e plantar normalmente
   await xDoMove(front.x, front.y);
   await xDelay(257);
   await plantSeed();
 }
 
+
 // ── ALOE BOT ─────────────────────────────────────────────────
+
 
 dsk.aloe = { enabled: false };
 
+
 dsk.setCmd('/aloe', () => {
   dsk.aloe.enabled = !dsk.aloe.enabled;
+
 
   if (dsk.aloe.enabled) {
     dsk.localMsg('Aloe Bot: Ativado', '#5f5');
@@ -5191,33 +8624,42 @@ dsk.setCmd('/aloe', () => {
   }
 });
 
+
 async function AloeBot() {
+
 
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
 
   // Slots
   const shovelSlot = item_data.find(el => el?.n?.includes('Shovel'))?.slot;
   const seedSlot   = item_data.find(el => el?.n?.includes('Seed'))?.slot;
 
+
   if (shovelSlot === undefined || seedSlot === undefined) return;
+
 
   const allowedWalls = ['Animal Gate','Stone Wall','Tribe Gate','Signpost'];
   const porta = ['Tribe Gate'];
+
 
   const hasWallRight = objects.items.find(el =>
     el && allowedWalls.includes(el.name) &&
     el.x === myself.x + 1 && el.y === myself.y
   );
 
+
   const hasWallLeft = objects.items.find(el =>
     el && porta.includes(el.name) &&
     el.x === myself.x - 1 && el.y === myself.y
   );
 
+
   // =========================
   // Funções auxiliares
   // =========================
+
 
   async function repairShovel() {
     if (myself.dir == 0 && !hasWallRight) {
@@ -5322,9 +8764,11 @@ async function AloeBot() {
     }
   }
 
+
   async function checkShovel() {
     if (inv[0]?.equip === 2) await repairShovel();
   }
+
 
   function getFrontTile() {
     if (myself.dir === 1) return {x: myself.x + 1, y: myself.y};
@@ -5333,12 +8777,14 @@ async function AloeBot() {
     if (myself.dir === 2) return {x: myself.x, y: myself.y + 1};
   }
 
+
   function getObstacle(x, y) {
     return objects.items.find(el =>
       el && (el.name.includes('Tree') || el.name.includes('Bush') || el.name.includes('Rock')) &&
       el.x === x && el.y === y
     );
   }
+
 
   async function clearObstacle(x, y) {
     let obstacle = getObstacle(x, y);
@@ -5351,11 +8797,13 @@ async function AloeBot() {
     }
   }
 
+
   async function digTile() {
     await checkShovel();
     await xDoKeyPress(6, 211);
     await xDelay(441);
   }
+
 
   async function digUntilReady(x, y) {
     let tries = 0;
@@ -5366,6 +8814,7 @@ async function AloeBot() {
     }
   }
 
+
   async function plantSeed() {
     await xDelay(150);
     await xDoPickUp();
@@ -5374,13 +8823,16 @@ async function AloeBot() {
     await xDelay(110);
   }
 
+
   const front = getFrontTile();
   const obstacleFront = getObstacle(front.x, front.y);
+
 
   // =========================
   // WALL DIREITA >
   // =========================
   if (myself.dir === 1 && hasWallRight) {
+
 
     // 1) cavar em cima
     if (farmOcc(myself.x, myself.y - 1) === 0) {
@@ -5395,17 +8847,20 @@ async function AloeBot() {
       await xDoUseSlot(1);
     }
 
+
     // 2) limpar bush em baixo
     await xDelay(423);
     await xDoChangeDir(2);
     await xDelay(418);
     await clearObstacle(myself.x, myself.y + 1);
 
+
     // 3) descer e plantar
     await xDelay(325);
     await xDoMove(myself.x, myself.y + 1);
     await xDelay(234);
     await plantSeed();
+
 
     // 4) cavar embaixo (tile destino)
     if (farmOcc(myself.x, myself.y + 1) === 0) {
@@ -5421,17 +8876,21 @@ async function AloeBot() {
       await xDoUseSlot(1);
     }
 
+
     // virar esquerda
     await xDelay(349);
     await xDoChangeDir(3);
 
+
     return;
   }
+
 
   // =========================
   // WALL ESQUERDA < (Tribe Gate — sem plantio, tem piso)
   // =========================
   if (myself.dir === 3 && hasWallLeft) {
+
 
     // 1) cavar embaixo
     if (farmOcc(myself.x, myself.y + 1) === 0) {
@@ -5447,6 +8906,7 @@ async function AloeBot() {
       await xDoUseSlot(1);
     }
 
+
     // 3) lógica de drop/pickup na Tribe Gate
     const gateLeft = objects.items.find(el =>
       el?.name === 'Tribe Gate' && el.x === myself.x - 1 && el.y === myself.y
@@ -5458,16 +8918,16 @@ async function AloeBot() {
       await xDelay(500);
       await xDoPickUp();
       await xDelay(500);
-	  await xDoPickUp();
+          await xDoPickUp();
       await xDelay(500);
       if (aloe) await xDoDropByID(0, 767);
       await xDelay(500);
       const sementeAtual = item_data.find(el => el?.n?.includes('Seed'));
-	  if (sementeAtual && sementeAtual.qty > 50) {
-		const qnts = sementeAtual.qty - 50;
-		await xDelay(500);
-		await xDoDropByID(qnts, 614);
-	}
+          if (sementeAtual && sementeAtual.qty > 50) {
+                const qnts = sementeAtual.qty - 50;
+                await xDelay(500);
+                await xDoDropByID(qnts, 614);
+        }
       await xDelay(500);
       await xDoChangeDir(0);
       await xDelay(500);
@@ -5476,8 +8936,10 @@ async function AloeBot() {
       await xDoChangeDir(1);
     }
 
+
     return;
   }
+
 
   // =========================
   // Movimento normal lateral
@@ -5520,6 +8982,7 @@ async function AloeBot() {
     }
   }
 
+
   // =========================
   // Obstáculo à frente
   // =========================
@@ -5529,6 +8992,7 @@ async function AloeBot() {
     return;
   }
 
+
   // mover e plantar normalmente
   await xDoMove(front.x, front.y);
   await xDelay(237);
@@ -5536,12 +9000,17 @@ async function AloeBot() {
 }
 
 
+
+
 // ── AUTO HEAL ─────────────────────────────────────────────────
+
 
 dsk.heal = { enabled: false };
 
+
 dsk.setCmd('/heal', () => {
   dsk.heal.enabled = !dsk.heal.enabled;
+
 
   if (dsk.heal.enabled) {
     dsk.localMsg('Auto Heal: Ativado', '#5f5');
@@ -5557,9 +9026,12 @@ dsk.setCmd('/heal', () => {
   }
 });
 
+
 // ── AUTO FOOD ─────────────────────────────────────────────────
 
+
 dsk.food = { enabled: false };
+
 
 async function xFood() {
   if (dskPaused) return; // ← adiciona isso
@@ -5567,11 +9039,13 @@ async function xFood() {
   if (xGoing[107] === true) return;
   xGoing[107] = true;
 
+
   const foodId = xGetSlotFood(); // já existe no wcave
   if (foodId === undefined) {
     xGoing[107] = false;
     return;
   }
+
 
   if (hunger_status.val <= 65) {
     const foodSlot = xGetSlotByID(foodId);
@@ -5579,18 +9053,21 @@ async function xFood() {
     await xDelay(2000);
   }
 
+
   xGoing[107] = false;
 }
 
+
 dsk.setCmd('/food', () => {
   dsk.food.enabled = !dsk.food.enabled;
+
 
   if (dsk.food.enabled) {
     dsk.localMsg('Auto Food: Ativado', '#5f5');
     (async function loop() {
       while (dsk.food.enabled) {
-		if (dskPaused) return; // ← adiciona isso
-		if (!myself || game_state !== 2) return;
+                if (dskPaused) return; // ← adiciona isso
+                if (!myself || game_state !== 2) return;
         if (game_state === 2) await xFood();
         await xDelay(591);
       }
@@ -5601,12 +9078,16 @@ dsk.setCmd('/food', () => {
   }
 });
 
+
 // ── FISH BOT ──────────────────────────────────────────────────
+
 
 dsk.fish = { enabled: false };
 
+
 dsk.setCmd('/fish', () => {
   dsk.fish.enabled = !dsk.fish.enabled;
+
 
   if (dsk.fish.enabled) {
     dsk.localMsg('Fish Bot: Ativado', '#5f5');
@@ -5624,20 +9105,22 @@ dsk.setCmd('/fish', () => {
   }
 });
 
+
 async function xFish() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   if (xGoing[3] === true) return;
   xGoing[3] = true;
   if (currentLevel > 0 && skillLevel >= currentLevel && ['fishing'].includes(skillName)) {
-	await xDelay(1210);
-	dsk.fish.enabled = false;
-	xGoing[3] = false;
-	xTemp[9]  = false;
+        await xDelay(1210);
+        dsk.fish.enabled = false;
+        xGoing[3] = false;
+        xTemp[9]  = false;
     xTemp[10] = false;
-	dsk.localMsg('Fish: Desativado', '#f55');
+        dsk.localMsg('Fish: Desativado', '#f55');
     return;
-	}
+        }
+
 
   if (xIfChatHas('A bite!')) {
     dsk.localMsg('Catching the fish', '#0ff');
@@ -5647,6 +9130,7 @@ async function xFish() {
     return;
   }
 
+
   if (xIfChatHas('It got away..')) {
     xTemp[9] = true;
     await xDoClearChat('It got away..');
@@ -5654,12 +9138,14 @@ async function xFish() {
     return;
   }
 
+
   if (xIfChatHas('You land')) {
     xTemp[9] = true;
     await xDoClearChat('You land');
     xGoing[3] = false;
     return;
   }
+
 
   if (xIfChatHas('You cast')) {
     // Relança se o grau foi F
@@ -5672,6 +9158,7 @@ async function xFish() {
     return;
   }
 
+
   // Fisgou → pressiona espaço pra pegar
   if (xTemp[10] === true) {
     dsk.localMsg('Casting', '#0ff');
@@ -5682,6 +9169,7 @@ async function xFish() {
     return;
   }
 
+
   // Perdeu / precisa relançar
   if (xTemp[9] === true) {
     dsk.localMsg('Casting', '#0ff');
@@ -5691,18 +9179,24 @@ async function xFish() {
     return;
   }
 
+
   xGoing[3] = false;
 }
 
+
 // ── MYST BOT ──────────────────────────────────────────────────
+
 
 // Nome do mob alvo — troca pelo que quiser
 window.xMob = 'ratraccoon';
 
+
 dsk.myst = { enabled: false };
+
 
 dsk.setCmd('/newbi', () => {
   dsk.myst.enabled = !dsk.myst.enabled;
+
 
   if (dsk.myst.enabled) {
     dsk.localMsg('Newbi Bot: Ativado', '#5f5');
@@ -5719,6 +9213,7 @@ dsk.setCmd('/newbi', () => {
   }
 });
 
+
 // Define o mob alvo via /xmob <nome>
 dsk.setCmd('/xmob', (context) => {
   if (!context) {
@@ -5728,6 +9223,7 @@ dsk.setCmd('/xmob', (context) => {
   xMob = context.trim();
   dsk.localMsg(`Mob alvo: ${xMob}`, '#0ff');
 });
+
 
 async function xEnsureSword() {
   if (dskPaused) return; // ← adiciona isso
@@ -5740,13 +9236,16 @@ async function xEnsureSword() {
   }
 }
 
+
 async function xMyst() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   if (xGoing[101] === true) return;
   xGoing[101] = true;
 
+
   await xEnsureSword();
+
 
   if (hp_status.val <= 25) {
     await xMystHandleLowHp();
@@ -5754,9 +9253,11 @@ async function xMyst() {
     await xMystHandleCombat();
   }
 
+
   target.id = me;
   xGoing[101] = false;
 }
+
 
 async function xMystHandleLowHp() {
   if (dskPaused) return; // ← adiciona isso
@@ -5767,6 +9268,7 @@ async function xMystHandleLowHp() {
   }
   if (myself.x <= 23 && myself.y >= 39) await xDoMove(28, 38);
 
+
   if (myself.x === 21 && myself.y === 27) {
     await xDoChangeDir(0);
     await xDoKeyPress(6, 2000);
@@ -5775,15 +9277,18 @@ async function xMystHandleLowHp() {
   }
 }
 
+
 async function xMystHandleCombat() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   await xGetMobByName(xMob);
 
+
   if (xTemp[13] !== undefined && xTemp[13] !== myself) {
     await xMystAtacar();
     return;
   }
+
 
   // Patrulha entre dois pontos
   if (myself.x !== 22 || myself.y !== 31) {
@@ -5793,6 +9298,7 @@ async function xMystHandleCombat() {
   }
 }
 
+
 async function xMystAtacar() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
@@ -5800,6 +9306,7 @@ async function xMystAtacar() {
     target.id = xTemp[13].id;
     send({ type: 't', t: target.id });
   }
+
 
   const dist = Math.abs(xTemp[13].x - myself.x) + Math.abs(myself.y - xTemp[13].y);
   if (dist > 1) {
@@ -5810,81 +9317,184 @@ async function xMystAtacar() {
   }
 }
 
+
 // ── newbi CONFIG PANEL ─────────────────────────────────────────
 
-dsk.mystManager = jv.Dialog.create(220, 140);
-const mm = dsk.mystManager;
-mm.visible = false;
 
-mm.header = jv.text('Newbi Config', {
-  font: '14px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
-});
-mm.addChild(mm.header);
-jv.center(mm.header);
-jv.top(mm.header, 4);
+// ── Newbi Config (HTML overlay) ──────────────────────────────
 
-mm.close = jv.Button.create(0, 0, 24, 'X', mm, 24);
-jv.top(mm.close, 4); jv.right(mm.close, 4);
-mm.close.on_click = () => (mm.visible = 0);
 
-mm.move = jv.Button.create(0, 0, 24, '@', mm, 24);
-jv.top(mm.move, 4); jv.right(mm.move, 28);
+(function () {
+  let mmPanel = null;
 
-mm._px = 0; mm._py = 0;
-window.addEventListener('mousemove', e => { mm._px = e.clientX; mm._py = e.clientY; });
-window.addEventListener('touchmove', e => { mm._px = e.touches[0].clientX; mm._py = e.touches[0].clientY; });
 
-mm.updatePosition = () => {
-  if (mm.move.is_pressed) {
-    const canvas = document.querySelector('canvas');
-    const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: jv.game_width, height: jv.game_height };
-    mm.x = (mm._px - rect.left) * (jv.game_width / rect.width) - mm.w / 2;
-    mm.y = (mm._py - rect.top) * (jv.game_height / rect.height) - 12;
+  const mm = {
+    get visible() { return !!mmPanel; },
+    set visible(v) { if (!v && mmPanel) removePanel(); else if (v && !mmPanel) createPanel(); },
+  };
+  dsk.mystManager = mm;
+
+
+  // Atualiza status ao vivo
+  dsk.on('postLoop', () => {
+    if (!mmPanel) return;
+    const q = k => mmPanel.querySelector(`[data-mm="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    set('mob',    `Mob: ${window.xMob ?? '-'}`);
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('target', `Target: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('status', dsk.myst?.enabled ? '● ON' : '○ OFF');
+    const statusEl = q('status');
+    if (statusEl) statusEl.style.color = dsk.myst?.enabled ? '#5f5' : '#f55';
+  });
+
+
+  const mobPresets = ['ratraccoon', 'wolf', 'snake', 'Polar Bear'];
+  let mobIdx = 0;
+
+
+  function createPanel() {
+    if (mmPanel) { removePanel(); return; }
+
+
+    mmPanel = document.createElement('div');
+    Object.assign(mmPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '240px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🐭 Newbi Config';
+    Object.assign(titleEl.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl); header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - mmPanel.getBoundingClientRect().left;
+      oy = _xy.y - mmPanel.getBoundingClientRect().top;
+      mmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); mmPanel.style.left = (_xy.x - ox) + 'px'; mmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+
+    // Status ao vivo
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '3px',
+    });
+    [['mob','Mob: -'],['hp','HP: -'],['target','Target: -']].forEach(([key, init]) => {
+      const el = document.createElement('div');
+      el.dataset.mm = key;
+      el.textContent = init;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    // Status ON/OFF
+    const statusOnOff = document.createElement('div');
+    statusOnOff.dataset.mm = 'status';
+    statusOnOff.textContent = '○ OFF';
+    Object.assign(statusOnOff.style, { color: '#f55', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' });
+    statusBox.appendChild(statusOnOff);
+    body.appendChild(statusBox);
+
+
+    // Mob preset selector
+    const mobRow = document.createElement('div');
+    Object.assign(mobRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+    const mobLblWrap = document.createElement('div');
+    const mobTitle = document.createElement('div');
+    mobTitle.textContent = 'Mob alvo';
+    Object.assign(mobTitle.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const mobCur = document.createElement('div');
+    mobCur.textContent = mobPresets[0];
+    Object.assign(mobCur.style, { color: '#fff', fontSize: '11px' });
+    mobLblWrap.appendChild(mobTitle); mobLblWrap.appendChild(mobCur);
+
+
+    const btnMob = document.createElement('button');
+    btnMob.textContent = '↺ Trocar';
+    Object.assign(btnMob.style, {
+      padding: '4px 10px', borderRadius: '6px', border: '1px solid #FFD700',
+      background: '#1a1a2e', color: '#FFD700', cursor: 'pointer', fontSize: '10px',
+    });
+    btnMob.onmouseenter = () => { btnMob.style.background = '#FFD700'; btnMob.style.color = '#1a1a2e'; };
+    btnMob.onmouseleave = () => { btnMob.style.background = '#1a1a2e'; btnMob.style.color = '#FFD700'; };
+    btnMob.onclick = () => {
+      mobIdx = (mobIdx + 1) % mobPresets.length;
+      window.xMob = mobPresets[mobIdx];
+      mobCur.textContent = window.xMob;
+    };
+    mobRow.appendChild(mobLblWrap); mobRow.appendChild(btnMob);
+    body.appendChild(mobRow);
+
+
+    mmPanel.appendChild(header);
+    mmPanel.appendChild(body);
+    document.body.appendChild(mmPanel);
   }
-  if (mm.x < 0) mm.x = 0;
-  if (mm.y < 0) mm.y = 0;
-  if (mm.x + mm.w > jv.game_width)  mm.x = jv.game_width - mm.w;
-  if (mm.y + mm.h > jv.game_height) mm.y = jv.game_height - mm.h;
-};
-dsk.on('postLoop', mm.updatePosition);
 
-const mmLbl = (txt, y) => {
-  const l = jv.text(txt, { font: '11px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  l.x = 10; l.y = y; mm.addChild(l); return l;
-};
 
-mm.lblMob    = mmLbl(`Mob: ${window.xMob}`, 38);
-mm.lblHP     = mmLbl('HP: -', 53);
-mm.lblTarget = mmLbl('Target: -', 68);
-mm.lblStatus = mmLbl('Status: -', 83);
+  function removePanel() {
+    if (mmPanel) { mmPanel.remove(); mmPanel = null; }
+  }
 
-dsk.on('postLoop', () => {
-  if (!mm.visible) return;
-  mm.lblMob.text    = `Mob: ${xMob ?? '-'}`;
-  mm.lblHP.text     = `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`;
-  mm.lblTarget.text = `Target: ${xTemp[13]?.name ?? 'nenhum'}`;
-  mm.lblStatus.text = `Status: ${dsk.myst.enabled ? 'ON' : 'OFF'}`;
-});
 
-// Botões de mob preset
-const mobPresets = ['ratraccoon', 'wolf', 'snake', 'Polar Bear'];
-let mobIdx = 0;
+  dsk.setCmd('/newbiconfig', () => {
+    if (mmPanel) {
+      removePanel();
+      dsk.localMsg('Newbi Config: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Newbi Config: Aberto', '#5f5');
+    }
+  });
+})();
 
-const btnMob = jv.Button.create(0, 0, 100, mobPresets[0], mm, 20);
-btnMob.x = 110; btnMob.y = 36;
-btnMob.on_click = () => {
-  mobIdx = (mobIdx + 1) % mobPresets.length;
-  xMob = mobPresets[mobIdx];
-  btnMob.label.text = xMob;
-};
-
-dsk.setCmd('/newbiconfig', () => {
-  mm.visible = !mm.visible;
-  dsk.localMsg(`Newbi Config: ${mm.visible ? 'Aberto' : 'Fechado'}`, mm.visible ? '#5f5' : '#f55');
-});
 
 // ── GLOBALS COMPARTILHADOS ────────────────────────────────────
 // (só declara se ainda não existirem, pois wcave usa alguns deles)
+
 
 window.xWCID4         = 0;        // ID do slot 3 (picareta) — definido ao ligar /mining
 window.xRepairDropX   = 0;
@@ -5895,6 +9505,7 @@ window.WCMiningListY  = new Array(250).fill(0);
 window.mobNearMe      = false;
 window.player_dict    = window.player_dict ?? {};
 
+
 // Items que o bot pode catar do chão
 const xItensPermitidos = [
   353, 758, 494, 342, 344, 337, 338,
@@ -5904,7 +9515,9 @@ const xItensPermitidos = [
   637, 638, 622, 623, 679
 ];
 
+
 // ── FUNÇÕES AUXILIARES ────────────────────────────────────────
+
 
 // Retorna a parede (objeto imóvel) mais próxima pelo sprite ID
 function xGetWallByID(id) {
@@ -5920,6 +9533,7 @@ function xGetWallByID(id) {
   return best;
 }
 
+
 // Retorna se alguma pedra (rock sprites) está adjacente ao personagem
 function isRockNextToMe() {
   const rockSprites = [-261, -618, -518];
@@ -5933,6 +9547,7 @@ function isRockNextToMe() {
   });
 }
 
+
 // Move até o objeto/wall pelo ID
 async function xDoMoveToID(id) {
   const item = xGetItemByID(id);
@@ -5940,6 +9555,7 @@ async function xDoMoveToID(id) {
   const wall = xGetWallByID(id);
   if (wall) await xDoMove(wall.x, wall.y);
 }
+
 
 // Varre objetos e seta xTemp[19] com a rocha mais próxima acessível
 async function WCFindRocks() {
@@ -5960,6 +9576,7 @@ async function WCFindRocks() {
   if (xTemp[19] !== undefined) await xDoMoveToID(xTemp[19]);
 }
 
+
 // Verifica lista de posições por presença de jogadores
 function xGetPlayerByPosList(exList, wyList) {
   for (let j in mobs.items) {
@@ -5975,6 +9592,7 @@ function xGetPlayerByPosList(exList, wyList) {
   return undefined;
 }
 
+
 // Encontra Shiny Rock acessível mais próxima → xTemp[170]
 async function xGetShiny() {
   if (dskPaused) return; // ← adiciona isso
@@ -5983,16 +9601,16 @@ async function xGetShiny() {
   for (let i in objects.items) {
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0 || obj.name !== 'Shiny Rock') continue;
-	if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
+        if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
     let canReach = false;
-	for (let s = 0; s < exList.length; s++) {
-	  await xGetCanMove(exList[s], wyList[s]);
-	  if (xCanMov) { canReach = true; break; }
-	}
-	if (!canReach) continue;
+        for (let s = 0; s < exList.length; s++) {
+          await xGetCanMove(exList[s], wyList[s]);
+          if (xCanMov) { canReach = true; break; }
+        }
+        if (!canReach) continue;
     if (!xTemp[170] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[170].x, xTemp[170].y, myself.x, myself.y)) {
@@ -6001,6 +9619,7 @@ async function xGetShiny() {
   }
   return xTemp[170];
 }
+
 
 async function xGetSSDStone() {
   if (dskPaused) return;
@@ -6012,16 +9631,16 @@ async function xGetSSDStone() {
     if (!obj || obj.can_pickup !== 0) continue;
     // verifica por nome OU por sprite
     if (obj.name !== 'Rock' && !rockSprites.includes(obj.sprite)) continue;
-	if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
+        if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
     let canReach = false;
-	for (let s = 0; s < exList.length; s++) {
-	  await xGetCanMove(exList[s], wyList[s]);
-	  if (xCanMov) { canReach = true; break; }
-	}
-	if (!canReach) continue;
+        for (let s = 0; s < exList.length; s++) {
+          await xGetCanMove(exList[s], wyList[s]);
+          if (xCanMov) { canReach = true; break; }
+        }
+        if (!canReach) continue;
     if (!xTemp[172] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[172].x, xTemp[172].y, myself.x, myself.y)) {
@@ -6030,6 +9649,7 @@ async function xGetSSDStone() {
   }
   return xTemp[172];
 }
+
 
 // Encontra Baú (Odd/Treasure) acessível mais próximo → xTemp[171]
 async function xGetChest() {
@@ -6044,11 +9664,11 @@ async function xGetChest() {
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
     let canReach = false;
-	for (let s = 0; s < exList.length; s++) {
-		await xGetCanMove(exList[s], wyList[s]);
-		if (xCanMov) { canReach = true; break; }
-	}
-	if (!canReach) continue;
+        for (let s = 0; s < exList.length; s++) {
+                await xGetCanMove(exList[s], wyList[s]);
+                if (xCanMov) { canReach = true; break; }
+        }
+        if (!canReach) continue;
     if (!xTemp[171] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y)) {
@@ -6057,6 +9677,7 @@ async function xGetChest() {
   }
   return xTemp[171];
 }
+
 
 // Pega o drop mais próximo da lista de permitidos
 async function xPickSpecificDrop() {
@@ -6078,6 +9699,7 @@ async function xPickSpecificDrop() {
   for (let i = 0; i < 3; i++) { await xDoPickUp(); await xDelay(150); }
   return true;
 }
+
 
 // Versão do xGetMobByName adaptada para mining (prioriza mobs atacando)
 async function xGetMobByNameMining(nameList) {
@@ -6102,7 +9724,9 @@ async function xGetMobByNameMining(nameList) {
   return xTemp[13];
 }
 
+
 // ── HELPER: pickup de todos os IDs de gear ────────────────────
+
 
 async function xPickupAllGear(...ids) {
   for (const id of ids) {
@@ -6113,7 +9737,9 @@ async function xPickupAllGear(...ids) {
   }
 }
 
+
 // ── HELPER: equipa slots 0,1,2 se desequipados ───────────────
+
 
 async function xEquipSlots() {
   if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(100); }
@@ -6122,21 +9748,27 @@ async function xEquipSlots() {
 }
 
 
+
+
 // ── xSSD BOT ──────────────────────────────────────────────────
+
 
 dsk.ssd = { enabled: false };
 
+
 dsk.setCmd('/ssd', () => {
   dsk.ssd.enabled = !dsk.ssd.enabled;
+
 
   if (dsk.ssd.enabled) {
     xWCID1 = inv[0]?.sprite;
     xWCID2 = inv[1]?.sprite;
     xWCID3 = inv[2]?.sprite;
-	xWCID4 = inv[3]?.sprite; // ← adiciona isso
+        xWCID4 = inv[3]?.sprite; // ← adiciona isso
     repItem = xGetItemNameBySlot(0) ?? '';
-	dsk.ssd.targetMode    = dsk.ssd.targetMode    ?? 'shiny'; // 'shiny' | 'stone' | 'both'
-	dsk.ssd.repairInPlace = dsk.ssd.repairInPlace ?? false;
+        dsk.ssd.targetMode    = dsk.ssd.targetMode    ?? 'shiny'; // 'shiny' | 'stone' | 'both'
+        dsk.ssd.repairInPlace = dsk.ssd.repairInPlace ?? false;
+
 
     if (!xWCID1 || !xWCID2 || !xWCID3 || !xWCID4) {
       dsk.localMsg('SSD: coloque itens nos slots 0, 1, 2 e 3 primeiro!', '#f55'); // ← atualiza mensagem
@@ -6144,15 +9776,16 @@ dsk.setCmd('/ssd', () => {
       return;
     }
 
+
     // ── Reset completo ao ligar ──────────────────────────────
     xGoing[110] = false;
     xMovingNow = false;
     xNeedsRep = false;
     RepTimer = 0;
-	xTemp[13] = myself; // ← reseta mob alvo
-	xTemp[170] = undefined; // ← reseta shiny
-	xTemp[171] = undefined; // ← reseta chest
-	xTemp[172] = undefined; // reseta stone
+        xTemp[13] = myself; // ← reseta mob alvo
+        xTemp[170] = undefined; // ← reseta shiny
+        xTemp[171] = undefined; // ← reseta chest
+        xTemp[172] = undefined; // reseta stone
     xTemp[70] = undefined; // força reinit waypoints
     xTemp[90] = undefined; // cache mob X
     xTemp[91] = undefined; // cache mob Y
@@ -6160,7 +9793,9 @@ dsk.setCmd('/ssd', () => {
     xTemp[93] = undefined; // cache wp Y
     target.id = me;
 
+
     dsk.localMsg(`SSD Bot: Ativado | ID1=${xWCID1} ID2=${xWCID2} ID3=${xWCID3}`, '#5f5');
+
 
     (async function loop() {
       while (dsk.ssd.enabled) {
@@ -6175,14 +9810,15 @@ dsk.setCmd('/ssd', () => {
       }
     })();
 
+
   } else {
     xGoing[110] = false;
     xMovingNow = false;
     xNeedsRep = false;
-	xTemp[13] = myself; // ← reseta mob alvo
-	xTemp[170] = undefined; // ← reseta shiny
-	xTemp[171] = undefined; // ← reseta chest
-	xTemp[172] = undefined; //reseta stone
+        xTemp[13] = myself; // ← reseta mob alvo
+        xTemp[170] = undefined; // ← reseta shiny
+        xTemp[171] = undefined; // ← reseta chest
+        xTemp[172] = undefined; //reseta stone
     xTemp[90] = undefined;
     xTemp[91] = undefined;
     xTemp[92] = undefined;
@@ -6192,12 +9828,15 @@ dsk.setCmd('/ssd', () => {
   }
 });
 
+
 async function xSSD() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
 
+
   if (connection?.readyState === 3) { xMovingNow = false; return; }
   if (!connection) { xMovingNow = false; return; }
+
 
   // Auto-reset se travar por mais de 10s
   if (xGoing[110] === true) {
@@ -6211,6 +9850,7 @@ async function xSSD() {
   }
   xGoing[110]     = true;
   xGoing._ssdTime = undefined;
+
 
   // ── INIT WAYPOINTS ──────────────────────────────────────────
   if (xTemp[70] === undefined) {
@@ -6228,6 +9868,8 @@ async function xSSD() {
   }
 
 
+
+
 // ── MODO REPARO ─────────────────────────────────────────────
   if (xNeedsRep) {
     if (dsk.ssd.repairInPlace) {
@@ -6238,6 +9880,7 @@ async function xSSD() {
     xGoing[110] = false;
     return;
   }
+
 
   // ── COMIDA ──────────────────────────────────────────────────
   const foodId = xGetSlotFood();
@@ -6251,6 +9894,8 @@ async function xSSD() {
     xGoing[110] = false;
     return;
   }
+
+
 
 
 // ── GEAR QUEBRADO ─────────────────────────────────────────────
@@ -6273,6 +9918,7 @@ async function xSSD() {
     }
   }
 
+
   // ── HP ────────────────────────────────────────────────────────
   if (hp_status.val <= 70 && hp_status.val >= 0.1) {
     await xHeal();
@@ -6283,6 +9929,7 @@ async function xSSD() {
     }
   }
 
+
 // ── SLOTS VAZIOS ─────────────────────────────────────────────
   if (!inv[0]?.sprite || !inv[1]?.sprite || !inv[2]?.sprite || !inv[3]?.sprite) {
     await xPickupAllGear(xWCID4, xWCID3, xWCID1, xWCID2);
@@ -6291,16 +9938,20 @@ async function xSSD() {
     return;
   }
 
+
 // ── SHINY / STONE ROCK ───────────────────────────────────────
   let xunhit = false;
   const _ssdMode = dsk.ssd.targetMode ?? 'shiny';
   const _stoneSprites = [-261, -618];
 
+
   if (_ssdMode === 'shiny' || _ssdMode === 'both') await xGetShiny();
   if (_ssdMode === 'rock'  || _ssdMode === 'both') await xGetSSDStone();
 
+
   const _ssdTarget  = xTemp[170] ?? xTemp[172];
   const _ssdIsShiny = xTemp[170] !== undefined;
+
 
   if (_ssdTarget && xTemp[13] === myself) {
     const sides = [
@@ -6311,9 +9962,11 @@ async function xSSD() {
       const wall = xGetWallByPos(myself.x + c.dx, myself.y + c.dy);
       if (!wall) continue;
 
+
       const isTarget = _ssdIsShiny
         ? wall.name === 'Shiny Rock'
         : (wall.name === 'Rock' || _stoneSprites.includes(wall.sprite)); // ← fix: era rockSprites
+
 
       if (isTarget) {
         xunhit = true;
@@ -6335,6 +9988,7 @@ async function xSSD() {
   // Inicializa blacklist de mobs se não existir
   if (!xTemp[100]) xTemp[100] = {};
 
+
   // Limpa entradas expiradas da blacklist
   const now100 = Date.now();
   Object.keys(xTemp[100]).forEach(id => {
@@ -6342,10 +9996,12 @@ async function xSSD() {
   });
   await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
 
+
   // Verifica se mob ainda existe no jogo
   if (xTemp[13] && xTemp[13] !== myself) {
     const mob  = xTemp[13];
     const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
+
 
     if (dist > 7) {
       xTemp[13] = myself;
@@ -6354,15 +10010,18 @@ async function xSSD() {
       return;
     }
 
+
     if (target.id !== mob.id) {
       target.id = mob.id;
       send({ type: 't', t: target.id });
     }
 
+
     // Inicializa rastreamento por ID do mob
     if (!xTemp[96] || xTemp[96].id !== mob.id) {
       xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
     }
+
 
     if (dist <= 1) {
       // Chegou — reseta rastreamento
@@ -6384,6 +10043,7 @@ async function xSSD() {
         return;
       }
 
+
       // Só tenta mover de novo se passou 2s desde a última tentativa
       const now = Date.now();
       if (!xMovingNow && now - xTemp[96].lastMove > 2000) {
@@ -6394,15 +10054,18 @@ async function xSSD() {
       }
     }
 
+
     xGoing[110] = false;
     return;
   }
+
 
   // Sem mob → reseta tudo e solta tecla
   target.id  = me;
   xTemp[13]  = myself;
   xTemp[90]  = undefined;
   xTemp[91]  = undefined;
+
 
   // ── PRIORIDADE 2: CHEST ──────────────────────────────────────
   await xGetChest();
@@ -6423,6 +10086,7 @@ async function xSSD() {
     return;
   }
 
+
   // ── PRIORIDADE 3: DROPS ──────────────────────────────────────
   if (await xPickSpecificDrop()) {
     xGoing[110] = false;
@@ -6433,11 +10097,14 @@ async function xSSD() {
   if (_ssdTarget) {
     if (inv[3]?.equip === 0) { xDoUseSlot(3); await xDelay(400); }
 
+
     if (xTemp[97]?.x === _ssdTarget.x && xTemp[97]?.y === _ssdTarget.y) {
+
 
       if (!xMovingNow) {
         // Marca o tempo que parou de mover pela primeira vez
         if (!xTemp[98]) xTemp[98] = Date.now();
+
 
         // Só blacklista se ficou parado sem chegar por mais de 15 segundos
         if (Date.now() - xTemp[98] > 15000) {
@@ -6452,12 +10119,14 @@ async function xSSD() {
           return;
         }
 
+
         // Tenta mover de novo
         xDoMove(_ssdTarget.x, _ssdTarget.y);
       } else {
         // Ainda andando → reseta o timer (não está travado)
         xTemp[98] = 0;
       }
+
 
     } else {
       // Novo alvo → reseta tudo
@@ -6467,14 +10136,17 @@ async function xSSD() {
       xDoMove(_ssdTarget.x, _ssdTarget.y);
     }
 
+
     xGoing[110] = false;
     return;
   }
+
 
   // ── PRIORIDADE 5: WAYPOINTS ──────────────────────────────────
   const wpX    = WCPosListX[xTemp[70]];
   const wpY    = WCPosListY[xTemp[70]];
   const distWP = xGetDistance(myself.x, myself.y, wpX, wpY);
+
 
   if (distWP <= 2) {
     if (xTemp[70] >= xTemp[71]) {
@@ -6484,6 +10156,7 @@ async function xSSD() {
     } else {
       xTemp[70]++;
     }
+
 
 if (RepTimer >= wcaveRepVoltas) {
       dsk.localMsg('SSD: indo reparar...', '#ff0');
@@ -6495,9 +10168,11 @@ if (RepTimer >= wcaveRepVoltas) {
       if (!dsk.ssd.repairInPlace) await xDoMove(94, 93); // ← só move fixo se não for in-place
     }
 
+
     xGoing[110] = false;
     return;
   }
+
 
   // Move para waypoint
   if (xTemp[92] !== wpX || xTemp[93] !== wpY) {
@@ -6510,8 +10185,10 @@ if (RepTimer >= wcaveRepVoltas) {
     xDoMove(wpX, wpY);
   }
 
+
   xGoing[110] = false;
 }
+
 
 async function xSSDRepairInPlace() {
   // ── Mob check ────────────────────────────────────────────────
@@ -6530,11 +10207,12 @@ async function xSSDRepairInPlace() {
     return;
   }
 
+
   // ── FASE 1: ainda tem gear → dropa tudo ──────────────────────
   const hasGear = inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite || inv[3]?.sprite;
   if (hasGear) {
-	xMovingNow = false;  // ← garante parado antes de dropa
-	xDoKeyUp(6);
+        xMovingNow = false;  // ← garante parado antes de dropa
+        xDoKeyUp(6);
     await xDelay(900);   // ← aguarda parar completamente
     xTemp[94]  = myself.x;
     xTemp[95]  = myself.y;
@@ -6547,6 +10225,7 @@ async function xSSDRepairInPlace() {
     return;
   }
 
+
   // ── FASE 2: move para tile adjacente livre ───────────────────
   const kitSlot = xGetSlotByID(719);
   if (kitSlot === undefined) {
@@ -6555,8 +10234,10 @@ async function xSSDRepairInPlace() {
     return;
   }
 
+
   const dropX = xTemp[94] ?? myself.x;
   const dropY = xTemp[95] ?? myself.y;
+
 
   // Calcula o tile adjacente UMA VEZ e guarda no cache
   if (xTemp[104] === undefined || xTemp[105] === undefined) {
@@ -6567,6 +10248,7 @@ async function xSSDRepairInPlace() {
       { x: dropX,     y: dropY - 1 },
     ].find(t => !xGetSolidByID(t.x, t.y));
 
+
     if (!adjFree) {
       dsk.localMsg('SSD in-place: sem tile livre adjacente!', '#f55');
       xNeedsRep = false; RepTimer = 0;
@@ -6576,6 +10258,7 @@ async function xSSDRepairInPlace() {
     xTemp[105] = adjFree.y;
   }
 
+
   // Move para o tile cacheado, só se ainda não chegou
   if (myself.x !== xTemp[104] || myself.y !== xTemp[105]) {
     if (!xMovingNow) {
@@ -6584,6 +10267,7 @@ async function xSSDRepairInPlace() {
     return; // aguarda chegada sem recalcular
   }
 
+
   // ── FASE 3: equipa kit ───────────────────────────────────────
   if (inv[kitSlot]?.equip === 0) {
     await xDoUseSlot(kitSlot);
@@ -6591,16 +10275,19 @@ async function xSSDRepairInPlace() {
     return;
   }
 
+
   // ── FASE 4: vira para os itens dropados ─────────────────────
   const dx = dropX - myself.x;
   const dy = dropY - myself.y;
   const facingDir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+
 
   if (myself.dir !== facingDir) {
     await xDoChangeDir(facingDir);
     await xDelay(300);
     return;
   }
+
 
   // ── FASE 5: repara ───────────────────────────────────────────
   if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
@@ -6623,6 +10310,7 @@ async function xSSDRepairInPlace() {
   }
 }
 
+
 // ── REPARO ────────────────────────────────────────────────────
 async function xSSDRepair() {
   if (dsk.ssd.repairInPlace) { await xSSDRepairInPlace(); return; }
@@ -6640,6 +10328,7 @@ async function xSSDRepair() {
     return;
   }
 
+
   // Verifica mobs durante reparo
   for (let i in mobs.items) {
     const mob = mobs.items[i];
@@ -6647,6 +10336,7 @@ async function xSSDRepair() {
     if (xPlyrTest(mob)) continue; // ignora jogadores
     const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
     if (dist > 6) continue;
+
 
     const wc3 = xGetItemByID(xWCID3);
     if (wc3) {
@@ -6656,6 +10346,7 @@ async function xSSDRepair() {
       for (let p = 0; p < 3; p++) { xDoPickUp(); await xDelay(100); }
     }
     await xEquipSlots();
+
 
     await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon');
     if (xTemp[13] && xTemp[13] !== myself) {
@@ -6667,6 +10358,7 @@ async function xSSDRepair() {
     }
     return;
   }
+
 
   // Drop gear para reparar
   if (inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite) {
@@ -6682,6 +10374,7 @@ async function xSSDRepair() {
     return;
   }
 
+
   // Executa reparo
   if (myself.x === 94 && myself.y === 92 && myself.dir === 2) {
     if (inv[xGetSlotByID(719)]?.equip === 0) {
@@ -6694,6 +10387,7 @@ async function xSSDRepair() {
       xDoKeyUp(6);
       await xDelay(300);
 
+
       const wc3 = xGetItemByID(xWCID3);
       if (wc3) {
         xMovingNow = false;
@@ -6702,6 +10396,7 @@ async function xSSDRepair() {
         for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(150); }
       }
       await xEquipSlots();
+
 
       xNeedsRep = false;
       RepTimer  = 0;
@@ -6720,12 +10415,16 @@ async function xSSDRepair() {
   }
 }
 
+
 // ── MINING BOT ────────────────────────────────────────────────
+
 
 dsk.mining = { enabled: false };
 
+
 dsk.setCmd('/mining', () => {
   dsk.mining.enabled = !dsk.mining.enabled;
+
 
   if (dsk.mining.enabled) {
     xWCID1 = inv[0]?.sprite;
@@ -6734,14 +10433,17 @@ dsk.setCmd('/mining', () => {
     xWCID4 = inv[3]?.sprite; // picareta
     repItem = xGetItemNameBySlot(0) ?? '';
 
+
     if (!xWCID1 || !xWCID2 || !xWCID3 || !xWCID4) {
       dsk.localMsg('Mining: coloque itens nos slots 0-3 primeiro! (0=arma,1=escudo,2=armadura,3=picareta)', '#f55');
       dsk.mining.enabled = false;
       return;
     }
 
+
     xTemp[70] = undefined; // força reinit dos waypoints
     dsk.localMsg(`Mining Bot: Ativado | Picareta ID=${xWCID4}`, '#5f5');
+
 
     (async function loop() {
       while (dsk.mining.enabled) {
@@ -6758,6 +10460,7 @@ dsk.setCmd('/mining', () => {
   }
 });
 
+
 async function uMining() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
@@ -6765,6 +10468,7 @@ async function uMining() {
   else if (!connection) xMovingNow = false;
   if (xGoing[110] === true) return;
   xGoing[110] = true;
+
 
   // ── REPARO ──────────────────────────────────────────────────
   if (xNeedsRep) {
@@ -6777,11 +10481,13 @@ async function uMining() {
       return;
     }
 
+
     // Mob check durante reparo
     for (let i in mobs.items) {
       const mob = mobs.items[i];
       if (!mob || mob === myself) continue;
       const mobDist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
 
       if (mobDist <= 6) {
         await xDoKeyUp(6);
@@ -6798,6 +10504,7 @@ async function uMining() {
         return;
       }
 
+
       if (mob.id?.toString() in player_dict) {
         dsk.localMsg('Jogador detectado!', '#f55');
         xDoKeyUp(6);
@@ -6813,6 +10520,7 @@ async function uMining() {
         return;
       }
     }
+
 
     // Drop gear para reparar
     if (inv[0]?.sprite) {
@@ -6872,20 +10580,24 @@ async function uMining() {
     return;
   }
 
+
   // ── COMIDA ──────────────────────────────────────────────────
   const foodSlot = xGetSlotFood();
   if (foodSlot !== undefined) {
     if (hunger_status.val <= 65) { dsk.localMsg('Comendo...', '#0ff'); xDoUseSlotByID(foodSlot); await xDelay(2000); }
   } else { xDoLogOff(); }
 
+
   // ── EQUIP QUEBRADO → sai ─────────────────────────────────────
   if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2) { xDoLogOff(); await xDelay(100); }
+
 
   // ── HP ────────────────────────────────────────────────────────
   if (hp_status.val <= 72 && hp_status.val >= 0.1) {
     xHeal();
     if (hp_status.val <= 40) { xDoLogOff(); await xDelay(100); }
   }
+
 
   // ── SLOTS VAZIOS ─────────────────────────────────────────────
   const pickAll = async () => {
@@ -6897,6 +10609,7 @@ async function uMining() {
   if (!inv[3]?.sprite) { await pickAll(); xDoLogOff(); }
   if (!inv[5]?.sprite) { xDoLogOff(); }
 
+
   // ── INIT WAYPOINTS DE MINERAÇÃO ──────────────────────────────
   if (xTemp[70] === undefined) {
     xTemp[70] = 0;
@@ -6906,66 +10619,76 @@ async function uMining() {
     for (let i = 0; i < mx.length; i++) { WCMiningListX[i] = mx[i]; WCMiningListY[i] = my[i]; }
   }
 
-	// ── BUSCA MOB ────────────────────────────────────────────────
-	await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
 
-	if (xTemp[13] && xTemp[13] !== myself) {
-	  const mob = xTemp[13];
-	  const distMob = xGetDistance(mob.x, mob.y, myself.x, myself.y);
+        // ── BUSCA MOB ────────────────────────────────────────────────
+        await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
 
-	  // Seleciona alvo
-	  if (target.id !== mob.id) {
-		target.id = mob.id;
-		send({ type: 't', t: mob.id });
-	  }
 
-	  if (distMob === 0) {
-		// Mesmo tile — tenta sair para adjacente livre
-		const escapes = [
-		  { x: myself.x + 1, y: myself.y, dir: 1 },
-		  { x: myself.x - 1, y: myself.y, dir: 3 },
-		  { x: myself.x,     y: myself.y - 1, dir: 0 },
-		  { x: myself.x,     y: myself.y + 1, dir: 2 },
-		];
-		const free = escapes.find(t => !xGetSolidByID(t.x, t.y));
-		if (free) { await xDoMove(free.x, free.y); await xDelay(300); }
+        if (xTemp[13] && xTemp[13] !== myself) {
+          const mob = xTemp[13];
+          const distMob = xGetDistance(mob.x, mob.y, myself.x, myself.y);
 
-	  } else if (distMob === 1) {
-		// Adjacente — vira para o mob e ataca
-		const dx = mob.x - myself.x;
-		const dy = mob.y - myself.y;
-		const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === -1 ? 0 : 2;
-		if (myself.dir !== dir) { await xDoChangeDir(dir); await xDelay(150); }
-		await xDelay(200);
 
-	  } else if (distMob <= 3) {
-		// Longe — move até o mob
-		await xDoMove(mob.x, mob.y);
-		await xDelay(400);
-		// Confirma chegada — desiste se ainda longe
-		if (xGetDistance(mob.x, mob.y, myself.x, myself.y) > 3) {
-		  target.id = me;
-		}
-	  } else {
-		// Muito longe — desiste
-		target.id = me;
-	  }
-	}
+          // Seleciona alvo
+          if (target.id !== mob.id) {
+                target.id = mob.id;
+                send({ type: 't', t: mob.id });
+          }
+
+
+          if (distMob === 0) {
+                // Mesmo tile — tenta sair para adjacente livre
+                const escapes = [
+                  { x: myself.x + 1, y: myself.y, dir: 1 },
+                  { x: myself.x - 1, y: myself.y, dir: 3 },
+                  { x: myself.x,     y: myself.y - 1, dir: 0 },
+                  { x: myself.x,     y: myself.y + 1, dir: 2 },
+                ];
+                const free = escapes.find(t => !xGetSolidByID(t.x, t.y));
+                if (free) { await xDoMove(free.x, free.y); await xDelay(300); }
+
+
+          } else if (distMob === 1) {
+                // Adjacente — vira para o mob e ataca
+                const dx = mob.x - myself.x;
+                const dy = mob.y - myself.y;
+                const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === -1 ? 0 : 2;
+                if (myself.dir !== dir) { await xDoChangeDir(dir); await xDelay(150); }
+                await xDelay(200);
+
+
+          } else if (distMob <= 3) {
+                // Longe — move até o mob
+                await xDoMove(mob.x, mob.y);
+                await xDelay(400);
+                // Confirma chegada — desiste se ainda longe
+                if (xGetDistance(mob.x, mob.y, myself.x, myself.y) > 3) {
+                  target.id = me;
+                }
+          } else {
+                // Muito longe — desiste
+                target.id = me;
+          }
+        }
+
 
   // ── SOLTA TECLA SE TEM MOB ───────────────────────────────────
   if (xTemp[13] && xTemp[13] !== myself && keySpace.isDown) {
     await xDoKeyUp(6); xDoKeyUp(6); await xDelay(50);
   }
 
+
   // ── EQUIPA GEAR SE TEM MOB ───────────────────────────────────
   if ((xTemp[13] && xTemp[13] !== myself) || xTemp[19] === undefined) {
     await xEquipSlots();
   }
 
+
   // ── MINERAÇÃO ────────────────────────────────────────────────
   if ((!xTemp[13] || xTemp[13] === myself) && xTemp[19] !== undefined) {
     if (xTemp[80] !== xTemp[19]) { xTemp[80] = xTemp[19]; await xDoKeyUp(6); }
     xDoMoveToID(xTemp[19]);
+
 
     if (isRockNextToMe()) {
       const rockSprites = [-261, -618, -518];
@@ -6992,10 +10715,12 @@ async function uMining() {
     }
   }
 
+
   // ── SOLTA TECLA SE PEDRA SUMIU ───────────────────────────────
   if (xTemp[19] === undefined && keySpace.isDown) {
     xDoKeyUp(6); xTemp[80] = undefined; await xDelay(50); await xDoKeyUp(6);
   }
+
 
   // ── LIMPA xTemp[19] SE PEDRA SUMIU ───────────────────────────
   if (xTemp[19] !== undefined) {
@@ -7011,10 +10736,12 @@ async function uMining() {
     }
   }
 
+
   // ── PROCURA ROCHA ────────────────────────────────────────────
   if ((!xTemp[13] || xTemp[13] === myself) && !keySpace.isDown) {
     WCFindRocks();
   }
+
 
   // ── NAVEGAÇÃO ENTRE WAYPOINTS ────────────────────────────────
   if (!xTemp[13] || xTemp[13] === myself) {
@@ -7034,116 +10761,582 @@ async function uMining() {
     }
   }
 
+
   xGoing[110] = false;
 }
 
-// ── CONFIG PANEL COMPARTILHADO (SSD + Mining) ─────────────────
 
-dsk.miningManager = jv.Dialog.create(260, 260);
-const minm = dsk.miningManager;
-minm.visible = false;
+// ── LOOT TRACKER (global) ─────────────────────────────────────
+window.mineHubLoot = window.mineHubLoot ?? {
+  enabled: false,
+  items:   {},      // { spriteId: { name, count } }
+  _dirty:  false,
+  _prev:   null,
 
-minm.header = jv.text('Mining / SSD Config', {
-  font: '13px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
+
+  _snap() {
+    const t = {};
+    if (typeof item_data === 'undefined') return t;
+    for (let i = 0; i < 75; i++) {
+      const it = item_data[i];
+      if (!it || !it.spr || it.spr === 791) continue;
+      if (!t[it.spr]) t[it.spr] = { name: it.n || `#${it.spr}`, qty: 0 };
+      t[it.spr].qty += it.qty ?? 1;
+    }
+    return t;
+  },
+
+
+  _diff(prev, curr) {
+    for (const spr in curr) {
+      const gained = curr[spr].qty - (prev[spr]?.qty ?? 0);
+      if (gained <= 0) continue;
+      if (!this.items[spr]) this.items[spr] = { name: curr[spr].name, count: 0 };
+      this.items[spr].count += gained;
+      this._dirty = true;
+    }
+  },
+
+
+  start()  { this.enabled = true;  this._prev = this._snap(); },
+  reset()  { this.items = {}; this._dirty = true; this._prev = this._snap(); },
+  stop()   { this.enabled = false; },
+  get total() { return Object.values(this.items).reduce((s, v) => s + v.count, 0); },
+};
+
+
+dsk.on('postPacket:inv', () => {
+  if (!mineHubLoot.enabled) return;
+  if (!mineHubLoot._prev) { mineHubLoot.start(); return; }
+  const curr = mineHubLoot._snap();
+  mineHubLoot._diff(mineHubLoot._prev, curr);
+  mineHubLoot._prev = curr;
 });
-minm.addChild(minm.header);
-jv.center(minm.header);
-jv.top(minm.header, 4);
 
-minm.close = jv.Button.create(0, 0, 24, 'X', minm, 24);
-jv.top(minm.close, 4); jv.right(minm.close, 4);
-minm.close.on_click = () => (minm.visible = 0);
 
-minm.move = jv.Button.create(0, 0, 24, '@', minm, 24);
-jv.top(minm.move, 4); jv.right(minm.move, 28);
+// ── MINE HUB ──────────────────────────────────────────────────
+(function () {
+  let panel      = null;
+  let ticker     = null;
+  let lootListEl = null;
 
-minm._px = 0; minm._py = 0;
-window.addEventListener('mousemove', e => { minm._px = e.clientX; minm._py = e.clientY; });
-window.addEventListener('touchmove', e => { minm._px = e.touches[0].clientX; minm._py = e.touches[0].clientY; });
 
-minm.updatePosition = () => {
-  if (minm.move.is_pressed) {
-    const canvas = document.querySelector('canvas');
-    const rect = canvas ? canvas.getBoundingClientRect() : { left: 0, top: 0, width: jv.game_width, height: jv.game_height };
-    minm.x = (minm._px - rect.left) * (jv.game_width / rect.width) - minm.w / 2;
-    minm.y = (minm._py - rect.top) * (jv.game_height / rect.height) - 12;
+  // Compat com menu (state: () => !!minm?.visible)
+  window.minm       = { get visible() { return !!panel; } };
+  dsk.miningManager = window.minm;
+
+
+  // ── Micro helpers ─────────────────────────────────────────────
+  function mkEl(tag, css, text) {
+    const e = document.createElement(tag);
+    if (css)  Object.assign(e.style, css);
+    if (text !== undefined) e.textContent = text;
+    return e;
   }
-  if (minm.x < 0) minm.x = 0;
-  if (minm.y < 0) minm.y = 0;
-  if (minm.x + minm.w > jv.game_width)  minm.x = jv.game_width - minm.w;
-  if (minm.y + minm.h > jv.game_height) minm.y = jv.game_height - minm.h;
-};
-dsk.on('postLoop', minm.updatePosition);
 
-const minLbl = (txt, y) => {
-  const l = jv.text(txt, { font: '11px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  l.x = 10; l.y = y; minm.addChild(l); return l;
-};
 
-minm.lblWP      = minLbl('Waypoint: -',       38);
-minm.lblRep     = minLbl('RepTimer: -',        53);
-minm.lblNeeds   = minLbl('Needs Repair: não',  68);
-minm.lblHP      = minLbl('HP: -',              83);
-minm.lblHunger  = minLbl('Fome: -',            98);
-minm.lblMob     = minLbl('Mob: -',            113);
-minm.lblRock    = minLbl('Rock ID: -',         128);
-minm.lblPickaxe = minLbl('Picareta ID: -',     143);
+  function mkBtn(text, color, onClick, extra) {
+    const b = mkEl('button', {
+      padding: '4px 10px', borderRadius: '6px',
+      border: `1px solid ${color}`, background: '#16162a',
+      color, cursor: 'pointer', fontSize: '10px', fontFamily: 'Verdana',
+      transition: 'background .15s', ...extra,
+    }, text);
+    b.onmouseenter = () => b.style.background = '#2a2a4a';
+    b.onmouseleave = () => b.style.background = '#16162a';
+    b.onclick = onClick;
+    return b;
+  }
 
-dsk.on('postLoop', () => {
-  if (!minm.visible) return;
-  minm.lblWP.text      = `Waypoint: ${xTemp[70] ?? 0} / ${xTemp[71] ?? '-'}`;
-  minm.lblRep.text     = `RepTimer: ${RepTimer ?? 0}`;
-  minm.lblNeeds.text   = `Needs Repair: ${xNeedsRep ? 'SIM ⚠' : 'não'}`;
-  minm.lblHP.text      = `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`;
-  minm.lblHunger.text  = `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`;
-  minm.lblMob.text     = `Mob: ${xTemp[13]?.name ?? 'nenhum'}`;
-  minm.lblRock.text    = `Rock ID: ${xTemp[19] ?? '-'}`;
-  minm.lblPickaxe.text = `Picareta ID: ${xWCID4 ?? '-'}`;
-});
 
-const btnResetMin = jv.Button.create(0, 0, 115, 'Reset Waypoint', minm, 20);
-btnResetMin.x = 10; btnResetMin.y = 162;
-btnResetMin.on_click = () => { xTemp[70] = 0; RepTimer = 0; xNeedsRep = false; dsk.localMsg('Mining: reset!', '#ff0'); };
+  function mkSmBtn(text, onClick) {
+    const b = mkEl('button', {
+      width: '22px', height: '22px', padding: '0',
+      borderRadius: '4px', border: '1px solid #444',
+      background: '#16162a', color: '#ccc',
+      cursor: 'pointer', fontSize: '13px', lineHeight: '1',
+    }, text);
+    b.onmouseenter = () => b.style.background = '#2a2a4a';
+    b.onmouseleave = () => b.style.background = '#16162a';
+    b.onclick = onClick;
+    return b;
+  }
 
-const btnForceRepMin = jv.Button.create(0, 0, 115, 'Forçar Reparo', minm, 20);
-btnForceRepMin.x = 130; btnForceRepMin.y = 162;
-btnForceRepMin.on_click = () => { xNeedsRep = true; dsk.localMsg('Mining: reparo forçado!', '#ff0'); };
 
-// ── SSD: Modo de alvo ─────────────────────────────────────────
-minLbl('── SSD Config ──', 182);
+  // Play/Stop button auto-update
+  function mkPlayBtn(stateGetter, onToggle) {
+    const b = mkEl('button', {
+      width: '100%', padding: '6px 0', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#fff', cursor: 'pointer', fontSize: '11px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    const upd = () => {
+      const on = stateGetter();
+      b.textContent       = on ? '⏹ Stop' : '▶ Play';
+      b.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      b.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+    };
+    b.onclick = () => { onToggle(); setTimeout(upd, 150); };
+    upd();
+    return { el: b, upd };
+  }
 
-minLbl('Alvo:', 200);
-const _ssdModes = ['shiny', 'stone', 'both'];
-const btnSsdTarget = jv.Button.create(60, 196, 80, dsk.ssd?.targetMode ?? 'shiny', minm, 20);
-btnSsdTarget.on_click = () => {
-  const idx = _ssdModes.indexOf(dsk.ssd.targetMode ?? 'shiny');
-  dsk.ssd.targetMode = _ssdModes[(idx + 1) % _ssdModes.length];
-  btnSsdTarget.title.text = dsk.ssd.targetMode;
-  dsk.localMsg(`SSD alvo: ${dsk.ssd.targetMode}`, '#0ff');
-};
 
-// ── SSD: Modo de reparo ───────────────────────────────────────
-minLbl('Reparo:', 224);
-const btnRepairMode = jv.Button.create(65, 222, 100, 'fixo', minm, 20);
-btnRepairMode.on_click = () => {
-  dsk.ssd.repairInPlace = !dsk.ssd.repairInPlace;
-  btnRepairMode.title.text = dsk.ssd.repairInPlace ? 'in-place' : 'fixo';
-  dsk.localMsg(`SSD reparo: ${dsk.ssd.repairInPlace ? 'in-place' : 'fixo'}`, '#0ff');
-};
+  // ── Loot renderer ─────────────────────────────────────────────
+  function redrawLoot() {
+    if (!lootListEl) return;
+    mineHubLoot._dirty = false;
+    lootListEl.innerHTML = '';
 
-// Atualiza botões em tempo real
-dsk.on('postLoop', () => {
-  if (!minm.visible) return;
-  if (btnSsdTarget) btnSsdTarget.title.text = dsk.ssd?.targetMode ?? 'shiny';
-  if (btnRepairMode) btnRepairMode.title.text = dsk.ssd?.repairInPlace ? 'in-place' : 'fixo';
-});
 
-dsk.setCmd('/miningconfig', () => {
-  minm.visible = !minm.visible;
-  dsk.localMsg(`Mining Config: ${minm.visible ? 'Aberto' : 'Fechado'}`, minm.visible ? '#5f5' : '#f55');
-});
+    const entries = Object.values(mineHubLoot.items)
+      .sort((a, b) => b.count - a.count);
+
+
+    if (!entries.length) {
+      const e = mkEl('div', {
+        color: '#444', fontSize: '10px', padding: '6px',
+        textAlign: 'center', fontStyle: 'italic',
+      }, 'Nenhum item coletado ainda...');
+      lootListEl.appendChild(e);
+      return;
+    }
+
+
+    entries.forEach(({ name, count }) => {
+      const row = mkEl('div', {
+        display: 'flex', justifyContent: 'space-between',
+        alignItems: 'center', padding: '3px 6px',
+        borderRadius: '4px', cursor: 'default', transition: 'background .1s',
+      });
+      row.onmouseenter = () => row.style.background = '#252540';
+      row.onmouseleave = () => row.style.background = 'transparent';
+      row.appendChild(mkEl('span', { color: '#c8c8e0', fontSize: '10px' }, name));
+      row.appendChild(mkEl('span', {
+        color: '#FFD700', fontSize: '10px', fontWeight: 'bold',
+        background: '#2a2010', padding: '1px 6px', borderRadius: '10px',
+        border: '1px solid #4a3a10',
+      }, `×${count}`));
+      lootListEl.appendChild(row);
+    });
+  }
+
+
+  // ── Build panel ───────────────────────────────────────────────
+  function createPanel() {
+    if (panel) { removePanel(); return; }
+
+
+    panel = mkEl('div', {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '318px',
+      background: 'linear-gradient(160deg, #1a1a2e 0%, #16162a 100%)',
+      border: '1px solid #3a3a5a',
+      borderRadius: '12px', boxShadow: '0 12px 40px rgba(0,0,0,.8)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif',
+      userSelect: 'none', display: 'flex', flexDirection: 'column',
+    });
+
+
+    // ── Header ───────────────────────────────────────────────
+    const hdr = mkEl('div', {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '9px 12px',
+      background: 'linear-gradient(90deg, #1e1e3a, #252545)',
+      borderRadius: '12px 12px 0 0',
+      cursor: 'move', borderBottom: '1px solid #3a3a5a',
+    });
+
+
+    const hdrLeft = mkEl('div', { display: 'flex', alignItems: 'center', gap: '8px' });
+    hdrLeft.appendChild(mkEl('span', { fontSize: '15px' }, '⛏️'));
+    hdrLeft.appendChild(mkEl('span', {
+      color: '#FFD700', fontWeight: 'bold', fontSize: '13px',
+      letterSpacing: '.5px',
+    }, 'Mine Hub'));
+
+
+    const xBtn = mkEl('button', {
+      background: 'none', border: '1px solid #444', color: '#888',
+      cursor: 'pointer', fontSize: '12px', padding: '2px 7px',
+      borderRadius: '4px', transition: 'all .15s',
+    }, '✕');
+    xBtn.onmouseenter = () => { xBtn.style.borderColor = '#f55'; xBtn.style.color = '#f55'; };
+    xBtn.onmouseleave = () => { xBtn.style.borderColor = '#444'; xBtn.style.color = '#888'; };
+    xBtn.onclick = removePanel;
+
+
+    hdr.appendChild(hdrLeft);
+    hdr.appendChild(xBtn);
+
+
+    // drag
+    let dg = false, ox = 0, oy = 0;
+    hdr.addEventListener('mousedown',  _startDg);
+    hdr.addEventListener('touchstart', _startDg, { passive: false });
+    function _startDg(e) {
+      if (e.target === xBtn) return;
+      e.preventDefault();
+      dg = true;
+      const _xy = _getXY(e);
+      const r = panel.getBoundingClientRect();
+      ox = _xy.x - r.left; oy = _xy.y - r.top;
+      panel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDgMove);
+    window.addEventListener('touchmove',  _onDgMove, { passive: false });
+    window.addEventListener('mouseup',  _onDgEnd);
+    window.addEventListener('touchend', _onDgEnd);
+    function _onDgMove(e) { if (!dg) return; const _xy = _getXY(e); panel.style.left = (_xy.x - ox) + 'px'; panel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDgEnd() { dg = false; }
+
+
+    const body = mkEl('div', {
+      padding: '10px 12px',
+      display: 'flex', flexDirection: 'column', gap: '8px',
+    });
+
+
+    // ── 3 Bot columns ─────────────────────────────────────────
+    const botGrid = mkEl('div', {
+      display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '7px',
+    });
+
+
+    const pBtns = {};
+
+
+    function addBotCol(id, emoji, label, stateGetter, onToggle, extra) {
+      const col = mkEl('div', {
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '5px',
+        background: '#1e1e38', borderRadius: '8px', padding: '8px 6px',
+        border: '1px solid #2a2a4a',
+      });
+
+
+      const lbl = mkEl('div', {
+        color: '#e0d8ff', fontSize: '11px', fontWeight: 'bold',
+        textAlign: 'center', lineHeight: '1.3',
+      });
+      lbl.innerHTML = `${emoji}<br>${label}`;
+      col.appendChild(lbl);
+
+
+      if (extra) col.appendChild(extra);
+
+
+      const pb = mkPlayBtn(stateGetter, onToggle);
+      col.appendChild(pb.el);
+      botGrid.appendChild(col);
+      pBtns[id] = pb;
+    }
+
+
+    addBotCol('ssd', '⛏', 'SSD',
+      () => !!dsk.ssd?.enabled,
+      () => dsk.commands['/ssd']()
+    );
+
+
+    addBotCol('mining', '🪨', 'Mining',
+      () => !!dsk.mining?.enabled,
+      () => dsk.commands['/mining']()
+    );
+
+
+    // Mine Bot: input + play
+    const mineInput = mkEl('input', {
+      width: '100%', padding: '3px 5px', borderRadius: '5px',
+      border: '1px solid #3a3a5a', background: '#12121e',
+      color: '#ddd', fontSize: '9px', boxSizing: 'border-box',
+      outline: 'none',
+    });
+    mineInput.placeholder = 'Nome do alvo...';
+    mineInput.value = dsk.mine?.targetName ?? '';
+    mineInput.oninput = () => { if (dsk.mine) dsk.mine.targetName = mineInput.value.trim(); };
+    mineInput.onfocus = () => mineInput.style.borderColor = '#7289DA';
+    mineInput.onblur  = () => mineInput.style.borderColor = '#3a3a5a';
+
+
+    addBotCol('mine', '🎯', 'Mine Bot',
+      () => !!dsk.mine?.enabled,
+      () => dsk.commands['/mine'](mineInput.value.trim() || (dsk.mine?.targetName ?? '')),
+      mineInput
+    );
+
+
+    body.appendChild(botGrid);
+
+
+    // ── Status grid ───────────────────────────────────────────
+    const statusBox = mkEl('div', {
+      background: '#0e0e1e', borderRadius: '8px', padding: '7px 10px',
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px',
+      border: '1px solid #2a2a3a',
+    });
+
+
+    const STATUS_ROWS = [
+      ['mh-wp',    'WP: -'],
+      ['mh-rep',   'Rep: -'],
+      ['mh-needs', 'Repair: não'],
+      ['mh-hp',    'HP: -'],
+      ['mh-hunger','Fome: -'],
+      ['mh-mob',   'Mob: -'],
+      ['mh-rock',  'Rock: -'],
+      ['mh-pick',  'Pick: -'],
+    ];
+
+
+    STATUS_ROWS.forEach(([id, txt]) => {
+      const e = mkEl('div', {
+        color: '#9090b0', fontSize: '10px',
+        whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+      }, txt);
+      e.id = id;
+      statusBox.appendChild(e);
+    });
+    body.appendChild(statusBox);
+
+
+    // ── Separator ─────────────────────────────────────────────
+    const sep = (text) => {
+      const d = mkEl('div', {
+        display: 'flex', alignItems: 'center', gap: '6px',
+        color: '#444', fontSize: '9px', letterSpacing: '1px',
+      }, '');
+      const l = mkEl('div', { flex: '1', height: '1px', background: '#2a2a4a' });
+      const r = mkEl('div', { flex: '1', height: '1px', background: '#2a2a4a' });
+      d.appendChild(l);
+      d.appendChild(mkEl('span', { color: '#555', fontSize: '9px', whiteSpace: 'nowrap' }, text));
+      d.appendChild(r);
+      return d;
+    };
+
+
+    body.appendChild(sep('⚙ SSD / MINING CONFIG'));
+
+
+    // SSD mode + repair mode
+    const cfgRow = mkEl('div', {
+      display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap',
+    });
+
+
+    cfgRow.appendChild(mkEl('span', { color: '#7a7a9a', fontSize: '10px' }, 'Alvo:'));
+    const _modes = ['shiny', 'stone', 'both'];
+    const ssdModeBtn = mkBtn(dsk.ssd?.targetMode ?? 'shiny', '#00bfff', () => {
+      const i = _modes.indexOf(dsk.ssd?.targetMode ?? 'shiny');
+      if (dsk.ssd) dsk.ssd.targetMode = _modes[(i + 1) % _modes.length];
+      ssdModeBtn.textContent = dsk.ssd?.targetMode ?? 'shiny';
+      dsk.localMsg(`SSD alvo: ${dsk.ssd?.targetMode}`, '#0ff');
+    });
+    cfgRow.appendChild(ssdModeBtn);
+
+
+    cfgRow.appendChild(mkEl('span', { color: '#7a7a9a', fontSize: '10px' }, 'Reparo:'));
+    const repBtn = mkBtn(dsk.ssd?.repairInPlace ? 'in-place' : 'fixo', '#9090b0', () => {
+      if (dsk.ssd) dsk.ssd.repairInPlace = !dsk.ssd.repairInPlace;
+      repBtn.textContent = dsk.ssd?.repairInPlace ? 'in-place' : 'fixo';
+      dsk.localMsg(`SSD reparo: ${repBtn.textContent}`, '#0ff');
+    });
+    cfgRow.appendChild(repBtn);
+    body.appendChild(cfgRow);
+
+
+    // Voltas p/ reparar
+    const voltasRow = mkEl('div', {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+    voltasRow.appendChild(mkEl('span', { color: '#7a7a9a', fontSize: '10px' }, 'Voltas p/ reparar:'));
+
+
+    const vWrap = mkEl('div', { display: 'flex', alignItems: 'center', gap: '5px' });
+    const voltasVal = mkEl('span', {
+      color: '#FFD700', fontSize: '12px', fontWeight: 'bold',
+      minWidth: '24px', textAlign: 'center',
+    }, String(window.wcaveRepVoltas ?? 3));
+
+
+    vWrap.appendChild(mkSmBtn('−', () => {
+      window.wcaveRepVoltas = Math.max(1, (window.wcaveRepVoltas ?? 3) - 1);
+      voltasVal.textContent = String(window.wcaveRepVoltas);
+    }));
+    vWrap.appendChild(voltasVal);
+    vWrap.appendChild(mkSmBtn('+', () => {
+      window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 3) + 1;
+      voltasVal.textContent = String(window.wcaveRepVoltas);
+    }));
+    voltasRow.appendChild(vWrap);
+    body.appendChild(voltasRow);
+
+
+    // Action buttons
+    const actRow = mkEl('div', { display: 'flex', gap: '6px' });
+    actRow.appendChild(mkBtn('↺ Reset WP', '#ffd700', () => {
+      xTemp[70] = undefined;
+      window.WCPosListX = new Array(250).fill(0);
+      window.WCPosListY = new Array(250).fill(0);
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('Mine Hub: WP resetado!', '#ff0');
+    }, { flex: '1' }));
+    actRow.appendChild(mkBtn('🔧 Forçar Rep', '#00bfff', () => {
+      window.xNeedsRep = true;
+      dsk.localMsg('Mine Hub: reparo forçado!', '#0cf');
+    }, { flex: '1' }));
+    body.appendChild(actRow);
+
+
+    // ── Loot section ──────────────────────────────────────────
+    body.appendChild(sep('🎒 LOOT TRACKER'));
+
+
+    const lootHdr = mkEl('div', {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+
+
+    const lootTitleEl = mkEl('span', {
+      color: '#9090b0', fontSize: '10px',
+    }, `🎒 ${mineHubLoot.total} itens coletados`);
+    lootTitleEl.id = 'mh-loot-title';
+
+
+    const lootBtnRow = mkEl('div', { display: 'flex', gap: '5px' });
+
+
+    let lootToggleBtn;
+    const updLootToggle = () => {
+      const on = mineHubLoot.enabled;
+      lootToggleBtn.textContent       = on ? '⏹ Stop' : '▶ Track';
+      lootToggleBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      lootToggleBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    };
+    lootToggleBtn = mkBtn('▶ Track', '#2ecc71', () => {
+      mineHubLoot.enabled ? mineHubLoot.stop() : mineHubLoot.start();
+      updLootToggle();
+    }, { padding: '3px 8px' });
+
+
+    const lootClear = mkBtn('🗑 Reset', '#e74c3c', () => {
+      mineHubLoot.reset(); redrawLoot();
+    }, { padding: '3px 8px' });
+
+
+    lootBtnRow.appendChild(lootToggleBtn);
+    lootBtnRow.appendChild(lootClear);
+    lootHdr.appendChild(lootTitleEl);
+    lootHdr.appendChild(lootBtnRow);
+    body.appendChild(lootHdr);
+
+
+    lootListEl = mkEl('div', {
+      maxHeight: '135px', overflowY: 'auto',
+      background: '#0e0e1e', borderRadius: '7px', padding: '4px 5px',
+      border: '1px solid #2a2a3a',
+    });
+
+
+    // Custom scrollbar styling
+    lootListEl.style.cssText += `
+      scrollbar-width: thin;
+      scrollbar-color: #3a3a5a #0e0e1e;
+    `;
+
+
+    body.appendChild(lootListEl);
+    redrawLoot();
+
+
+    // ── Tick (500ms) ─────────────────────────────────────────
+    ticker = setInterval(() => {
+      if (!panel) return;
+
+
+      // Play buttons
+      Object.values(pBtns).forEach(pb => pb.upd());
+
+
+      // Mine input sync (only if not focused)
+      if (document.activeElement !== mineInput) {
+        mineInput.value = dsk.mine?.targetName ?? '';
+      }
+
+
+      // Status
+      const $ = id => document.getElementById(id);
+      const s = (id, v) => { const e = $(id); if (e) e.textContent = v; };
+      const needColor = window.xNeedsRep ? '#ff6b6b' : '#6bff9e';
+
+
+      s('mh-wp',    `WP: ${xTemp[70] ?? 0}/${xTemp[71] ?? '-'}`);
+      s('mh-rep',   `Rep: ${window.RepTimer ?? 0}/${window.wcaveRepVoltas ?? 3}`);
+      s('mh-needs', window.xNeedsRep ? 'Repair: ⚠ SIM' : 'Repair: não');
+      s('mh-hp',    `HP: ${hp_status?.val?.toFixed(0) ?? '-'}%`);
+      s('mh-hunger',`Fome: ${hunger_status?.val?.toFixed(0) ?? '-'}%`);
+      s('mh-mob',   `Mob: ${xTemp[13]?.name ?? '-'}`);
+      s('mh-rock',  `Rock: ${xTemp[19] ?? '-'}`);
+      s('mh-pick',  `Pick ID: ${window.xWCID4 ?? '-'}`);
+
+
+      const needEl = $('mh-needs');
+      if (needEl) needEl.style.color = needColor;
+
+
+      // Config button sync
+      ssdModeBtn.textContent = dsk.ssd?.targetMode ?? 'shiny';
+      repBtn.textContent     = dsk.ssd?.repairInPlace ? 'in-place' : 'fixo';
+      voltasVal.textContent  = String(window.wcaveRepVoltas ?? 3);
+      updLootToggle();
+
+
+      // Loot title
+      const lt = $('mh-loot-title');
+      if (lt) lt.textContent = `${mineHubLoot.total} itens coletados`;
+
+
+      // Loot list (only on dirty)
+      if (mineHubLoot._dirty) redrawLoot();
+
+
+    }, 500);
+
+
+    panel.appendChild(hdr);
+    panel.appendChild(body);
+    document.body.appendChild(panel);
+
+
+    // Auto-inicia o loot tracker ao abrir o hub
+    if (!mineHubLoot.enabled) { mineHubLoot.start(); updLootToggle(); }
+  }
+
+
+  function removePanel() {
+    clearInterval(ticker);
+    ticker     = null;
+    lootListEl = null;
+    if (panel) { panel.remove(); panel = null; }
+  }
+
+
+  dsk.setCmd('/minehub', () => {
+    if (panel) { removePanel(); dsk.localMsg('Mine Hub: Fechado', '#f55'); }
+    else       { createPanel(); dsk.localMsg('Mine Hub: Aberto',  '#5f5'); }
+  });
+
+
+  // Compat: /miningconfig agora abre o Mine Hub
+  dsk.setCmd('/miningconfig', () => dsk.commands['/minehub']());
+
+
+})();
+
 
 // ── SKILL ROTATION BOT ────────────────────────────────────────
+
 
 window.rotationConfig = window.rotationConfig ?? {
   cookLevel:   30,
@@ -7170,7 +11363,10 @@ window.rotationConfig = window.rotationConfig ?? {
   },
 };
 
+
 dsk.rotation = { enabled: false, step: '-', phase: '-' };
+
+
 
 
 // ── Espera chegar na posição exata ────────────────────────────
@@ -7195,8 +11391,10 @@ async function rotMoveTo(x, y, timeout) {
 }
 // ── Liga/Desliga ──────────────────────────────────────────────
 
+
 dsk.setCmd('/rotation', () => {
   dsk.rotation.enabled = !dsk.rotation.enabled;
+
 
   if (!dsk.rotation.enabled) {
     dsk.cooking.enabled  = false;
@@ -7212,32 +11410,39 @@ dsk.setCmd('/rotation', () => {
     return;
   }
 
+
   dsk.localMsg('Skill Rotation: Iniciando', '#5f5');
   rotRun();
 });
 
+
 // ── Loop principal ────────────────────────────────────────────
+
 
 async function rotRun() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
 
   // ── STEP 1: COOK ─────────────────────────────────────────
   if (!rotationConfig.skipCook) {
     dsk.rotation.step  = 'cook';
     dsk.rotation.phase = 'nav';
 
+
     dsk.localMsg('Rotation → indo para Cook...', '#0ff');
     await rotMoveTo(rotationConfig.pos.cook.x, rotationConfig.pos.cook.y);
+
 
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.cookLevel;
     skillName    = 'cooking';
     cookPositionX = rotationConfig.pos.cook.x;
     cookPositionY = rotationConfig.pos.cook.y;
-	skillLevel = 0;
+        skillLevel = 0;
     dsk.cooking.enabled = true;
     dsk.localMsg(`Rotation → Cook até nível ${currentLevel}`, '#5f5');
+
 
     (async () => {
       while (dsk.cooking.enabled && dsk.rotation.enabled) {
@@ -7246,12 +11451,14 @@ async function rotRun() {
       }
     })();
 
+
     while (dsk.cooking.enabled && dsk.rotation.enabled) await xDelay(2000);
     if (!dsk.rotation.enabled) return;
 
+
     dsk.rotation.phase = 'cleanup';
     dsk.cooking.enabled = false;
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     dsk.localMsg('Rotation → Cook pronto! Dropando...', '#ff0');
     await xDelay(500);
     for (const slot of [1, 2, 3]) {
@@ -7260,15 +11467,19 @@ async function rotRun() {
     await xDelay(500);
   }
 
+
   if (!dsk.rotation.enabled) return;
+
 
   // ── STEP 2: SMELT ─────────────────────────────────────────
   if (!rotationConfig.skipSmelt) {
     dsk.rotation.step  = 'smelt';
     dsk.rotation.phase = 'nav';
 
+
     dsk.localMsg('Rotation → indo para Smelt...', '#0ff');
     await rotMoveTo(rotationConfig.pos.smelt.x, rotationConfig.pos.smelt.y);
+
 
     for (const id of [539, 538]) {
       if (xGetSlotByID(id) !== undefined) {
@@ -7278,14 +11489,16 @@ async function rotRun() {
       }
     }
 
+
     dsk.rotation.phase = 'bot';
     currentLevel  = rotationConfig.smeltLevel;
     skillName     = 'smelting';
     smeltPositionX = rotationConfig.pos.smelt.x;
     smeltPositionY = rotationConfig.pos.smelt.y;
-	skillLevel = 0;
+        skillLevel = 0;
     dsk.smelting.enabled = true;
     dsk.localMsg(`Rotation → Smelt até nível ${currentLevel}`, '#5f5');
+
 
     (async () => {
       while (dsk.smelting.enabled && dsk.rotation.enabled) {
@@ -7294,12 +11507,14 @@ async function rotRun() {
       }
     })();
 
+
     while (dsk.smelting.enabled && dsk.rotation.enabled) await xDelay(2000);
     if (!dsk.rotation.enabled) return;
 
+
     dsk.rotation.phase = 'cleanup';
     dsk.smelting.enabled = false;
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     dsk.localMsg('Rotation → Smelt pronto! Dropando...', '#ff0');
     await xDelay(500);
     for (const slot of [1, 2, 3, 4, 5, 6]) {
@@ -7308,12 +11523,15 @@ async function rotRun() {
     await xDelay(500);
   }
 
+
   if (!dsk.rotation.enabled) return;
+
 
   // ── STEP 3: SWORD ─────────────────────────────────────────
   if (!rotationConfig.skipSword) {
     dsk.rotation.step  = 'sword';
     dsk.rotation.phase = 'nav';
+
 
     dsk.localMsg('Rotation → indo buscar espada...', '#0ff');
     await rotMoveTo(rotationConfig.pos.sword.x, rotationConfig.pos.sword.y);
@@ -7324,12 +11542,14 @@ async function rotRun() {
     await xDoChangeDir(0);
     await xDelay(500);
 
+
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.swordLevel;
     skillName    = 'sword';
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     dsk.sword.enabled = true;
     dsk.localMsg(`Rotation → Sword até nível ${currentLevel}`, '#5f5');
+
 
     (async () => {
       while (dsk.sword.enabled && dsk.rotation.enabled) {
@@ -7338,24 +11558,29 @@ async function rotRun() {
       }
     })();
 
+
     while (dsk.sword.enabled && dsk.rotation.enabled) await xDelay(2000);
     if (!dsk.rotation.enabled) return;
 
+
     dsk.rotation.phase = 'cleanup';
     dsk.sword.enabled = false;
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     xDoKeyUp(6);
     await xDelay(400);
     await xDoDropSlot(1, 1);
     await xDelay(500);
   }
 
+
   if (!dsk.rotation.enabled) return;
+
 
   // ── STEP 4: HAMMER ─────────────────────────────────────────
   if (!rotationConfig.skipHammer) {
     dsk.rotation.step  = 'hammer';
     dsk.rotation.phase = 'nav';
+
 
     dsk.localMsg('Rotation → indo buscar martelo...', '#0ff');
     await rotMoveTo(rotationConfig.pos.hammer.x, rotationConfig.pos.hammer.y);
@@ -7366,12 +11591,14 @@ async function rotRun() {
     await xDoChangeDir(0);
     await xDelay(500);
 
+
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.hammerLevel;
     skillName    = 'hammer';
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     dsk.hammer.enabled = true;
     dsk.localMsg(`Rotation → Hammer até nível ${currentLevel}`, '#5f5');
+
 
     (async () => {
       while (dsk.hammer.enabled && dsk.rotation.enabled) {
@@ -7380,24 +11607,29 @@ async function rotRun() {
       }
     })();
 
+
     while (dsk.hammer.enabled && dsk.rotation.enabled) await xDelay(2000);
     if (!dsk.rotation.enabled) return;
 
+
     dsk.rotation.phase = 'cleanup';
     dsk.hammer.enabled = false;
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     xDoKeyUp(6);
-	await xDelay(500);
-	await xDoDropSlot(1, 1);
+        await xDelay(500);
+        await xDoDropSlot(1, 1);
     await xDelay(500);
   }
 
+
   if (!dsk.rotation.enabled) return;
+
 
   // ── STEP 5: ARMAS ─────────────────────────────────────────
   if (!rotationConfig.skipArmas) {
     dsk.rotation.step  = 'armas';
     dsk.rotation.phase = 'nav';
+
 
     dsk.localMsg('Rotation → indo buscar armas...', '#0ff');
     await rotMoveTo(rotationConfig.pos.armasPick.x, rotationConfig.pos.armasPick.y);
@@ -7408,11 +11640,13 @@ async function rotRun() {
     await xDoChangeDir(0);
     await xDelay(500);
 
+
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.armasLevel;
-	skillLevel = 0;
+        skillLevel = 0;
     dsk.armas.enabled = true;
     dsk.localMsg(`Rotation → Armas até nível ${currentLevel}`, '#5f5');
+
 
     (async () => {
       while (dsk.armas.enabled && dsk.rotation.enabled) {
@@ -7421,17 +11655,19 @@ async function rotRun() {
       }
     })();
 
+
     while (dsk.armas.enabled && dsk.rotation.enabled) {
-	  if (inv[0]?.sprite === 687) {
-		dsk.armas.enabled = false;
-	  }
-	  await xDelay(2000);
-	}
+          if (inv[0]?.sprite === 687) {
+                dsk.armas.enabled = false;
+          }
+          await xDelay(2000);
+        }
     if (!dsk.rotation.enabled) return;
+
 
     dsk.rotation.phase = 'cleanup';
     dsk.armas.enabled = false;
-	skillLevel = 0; // ← adiciona isso
+        skillLevel = 0; // ← adiciona isso
     xDoKeyUp(6);
     await xDelay(500);
     dsk.localMsg('Rotation → Armas pronto! Dropando slots...', '#ff0');
@@ -7441,43 +11677,52 @@ async function rotRun() {
     await xDelay(500);
   }
 
+
   if (!dsk.rotation.enabled) return;
+
 
   // ── STEP 6: DESTRUCTION ───────────────────────────────────
   if (!rotationConfig.skipDestru) {
     dsk.rotation.step  = 'destru';
     dsk.rotation.phase = 'nav';
 
+
     await rotMoveTo(rotationConfig.pos.destru.x, rotationConfig.pos.destru.y);
     await xDelay(400);
     await xDoPickUp();
     await xDelay(400);
+
 
     if (inv[0]?.sprite && inv[0].equip === 0) {
       await xDoUseSlot(0);
       await xDelay(500);
     }
 
-    _originalSend({ type: 'chat', data: '/pvp' });
-	await xDelay(800); // ← espera o servidor responder
 
-	if (xIfChatHas("PVP Off")) {
-	  await xDoClearChat("PVP Off");
-	  await xDelay(300);
-	  _originalSend({ type: 'chat', data: '/pvp' }); // ← manda de novo pra ligar
-	  await xDelay(500);
-	}
+    _originalSend({ type: 'chat', data: '/pvp' });
+        await xDelay(800); // ← espera o servidor responder
+
+
+        if (xIfChatHas("PVP Off")) {
+          await xDoClearChat("PVP Off");
+          await xDelay(300);
+          _originalSend({ type: 'chat', data: '/pvp' }); // ← manda de novo pra ligar
+          await xDelay(500);
+        }
     await xDelay(500);
+
 
     destructPosX = rotationConfig.pos.destru.x;
     destructPosY = rotationConfig.pos.destru.y;
 
+
     dsk.rotation.phase = 'bot';
     skillName    = 'destruction';
-	currentLevel = rotationConfig.destruLevel;
-	skillLevel = 0;
-	dsk.destruction.enabled = true;
+        currentLevel = rotationConfig.destruLevel;
+        skillLevel = 0;
+        dsk.destruction.enabled = true;
     dsk.localMsg(`Rotation → Destruction até nível ${currentLevel}`, '#5f5');
+
 
     (async () => {
       while (dsk.destruction.enabled && dsk.rotation.enabled) {
@@ -7486,14 +11731,17 @@ async function rotRun() {
       }
     })();
 
+
     while (dsk.destruction.enabled && dsk.rotation.enabled) await xDelay(2000);
     if (!dsk.rotation.enabled) return;
+
 
     dsk.rotation.phase = 'cleanup';
     dsk.destruction.enabled = false;
     xDoKeyUp(6);
     await xDelay(500);
   }
+
 
   // ── FIM DO CICLO ──────────────────────────────────────────
   if (!dsk.rotation.enabled) return;
@@ -7503,194 +11751,381 @@ async function rotRun() {
   await xDelay(3000);
 }
 
+
 // ── Config Panel ──────────────────────────────────────────────
 
-dsk.rotManager = jv.Dialog.create(250, 416);
-const rm = dsk.rotManager;
-rm.visible = false;
 
-rm.header = jv.text('Skill Rotation Config', {
-  font: '13px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
-});
-rm.addChild(rm.header);
-jv.center(rm.header);
-jv.top(rm.header, 4);
+// ── Skill Rotation Config (HTML overlay) ─────────────────────
 
-rm.close = jv.Button.create(0, 0, 24, 'X', rm, 24);
-jv.top(rm.close, 4); jv.right(rm.close, 4);
-rm.close.on_click = () => (rm.visible = 0);
 
-rm.move = jv.Button.create(0, 0, 24, '@', rm, 24);
-jv.top(rm.move, 4); jv.right(rm.move, 28);
+(function () {
+  let rmPanel = null;
 
-rm._px = 0; rm._py = 0;
-window.addEventListener('mousemove', e => { rm._px = e.clientX; rm._py = e.clientY; });
-window.addEventListener('touchmove', e => { rm._px = e.touches[0].clientX; rm._py = e.touches[0].clientY; });
 
-dsk.on('postLoop', () => {
-  if (!rm.move?.is_pressed) {
-    rm.x = Math.max(0, Math.min(rm.x, jv.game_width  - rm.w));
-    rm.y = Math.max(0, Math.min(rm.y, jv.game_height - rm.h));
-    return;
-  }
-  const canvas = document.querySelector('canvas');
-  const rect = canvas ? canvas.getBoundingClientRect() : { left:0, top:0, width:jv.game_width, height:jv.game_height };
-  rm.x = (rm._px - rect.left) * (jv.game_width / rect.width) - rm.w / 2;
-  rm.y = (rm._py - rect.top) * (jv.game_height / rect.height) - 12;
-});
-
-// Cabeçalhos
-['Step', 'Nível', 'Skip'].forEach((t, xi) => {
-  const l = jv.text(t, { font: '10px Verdana', fill: 0xaaaaaa });
-  l.x = [10, 140, 212][xi]; l.y = 30; rm.addChild(l);
-});
-
-// Rows
-function rmRow(label, y, cfgKey, skipKey) {
-  const lbl = jv.text(label, { font: '10px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  lbl.x = 10; lbl.y = y; rm.addChild(lbl);
-
-  const btnM = jv.Button.create(130, y - 4, 22, '-', rm, 20);
-  const val  = jv.text(String(rotationConfig[cfgKey]), { font: '12px Verdana', fill: 0xFFD700, stroke: 0x000000, strokeThickness: 2 });
-  val.x = 158; val.y = y; rm.addChild(val);
-  const btnP = jv.Button.create(178, y - 4, 22, '+', rm, 20);
-
-  btnM.on_click = () => { rotationConfig[cfgKey] = Math.max(1,   rotationConfig[cfgKey] - 1); val.text = String(rotationConfig[cfgKey]); };
-  btnP.on_click = () => { rotationConfig[cfgKey] = Math.min(200, rotationConfig[cfgKey] + 1); val.text = String(rotationConfig[cfgKey]); };
-
-  const btnSkip = jv.Button.create(206, y - 4, 34, rotationConfig[skipKey] ? 'SKIP' : 'ON', rm, 20);
-  btnSkip.on_click = () => {
-    rotationConfig[skipKey] = !rotationConfig[skipKey];
-    btnSkip.title.text = rotationConfig[skipKey] ? 'SKIP' : 'ON';
+  const rm = {
+    get visible() { return !!rmPanel; },
+    set visible(v) { if (!v && rmPanel) removePanel(); else if (v && !rmPanel) createPanel(); },
+    posLabels: {}, // compat — não usado mas pode ser referenciado
   };
-  return val;
-}
-
-const valCook   = rmRow('Cook',   48,  'cookLevel',   'skipCook');
-const valSmelt  = rmRow('Smelt',  70,  'smeltLevel',  'skipSmelt');
-const valSword  = rmRow('Sword',  92,  'swordLevel',  'skipSword');
-const valHammer = rmRow('Hammer', 114, 'hammerLevel', 'skipHammer');
-const valArmas  = rmRow('Armas',  136, 'armasLevel',  'skipArmas');
-const valDestru = rmRow('Destru', 158, 'destruLevel', 'skipDestru');
-
-// Status ao vivo
-function rmLbl(txt, y) {
-  const l = jv.text(txt, { font: '11px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  l.x = 10; l.y = y; rm.addChild(l); return l;
-}
-
-const lblStep  = rmLbl('Step: -',  180);
-const lblPhase = rmLbl('Fase: -',  195);
-const lblSkill = rmLbl('Skill: -', 210);
-const lblNivel = rmLbl('Nível: -', 225);
-const lblAlvo  = rmLbl('Alvo: -',  240);
-const lblOn    = rmLbl('○ OFF',    255);
-
-dsk.on('postLoop', () => {
-  if (!rm.visible) return;
-  const r = dsk.rotation;
-	const alvoMap = {
-	  cook:   'cookLevel',
-	  smelt:  'smeltLevel',
-	  sword:  'swordLevel',
-	  hammer: 'hammerLevel',
-	  armas:  'armasLevel',
-	  destru: 'destruLevel',
-	};  
-  lblStep.text  = `Step: ${r.step}`;
-  lblPhase.text = `Fase: ${r.phase}`;
-  lblSkill.text = `Skill: ${skillName ?? '-'}`;
-  lblNivel.text = `Nível: ${skillLevel ?? '-'}`;
-  lblAlvo.text  = `Alvo: ${rotationConfig[alvoMap[r.step]] ?? '-'}`;
-  lblOn.text    = r.enabled ? '● ON' : '○ OFF';
-  lblOn.style.fill = r.enabled ? 0x44ff44 : 0xff4444;
-});
+  dsk.rotManager = rm;
 
 
+  const ROT_STEPS = [
+    { key: 'cook',   label: 'Cook',   cfgKey: 'cookLevel',   skipKey: 'skipCook'   },
+    { key: 'smelt',  label: 'Smelt',  cfgKey: 'smeltLevel',  skipKey: 'skipSmelt'  },
+    { key: 'sword',  label: 'Sword',  cfgKey: 'swordLevel',  skipKey: 'skipSword'  },
+    { key: 'hammer', label: 'Hammer', cfgKey: 'hammerLevel', skipKey: 'skipHammer' },
+    { key: 'armas',  label: 'Armas',  cfgKey: 'armasLevel',  skipKey: 'skipArmas'  },
+    { key: 'destru', label: 'Destru', cfgKey: 'destruLevel', skipKey: 'skipDestru' },
+  ];
 
-// ── Seção de posições ─────────────────────────────────────────
-const rmPosLbl = jv.text('── Posições (clique para capturar) ──', {
-  font: '9px Verdana', fill: 0xaaaaaa, stroke: 0x000000, strokeThickness: 2,
-});
-rmPosLbl.x = 10; rmPosLbl.y = 270;
-rm.addChild(rmPosLbl);
 
-const rmPosSteps = [
-  { key: 'cook',      label: 'Cook'      },
-  { key: 'smelt',     label: 'Smelt'     },
-  { key: 'sword',     label: 'Sword'     },
-  { key: 'hammer',    label: 'Hammer'    },
-  { key: 'armasPick', label: 'Armas Pick' },
-  { key: 'armas',     label: 'Armas Luta' },
-  { key: 'destru',    label: 'Destru'    },
-];
+  const POS_STEPS = [
+    { key: 'cook',      label: 'Cook'       },
+    { key: 'smelt',     label: 'Smelt'      },
+    { key: 'sword',     label: 'Sword'      },
+    { key: 'hammer',    label: 'Hammer'     },
+    { key: 'armasPick', label: 'Armas Pick' },
+    { key: 'armas',     label: 'Armas Luta' },
+    { key: 'destru',    label: 'Destru'     },
+  ];
 
-rm.posLabels = {};
 
-rmPosSteps.forEach(({ key, label }, i) => {
-  const col = i % 2;       // 0 = esquerda, 1 = direita
-  const row = Math.floor(i / 2);
-  const bx  = col === 0 ? 4 : 126;
-  const by  = 282 + row * 26;
-
-  const btn = jv.Button.create(bx, by, 118, '', rm, 20);
-
-  const lbl = jv.text(`${label}: (${rotationConfig.pos[key].x},${rotationConfig.pos[key].y})`, {
-    font: '9px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2,
+  // Status ao vivo
+  dsk.on('postLoop', () => {
+    if (!rmPanel) return;
+    const set = (k, v) => { const el = rmPanel.querySelector(`[data-rm="${k}"]`); if (el) el.textContent = v; };
+    const r = dsk.rotation;
+    const alvoMap = {
+      cook:'cookLevel', smelt:'smeltLevel', sword:'swordLevel',
+      hammer:'hammerLevel', armas:'armasLevel', destru:'destruLevel',
+    };
+    set('step',  `Step: ${r.step}`);
+    set('phase', `Fase: ${r.phase}`);
+    set('skill', `Skill: ${window.skillName ?? '-'}`);
+    set('nivel', `Nível: ${window.skillLevel ?? '-'}`);
+    set('alvo',  `Alvo: ${rotationConfig[alvoMap[r.step]] ?? '-'}`);
+    const onEl = rmPanel.querySelector('[data-rm="on"]');
+    if (onEl) {
+      onEl.textContent = r.enabled ? '● ON' : '○ OFF';
+      onEl.style.color = r.enabled ? '#5f5' : '#f55';
+    }
+    // Atualiza pos labels
+    POS_STEPS.forEach(({ key, label }) => {
+      const el = rmPanel.querySelector(`[data-rmpos="${key}"]`);
+      if (el) el.textContent = `${label}: (${rotationConfig.pos[key]?.x ?? '-'}, ${rotationConfig.pos[key]?.y ?? '-'})`;
+    });
   });
-  lbl.x = 4; lbl.y = 4;
-  btn.addChild(lbl);
-  rm.posLabels[key] = lbl;
 
-  btn.on_click = () => {
-    if (!myself) return;
-    rotationConfig.pos[key].x = myself.x;
-    rotationConfig.pos[key].y = myself.y;
-    lbl.text = `${label}: (${myself.x},${myself.y})`;
-    dsk.localMsg(`Rotation: ${label} → (${myself.x},${myself.y})`, '#0ff');
-    // Salva no localStorage
+
+  function createPanel() {
+    if (rmPanel) { removePanel(); return; }
+
+
+    rmPanel = document.createElement('div');
+    Object.assign(rmPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '290px', maxHeight: '85vh', overflowY: 'auto',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+      position: 'sticky', top: '0', zIndex: '1',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🔄 Skill Rotation Config';
+    Object.assign(titleEl.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl); header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - rmPanel.getBoundingClientRect().left;
+      oy = _xy.y - rmPanel.getBoundingClientRect().top;
+      rmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); rmPanel.style.left = (_xy.x - ox) + 'px'; rmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    // ── Cabeçalho das colunas ─────────────────────────────────
+    const colHeader = document.createElement('div');
+    Object.assign(colHeader.style, {
+      display: 'grid', gridTemplateColumns: '1fr 80px 60px',
+      padding: '0 4px', color: '#777', fontSize: '9px',
+    });
+    ['Step', 'Nível', 'Skip'].forEach(t => {
+      const el = document.createElement('span');
+      el.textContent = t;
+      colHeader.appendChild(el);
+    });
+    body.appendChild(colHeader);
+
+
+    // ── Rows de configuração ──────────────────────────────────
+    ROT_STEPS.forEach(({ label, cfgKey, skipKey }) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        display: 'grid', gridTemplateColumns: '1fr 80px 60px',
+        alignItems: 'center', gap: '4px',
+        background: '#2a2a3e', borderRadius: '6px', padding: '5px 8px',
+      });
+
+
+      const lbl = document.createElement('span');
+      lbl.textContent = label;
+      Object.assign(lbl.style, { color: '#fff', fontSize: '11px' });
+
+
+      // Controle de nível
+      const lvlWrap = document.createElement('div');
+      Object.assign(lvlWrap.style, { display: 'flex', alignItems: 'center', gap: '2px' });
+
+
+      function makeSmallBtn(txt, fn) {
+        const b = document.createElement('button');
+        b.textContent = txt;
+        Object.assign(b.style, {
+          width: '22px', height: '20px', padding: '0',
+          borderRadius: '4px', border: '1px solid #555',
+          background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '11px',
+        });
+        b.onmouseenter = () => b.style.background = '#3a3a5e';
+        b.onmouseleave = () => b.style.background = '#1a1a2e';
+        b.onclick = fn;
+        return b;
+      }
+
+
+      const valEl = document.createElement('span');
+      valEl.textContent = String(rotationConfig[cfgKey]);
+      Object.assign(valEl.style, {
+        color: '#FFD700', fontSize: '11px', minWidth: '24px', textAlign: 'center',
+      });
+
+
+      lvlWrap.appendChild(makeSmallBtn('-', () => {
+        rotationConfig[cfgKey] = Math.max(1, rotationConfig[cfgKey] - 1);
+        valEl.textContent = String(rotationConfig[cfgKey]);
+      }));
+      lvlWrap.appendChild(valEl);
+      lvlWrap.appendChild(makeSmallBtn('+', () => {
+        rotationConfig[cfgKey] = Math.min(200, rotationConfig[cfgKey] + 1);
+        valEl.textContent = String(rotationConfig[cfgKey]);
+      }));
+
+
+      // Toggle SKIP/ON
+      const skipBtn = document.createElement('button');
+      function updateSkip() {
+        const s = !!rotationConfig[skipKey];
+        skipBtn.textContent = s ? 'SKIP' : 'ON';
+        skipBtn.style.borderColor = s ? '#f55' : '#5f5';
+        skipBtn.style.color       = s ? '#f55' : '#5f5';
+      }
+      Object.assign(skipBtn.style, {
+        padding: '2px 0', borderRadius: '5px', border: '1px solid #5f5',
+        background: '#1a1a2e', color: '#5f5', cursor: 'pointer', fontSize: '10px',
+        width: '100%',
+      });
+      skipBtn.onclick = () => {
+        rotationConfig[skipKey] = !rotationConfig[skipKey];
+        updateSkip();
+      };
+      updateSkip();
+
+
+      row.appendChild(lbl); row.appendChild(lvlWrap); row.appendChild(skipBtn);
+      body.appendChild(row);
+    });
+
+
+    // ── Status ao vivo ────────────────────────────────────────
+    const statusDivider = document.createElement('div');
+    statusDivider.textContent = '── Status ──';
+    Object.assign(statusDivider.style, {
+      color: '#777', fontSize: '10px', textAlign: 'center',
+      borderTop: '1px solid #333', paddingTop: '6px',
+    });
+    body.appendChild(statusDivider);
+
+
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '3px',
+    });
+    [['step','Step: -'],['phase','Fase: -'],['skill','Skill: -'],['nivel','Nível: -'],['alvo','Alvo: -']].forEach(([key, init]) => {
+      const el = document.createElement('div');
+      el.dataset.rm = key;
+      el.textContent = init;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    const onEl = document.createElement('div');
+    onEl.dataset.rm = 'on';
+    onEl.textContent = '○ OFF';
+    Object.assign(onEl.style, { color: '#f55', fontSize: '12px', fontWeight: 'bold', marginTop: '4px' });
+    statusBox.appendChild(onEl);
+
+
+    // ── Botão Play/Pause ──────────────────────────────────────
+    const playBtn = document.createElement('button');
+    function updatePlayBtn() {
+      const on = !!dsk.rotation?.enabled;
+      playBtn.textContent       = on ? '⏹ Stop' : '▶ Play';
+      playBtn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      playBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      playBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    }
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '6px 0', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '11px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+      marginTop: '6px',
+    });
+    playBtn.onclick = () => {
+      dsk.commands['/rotation']();
+      setTimeout(updatePlayBtn, 150);
+    };
+    updatePlayBtn();
+    statusBox.appendChild(playBtn);
+    body.appendChild(statusBox);
+
+
+    // ── Seção posições ────────────────────────────────────────
+    const posDivider = document.createElement('div');
+    posDivider.textContent = '── Posições (clique para capturar) ──';
+    Object.assign(posDivider.style, {
+      color: '#777', fontSize: '10px', textAlign: 'center',
+      borderTop: '1px solid #333', paddingTop: '6px',
+    });
+    body.appendChild(posDivider);
+
+
+    const posGrid = document.createElement('div');
+    Object.assign(posGrid.style, {
+      display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px',
+    });
+
+
+    POS_STEPS.forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.dataset.rmpos = key;
+      btn.textContent = `${label}: (${rotationConfig.pos[key]?.x ?? '-'}, ${rotationConfig.pos[key]?.y ?? '-'})`;
+      Object.assign(btn.style, {
+        padding: '5px 4px', borderRadius: '6px', border: '1px solid #444',
+        background: '#2a2a3e', color: '#ddd', cursor: 'pointer',
+        fontSize: '9px', textAlign: 'left',
+      });
+      btn.onmouseenter = () => btn.style.background = '#3a3a5e';
+      btn.onmouseleave = () => btn.style.background = '#2a2a3e';
+      btn.onclick = () => {
+        if (!myself) return;
+        rotationConfig.pos[key] = { x: myself.x, y: myself.y };
+        btn.textContent = `${label}: (${myself.x},${myself.y})`;
+        try { localStorage.setItem('dsk_rotation_pos', JSON.stringify(rotationConfig.pos)); } catch(e) {}
+        dsk.localMsg(`Rotation: ${label} → (${myself.x},${myself.y})`, '#0ff');
+      };
+      posGrid.appendChild(btn);
+    });
+    body.appendChild(posGrid);
+
+
+    // ── Botão reset posições ──────────────────────────────────
+    const btnResetPos = document.createElement('button');
+    btnResetPos.textContent = '↺ Resetar Posições';
+    Object.assign(btnResetPos.style, {
+      width: '100%', padding: '7px 0', borderRadius: '7px',
+      border: '1px solid #ff0', background: '#1a1a10',
+      color: '#ff0', cursor: 'pointer', fontFamily: 'Verdana', fontSize: '11px',
+    });
+    btnResetPos.onmouseenter = () => btnResetPos.style.background = '#2a2a1a';
+    btnResetPos.onmouseleave = () => btnResetPos.style.background = '#1a1a10';
+    btnResetPos.onclick = () => {
+      rotationConfig.pos = {
+        cook:     { x: 112, y: 278 }, smelt:    { x: 112, y: 275 },
+        sword:    { x: 115, y: 279 }, hammer:   { x: 119, y: 280 },
+        armas:    { x: 114, y: 280 }, armasPick:{ x: 117, y: 280 },
+        destru:   { x: 124, y: 281 },
+      };
+      try { localStorage.removeItem('dsk_rotation_pos'); } catch(e) {}
+      POS_STEPS.forEach(({ key, label }) => {
+        const btn = rmPanel.querySelector(`[data-rmpos="${key}"]`);
+        if (btn) btn.textContent = `${label}: (${rotationConfig.pos[key].x},${rotationConfig.pos[key].y})`;
+      });
+      dsk.localMsg('Rotation: posições resetadas', '#ff0');
+    };
+    body.appendChild(btnResetPos);
+
+
+    rmPanel.appendChild(header);
+    rmPanel.appendChild(body);
+    document.body.appendChild(rmPanel);
+
+
+    // Carrega posições salvas
     try {
-      localStorage.setItem('dsk_rotation_pos', JSON.stringify(rotationConfig.pos));
+      const saved = JSON.parse(localStorage.getItem('dsk_rotation_pos') || '{}');
+      Object.keys(saved).forEach(k => {
+        if (rotationConfig.pos[k]) rotationConfig.pos[k] = saved[k];
+      });
     } catch(e) {}
-  };
-});
+  }
 
-// Botão para resetar posições para o padrão
-const btnResetPos = jv.Button.create(10, 386, 230, '↺ Resetar Posições', rm, 20);
-btnResetPos.on_click = () => {
-  rotationConfig.pos = {
-    cook:     { x: 112, y: 278 },
-    smelt:    { x: 112, y: 275 },
-    sword:    { x: 115, y: 279 },
-    hammer:   { x: 119, y: 280 },
-    armas:    { x: 114, y: 280 },
-    armasPick:{ x: 117, y: 280 },
-    destru:   { x: 124, y: 281 },
-  };
-  try { localStorage.removeItem('dsk_rotation_pos'); } catch(e) {}
-  // Atualiza labels
-  rmPosSteps.forEach(({ key, label }) => {
-    rm.posLabels[key].text = `${label}: (${rotationConfig.pos[key].x},${rotationConfig.pos[key].y})`;
-  });
-  dsk.localMsg('Rotation: posições resetadas para padrão', '#ff0');
-};
 
-// Carrega posições salvas ao iniciar
-try {
-  const saved = JSON.parse(localStorage.getItem('dsk_rotation_pos') || '{}');
-  Object.keys(saved).forEach(k => {
-    if (rotationConfig.pos[k]) {
-      rotationConfig.pos[k] = saved[k];
+  function removePanel() {
+    if (rmPanel) { rmPanel.remove(); rmPanel = null; }
+  }
+
+
+  dsk.setCmd('/rotationconfig', () => {
+    if (rmPanel) {
+      removePanel();
+      dsk.localMsg('Rotation Config: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Rotation Config: Aberto', '#5f5');
     }
   });
-} catch(e) {}
+})();
 
-dsk.setCmd('/rotationconfig', () => {
-  rm.visible = !rm.visible;
-  dsk.localMsg(`Rotation Config: ${rm.visible ? 'Aberto' : 'Fechado'}`, rm.visible ? '#5f5' : '#f55');
-});
 
 //botao emergencia reset//
+
 
 dsk.setCmd('/reset', () => {
   jv.key_array[6].isDown = false;
@@ -7700,13 +12135,17 @@ dsk.setCmd('/reset', () => {
   dsk.localMsg('Reset completo', '#ff0');
 });
 
+
 // ── HAMMER BOT ─────────────────────────────────────────────────
 
+
 dsk.hammer = { enabled: false, repairing: false };
+
 
 async function Hammer() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
+
 
   if (currentLevel > 0 && skillLevel >= currentLevel && skillName == 'hammer') {
     await xDoKeyUp(6);
@@ -7715,17 +12154,21 @@ async function Hammer() {
     return;
   }
 
+
   if (xGoing[113] === true) return;
   xGoing[113] = true;
+
 
   if (inv[0].sprite === 719) {
     // ── COM REPAIR KIT ──────────────────────────────
 
+
     if (inv[0].equip === 2) {
 
+
       if (dsk.hammer.repairingTarget === 'dummy') {
-		await xDoKeyUp(6);
-		await xDelay(520);
+                await xDoKeyUp(6);
+                await xDelay(520);
         await xDoMove(myself.x, myself.y + 3);
         await xDelay(700);
         await xDoDropSlot(1, 1);
@@ -7739,9 +12182,10 @@ async function Hammer() {
         await xDoMove(myself.x, myself.y - 2);
         await xDelay(500);
 
+
       } else {
-		await xDoKeyUp(6);
-		await xDelay(520);
+                await xDoKeyUp(6);
+                await xDelay(520);
         await xDoMove(myself.x, myself.y + 2);
         await xDelay(800);
         await xDoDropSlot(1, 1);
@@ -7756,49 +12200,55 @@ async function Hammer() {
         await xDelay(300);
       }
 
+
       dsk.hammer.repairingTarget = null;
       xGoing[113] = false;
       return;
     }
-	await xDoKeyPress(6, 214);
-	await xDelay(523);
+        await xDoKeyPress(6, 214);
+        await xDelay(523);
+
 
     if (xIfChatHas("is in perfect condition")) {
       xDoClearChat("is in perfect condition");
       dsk.hammer.repairing = false;
-	  await xDoKeyUp(6);
-	  await xDelay(512);
+          await xDoKeyUp(6);
+          await xDelay(512);
       await xDoMove(myself.x, myself.y - 2);
       await xDelay(620);
 
+
       await xDoChangeDir(0);
-	  await xDelay(418);
+          await xDelay(418);
       await xDoKeyPress(6, 181); await xDelay(510);
       while (xGetWallHp(myself.x, myself.y - 1) < 90 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
         await xDoKeyPress(6, 180);
         await xDelay(530);
       }
 
+
       await xDoChangeDir(1);
-	  await xDelay(422);
+          await xDelay(422);
       await xDoKeyPress(6, 182); await xDelay(510);
       while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
         await xDoKeyPress(6, 183);
         await xDelay(531);
       }
 
+
       await xDoChangeDir(3);
-	  await xDelay(412);
+          await xDelay(412);
       await xDoKeyPress(6, 181); await xDelay(523);
       while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
         await xDoKeyPress(6, 182);
         await xDelay(521);
       }
-	  await xDelay(614);
+          await xDelay(614);
       await xDoMove(myself.x, myself.y + 2);
       await xDelay(610);
       await xDoDropSlot(1, 1);
       await xDelay(634);
+
 
       await xDoMove(myself.x, myself.y - 1);
       await xDelay(614);
@@ -7807,69 +12257,84 @@ async function Hammer() {
       await xDoUseSlot(0);
       await xDelay(512);
       await xDoChangeDir(0);
-	  await xDelay(520);
+          await xDelay(520);
+
 
     } else if (dsk.hammer.repairing) {
       xGoing[113] = false;
       return;
     }
 
+
   } else {
     // ── COM MARTELO ──────────────────────────────────
+
 
     if (inv[0].equip === 0) {
       await xDoUseSlot(0);
       await xDelay(500);
     }
 
+
     const wN = xGetWallByPos(myself.x,     myself.y - 2);
     const wW = xGetWallByPos(myself.x - 1, myself.y - 1);
     const wE = xGetWallByPos(myself.x + 1, myself.y - 1);
+
 
     if (wN?.hpbar?.val <= 250 || wW?.hpbar?.val <= 250 || wE?.hpbar?.val <= 250) {
       dsk.hammer.repairing = true;
       dsk.hammer.repairingTarget = 'dummy'; // ← novo
 
+
       await xDoDropSlot(1, 1);
       await xDelay(645);
+
 
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(515);
       await xDoPickUp();
       await xDelay(545);
 
+
       await xDoChangeDir(0);
-	  await xDelay(519);
+          await xDelay(519);
       await xDoUseSlot(0);
       await xDelay(531);
+
 
       xGoing[113] = false;
       return;
     }
 
+
     if (inv[0].equip === 2) {
       dsk.hammer.repairing = true;
       dsk.hammer.repairingTarget = 'arma'; // ← novo
 
-	  await xDelay(456);
-	  await xDoKeyUp(6);
-	  await xDelay(325);
+
+          await xDelay(456);
+          await xDoKeyUp(6);
+          await xDelay(325);
       await xDoDropSlot(1, 1);
       await xDelay(624);
+
 
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(510);
       await xDoPickUp();
       await xDelay(515);
 
+
       await xDoChangeDir(0);
-	  await xDelay(515);
+          await xDelay(515);
       await xDoUseSlot(0);
       await xDelay(516);
+
 
       xGoing[113] = false;
       return;
     }
+
 
     if (!keySpace.isDown && inv[0].sprite !== undefined && inv[0].equip === 1) {
       await xDoKeyDown(6);
@@ -7877,11 +12342,14 @@ async function Hammer() {
     }
   }
 
+
   xGoing[113] = false;
 }
 
+
 dsk.setCmd('/hammer', () => {
   dsk.hammer.enabled = !dsk.hammer.enabled;
+
 
   if (dsk.hammer.enabled) {
     dsk.hammer.repairing = false;
@@ -7900,7 +12368,9 @@ dsk.setCmd('/hammer', () => {
   }
 });
 
+
 // ── SWORD BOT ─────────────────────────────────────────────────
+
 
 dsk.sword = {
   enabled: false,
@@ -7908,9 +12378,11 @@ dsk.sword = {
   repairingTarget: null, // 'dummy' | 'arma' | null
 };
 
+
 async function Sword() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
+
 
   if (currentLevel > 0 && skillLevel >= currentLevel && skillName == 'sword') {
     await xDoKeyUp(6);
@@ -7919,17 +12391,21 @@ async function Sword() {
     return;
   }
 
+
   if (xGoing[112] === true) return;
   xGoing[112] = true;
+
 
   if (inv[0].sprite === 719) {
     // ── COM REPAIR KIT ──────────────────────────────
 
+
     if (inv[0].equip === 2) {
 
+
       if (dsk.sword.repairingTarget === 'dummy') {
-		await xDoKeyUp(6);
-		await xDelay(510);
+                await xDoKeyUp(6);
+                await xDelay(510);
         await xDoMove(myself.x, myself.y + 2);
         await xDelay(520);
         await xDoDropSlot(1, 1);
@@ -7943,9 +12419,10 @@ async function Sword() {
         await xDoMove(myself.x, myself.y - 1);
         await xDelay(550);
 
+
       } else {
-		await xDoKeyUp(6);
-		await xDelay(632);
+                await xDoKeyUp(6);
+                await xDelay(632);
         await xDoMove(myself.x, myself.y + 2);
         await xDelay(530);
         await xDoDropSlot(1, 1);
@@ -7960,49 +12437,56 @@ async function Sword() {
         await xDelay(410);
       }
 
+
       dsk.sword.repairingTarget = null;
       xGoing[112] = false;
       return;
     }
-	await xDelay(532);
-	await xDoKeyPress(6, 231);
+        await xDelay(532);
+        await xDoKeyPress(6, 231);
+
 
     if (xIfChatHas("is in perfect condition")) {
       xDoClearChat("is in perfect condition");
       dsk.sword.repairing = false;
 
-	  await xDelay(425);
+
+          await xDelay(425);
       await xDoMove(myself.x, myself.y - 1);
       await xDelay(600);
 
+
       await xDoChangeDir(0);
-	  await xDelay(550);
+          await xDelay(550);
       await xDoKeyPress(6, 184); await xDelay(550);
       while (xGetWallHp(myself.x, myself.y - 1) < 90 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
         await xDoKeyPress(6, 185);
         await xDelay(515);
       }
 
+
       await xDoChangeDir(1);
-	  await xDelay(560);
+          await xDelay(560);
       await xDoKeyPress(6, 180); await xDelay(550);
       while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
         await xDoKeyPress(6, 186);
         await xDelay(518);
       }
 
+
       await xDoChangeDir(3);
-	  await xDelay(555);
+          await xDelay(555);
       await xDoKeyPress(6, 183); await xDelay(550);
       while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
         await xDoKeyPress(6, 187);
         await xDelay(514);
       }
-	  await xDelay(623);
+          await xDelay(623);
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(610);
       await xDoDropSlot(1, 1);
       await xDelay(420);
+
 
       await xDoMove(myself.x, myself.y - 1);
       await xDelay(530);
@@ -8011,65 +12495,78 @@ async function Sword() {
       await xDoUseSlot(0);
       await xDelay(540);
       await xDoChangeDir(0);
-	  await xDelay(520);
+          await xDelay(520);
+
 
     } else if (dsk.sword.repairing) {
       xGoing[112] = false;
       return;
     }
 
+
   } else {
     // ── COM SWORD ──────────────────────────────────
+
 
     if (inv[0].equip === 0) {
       await xDoUseSlot(0);
       await xDelay(520);
     }
 
+
     if (xGetWallHp(myself.x, myself.y - 1) <= 25 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
       dsk.sword.repairing = true;
       dsk.sword.repairingTarget = 'dummy'; // ← novo
-	  await xDoKeyUp(6);
-	  await xDelay(429);
+          await xDoKeyUp(6);
+          await xDelay(429);
       await xDoDropSlot(1, 1);
       await xDelay(535);
+
 
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(510);
       await xDoPickUp();
       await xDelay(420);
 
+
       await xDoChangeDir(0);
-	  await xDelay(310);
+          await xDelay(310);
       await xDoUseSlot(0);
       await xDelay(530);
+
 
       xGoing[112] = false;
       return;
     }
 
+
     if (inv[0].equip === 2) {
       dsk.sword.repairing = true;
       dsk.sword.repairingTarget = 'arma'; // ← novo
-	  await xDoKeyUp(6);
-	  await xDelay(425);
+          await xDoKeyUp(6);
+          await xDelay(425);
+
 
       await xDoDropSlot(1, 1);
       await xDelay(530);
+
 
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(530);
       await xDoPickUp();
       await xDelay(440);
 
+
       await xDoChangeDir(0);
-	  await xDelay(315);
+          await xDelay(315);
       await xDoUseSlot(0);
       await xDelay(520);
+
 
       xGoing[112] = false;
       return;
     }
+
 
     if (!keySpace.isDown && inv[0].sprite !== undefined && inv[0].equip === 1) {
       await xDoKeyDown(6);
@@ -8077,11 +12574,14 @@ async function Sword() {
     }
   }
 
+
   xGoing[112] = false;
 }
 
+
 dsk.setCmd('/sword', () => {
   dsk.sword.enabled = !dsk.sword.enabled;
+
 
   if (dsk.sword.enabled) {
     dsk.sword.repairing = false;
@@ -8099,6 +12599,7 @@ dsk.setCmd('/sword', () => {
     dsk.localMsg('Sword Bot: Desativado', '#f55');
   }
 });
+
 
 dsk.setCmd('/buy', async (context) => {
     const amount = parseInt(context);
@@ -8123,7 +12624,9 @@ dsk.setCmd('/buy', async (context) => {
     dsk.localMsg(`Buy: ${amount}x concluido!`, '#5f5');
 });
 
+
 //dropar paginas
+
 
 dsk.setCmd('/dropar', async (context) => {
     const amount = parseInt(context);
@@ -8148,12 +12651,15 @@ dsk.setCmd('/dropar', async (context) => {
 });
 //zoom
 
+
 dsk.zoom = { enabled: false };
+
 
 dsk.setCmd('/zoom', () => {
     dsk.zoom.enabled = !dsk.zoom.enabled;
     
     const xZoom = dsk.zoom.enabled ? 1.5 : 1.0;
+
 
     // Pega o sprite correto independente da conta
     const rootSprite = myself.body_sprite ?? myself.spr;
@@ -8165,11 +12671,13 @@ dsk.setCmd('/zoom', () => {
     world.position.x = 380 * (1 - (1 / xZoom));
     world.position.y = 230 * (1 - (1 / xZoom));
 
+
     // Escala o UI
     ui_container.scale.x = 1 / (1 / xZoom);
     ui_container.scale.y = 1 / (1 / xZoom);
     ui_container.position.x = (xZoom - 1) * -380;
     ui_container.position.y = (xZoom - 1) * -230;
+
 
     // Contra-escala da skill bar (dinâmico)
     const skillBar = jv.stage.children.find(c =>
@@ -8188,12 +12696,17 @@ dsk.setCmd('/zoom', () => {
 });
 
 
+
+
 //heal bot //
+
 
 dsk.healbot = { enabled: false };
 
+
 dsk.setCmd('/healbot', () => {
   dsk.healbot.enabled = !dsk.healbot.enabled;
+
 
   if (dsk.healbot.enabled) {
     dsk.localMsg('HealBot: Ativado', '#5f5');
@@ -8210,11 +12723,13 @@ dsk.setCmd('/healbot', () => {
   }
 });
 
+
 async function HealBot() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   if (xGoing[115] === true) return;
   xGoing[115] = true;
+
 
   if (inv[0].equip === 2) {
     // Arma gasta — ciclo de reparo
@@ -8238,12 +12753,16 @@ async function HealBot() {
     }
   }
 
+
   xGoing[115] = false;
 }
 
+
 // ── CLAY BOT ─────────────────────────────────────────────────
 
+
 dsk.clay = { enabled: false, repairing: false };
+
 
 async function repairItemClay() {
   if (dskPaused) return; // ← adiciona isso
@@ -8260,8 +12779,9 @@ async function repairItemClay() {
   await xDoUseSlot(xGetSlotByID(719));
   await xDelay(369);
 
+
   const firstEquippable = item_data.filter(el => el && el.eqp !== 0 && el.spr === 719)[0];
-	if (firstEquippable) {
+        if (firstEquippable) {
     // Continua pressionando até o item estar perfeito
     while (!xIfChatHas("is in perfect condition")) {
         await xDoKeyPress(6, 189);
@@ -8272,7 +12792,8 @@ async function repairItemClay() {
             return;
         }
     }
-	}
+        }
+
 
   if (xIfChatHas("is in perfect condition")) {
     xDoClearChat("is in perfect condition");
@@ -8292,10 +12813,12 @@ async function repairItemClay() {
   }
 }
 
+
 async function ClayBot() {
   if (dskPaused) return; // ← adiciona isso
   if (!myself || game_state !== 2) return;
   if (dsk.clay.repairing) return;
+
 
   // Parar se atingir o level alvo
   if (currentLevel > 0 && skillLevel >= currentLevel && skillName === 'digging') {
@@ -8306,8 +12829,10 @@ async function ClayBot() {
     return;
   }
 
+
   if (xGoing[114] === true) return;
   xGoing[114] = true;
+
 
   if (xIfChatHas("Disconnected (Packet Spamming)")) {
     await xDelay(300);
@@ -8318,12 +12843,14 @@ async function ClayBot() {
     return;
   }
 
+
   if (xIfChatHas("Welcome back ")) {
     await xDelay(1000);
     await xDoClearChat("Welcome back ");
     await xDelay(1000);
     await xDoKeyUp(6);
   }
+
 
   // Reparo tem prioridade
   if (inv[0].equip === 2) {
@@ -8332,7 +12859,9 @@ async function ClayBot() {
     return;
   }
 
+
   const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
+
 
   if (occupied(myself.x, myself.y - 2) === 0) {
     await xDoMove(myself.x, myself.y - 1);
@@ -8353,28 +12882,33 @@ async function ClayBot() {
     return;
   }
 
-	const wallBelow = objects.items.find(el =>
-		el && allowedNames.includes(el.name) &&
-		el.x === myself.x && el.y === (myself.y + 1)
-		// ← sem checar dir aqui
-	);
 
-	if (wallBelow) {
-		if (myself.dir !== 0) {
-		  await xDelay(357);
-		  await xDoChangeDir(0);
-		  await xDelay(546);
-		}
-		await xDoKeyDown(6);
-		xGoing[114] = false;
-		return;
-	}
+        const wallBelow = objects.items.find(el =>
+                el && allowedNames.includes(el.name) &&
+                el.x === myself.x && el.y === (myself.y + 1)
+                // ← sem checar dir aqui
+        );
+
+
+        if (wallBelow) {
+                if (myself.dir !== 0) {
+                  await xDelay(357);
+                  await xDoChangeDir(0);
+                  await xDelay(546);
+                }
+                await xDoKeyDown(6);
+                xGoing[114] = false;
+                return;
+        }
+
 
   xGoing[114] = false;
 }
 
+
 dsk.setCmd('/clay', () => {
   dsk.clay.enabled = !dsk.clay.enabled;
+
 
   if (dsk.clay.enabled) {
     dsk.clay.repairing = false;
@@ -8393,6 +12927,7 @@ dsk.setCmd('/clay', () => {
   }
 });
 
+
 dsk.baseRepair = {
   enabled: false,
   kitSlot: 2,
@@ -8401,147 +12936,153 @@ dsk.baseRepair = {
     // Corredor de cima → repara cima e baixo
     { x: 102, y: 254, dirs: [0, 3] },
     { x: 104, y: 254, dirs: [0, 2] },
-	{ x: 107, y: 254, dirs: [0, 2] },
-	{ x: 110, y: 254, dirs: [0, 2] },
-	{ x: 113, y: 254, dirs: [0, 2] },
-	{ x: 116, y: 254, dirs: [0, 2] },
-	{ x: 119, y: 254, dirs: [0, 2] },
-	{ x: 122, y: 254, dirs: [0, 2] },
-	{ x: 125, y: 254, dirs: [0, 2] },
-	{ x: 128, y: 254, dirs: [0, 2] },
-	{ x: 131, y: 254, dirs: [0, 2] },
-	{ x: 134, y: 254, dirs: [0, 2] },
-	{ x: 137, y: 254, dirs: [0, 2] },
-	{ x: 140, y: 254, dirs: [0, 2] },
-	{ x: 143, y: 254, dirs: [0, 2] },
-	{ x: 146, y: 254, dirs: [0, 2] },
-	{ x: 149, y: 254, dirs: [0, 2] },
-	{ x: 152, y: 254, dirs: [0, 2] },
-	{ x: 155, y: 254, dirs: [0, 2] },
-	{ x: 157, y: 254, dirs: [0, 1] },
+        { x: 107, y: 254, dirs: [0, 2] },
+        { x: 110, y: 254, dirs: [0, 2] },
+        { x: 113, y: 254, dirs: [0, 2] },
+        { x: 116, y: 254, dirs: [0, 2] },
+        { x: 119, y: 254, dirs: [0, 2] },
+        { x: 122, y: 254, dirs: [0, 2] },
+        { x: 125, y: 254, dirs: [0, 2] },
+        { x: 128, y: 254, dirs: [0, 2] },
+        { x: 131, y: 254, dirs: [0, 2] },
+        { x: 134, y: 254, dirs: [0, 2] },
+        { x: 137, y: 254, dirs: [0, 2] },
+        { x: 140, y: 254, dirs: [0, 2] },
+        { x: 143, y: 254, dirs: [0, 2] },
+        { x: 146, y: 254, dirs: [0, 2] },
+        { x: 149, y: 254, dirs: [0, 2] },
+        { x: 152, y: 254, dirs: [0, 2] },
+        { x: 155, y: 254, dirs: [0, 2] },
+        { x: 157, y: 254, dirs: [0, 1] },
+
 
     // Corredor direito → repara direita e esquerda
     { x: 157, y: 257, dirs: [1, 3] },
-	{ x: 157, y: 260, dirs: [1, 3] },
-	{ x: 157, y: 263, dirs: [1, 3] },
-	{ x: 157, y: 266, dirs: [1, 3] },
-	{ x: 157, y: 269, dirs: [1, 3] },
-	{ x: 157, y: 272, dirs: [1, 3] },
-	{ x: 157, y: 275, dirs: [1, 3] },
-	{ x: 157, y: 278, dirs: [1, 3] },
-	{ x: 157, y: 281, dirs: [1, 3] },
-	{ x: 157, y: 284, dirs: [1, 3] },
-	{ x: 157, y: 287, dirs: [1, 3] },
-	{ x: 157, y: 290, dirs: [1, 3] },
-	{ x: 157, y: 292, dirs: [1, 2] },
+        { x: 157, y: 260, dirs: [1, 3] },
+        { x: 157, y: 263, dirs: [1, 3] },
+        { x: 157, y: 266, dirs: [1, 3] },
+        { x: 157, y: 269, dirs: [1, 3] },
+        { x: 157, y: 272, dirs: [1, 3] },
+        { x: 157, y: 275, dirs: [1, 3] },
+        { x: 157, y: 278, dirs: [1, 3] },
+        { x: 157, y: 281, dirs: [1, 3] },
+        { x: 157, y: 284, dirs: [1, 3] },
+        { x: 157, y: 287, dirs: [1, 3] },
+        { x: 157, y: 290, dirs: [1, 3] },
+        { x: 157, y: 292, dirs: [1, 2] },
+
 
     // Corredor de baixo → repara cima e baixo
     { x: 154, y: 292, dirs: [0, 2] },
     { x: 151, y: 292, dirs: [0, 2] },
-	{ x: 148, y: 292, dirs: [0, 2] },
-	{ x: 145, y: 292, dirs: [0, 2] },
-	{ x: 142, y: 292, dirs: [0, 2] },
-	{ x: 139, y: 292, dirs: [0, 2] },
-	{ x: 136, y: 292, dirs: [0, 2] },
-	{ x: 133, y: 292, dirs: [0, 2] },
-	{ x: 130, y: 292, dirs: [0, 2] },
-	{ x: 127, y: 292, dirs: [0, 2] },
-	{ x: 124, y: 292, dirs: [0, 2] },
-	{ x: 121, y: 292, dirs: [0, 2] },
-	{ x: 118, y: 292, dirs: [0, 2] },
-	{ x: 115, y: 292, dirs: [0, 2] },
-	{ x: 112, y: 292, dirs: [0, 2] },
-	{ x: 109, y: 292, dirs: [0, 2] },
-	{ x: 106, y: 292, dirs: [0, 2] },
-	{ x: 103, y: 292, dirs: [0, 2] },
-	{ x: 102, y: 292, dirs: [2, 3] },
+        { x: 148, y: 292, dirs: [0, 2] },
+        { x: 145, y: 292, dirs: [0, 2] },
+        { x: 142, y: 292, dirs: [0, 2] },
+        { x: 139, y: 292, dirs: [0, 2] },
+        { x: 136, y: 292, dirs: [0, 2] },
+        { x: 133, y: 292, dirs: [0, 2] },
+        { x: 130, y: 292, dirs: [0, 2] },
+        { x: 127, y: 292, dirs: [0, 2] },
+        { x: 124, y: 292, dirs: [0, 2] },
+        { x: 121, y: 292, dirs: [0, 2] },
+        { x: 118, y: 292, dirs: [0, 2] },
+        { x: 115, y: 292, dirs: [0, 2] },
+        { x: 112, y: 292, dirs: [0, 2] },
+        { x: 109, y: 292, dirs: [0, 2] },
+        { x: 106, y: 292, dirs: [0, 2] },
+        { x: 103, y: 292, dirs: [0, 2] },
+        { x: 102, y: 292, dirs: [2, 3] },
+
 
     // Corredor esquerdo → repara direita e esquerda
     { x: 102,  y: 290, dirs: [1, 3] },
-	{ x: 102,  y: 287, dirs: [1, 3] },
-	{ x: 102,  y: 284, dirs: [1, 3] },
-	{ x: 102,  y: 281, dirs: [1, 3] },
+        { x: 102,  y: 287, dirs: [1, 3] },
+        { x: 102,  y: 284, dirs: [1, 3] },
+        { x: 102,  y: 281, dirs: [1, 3] },
     { x: 102,  y: 279, dirs: [1, 3] },
-	{ x: 102,  y: 276, dirs: [1, 3] },
-	{ x: 102,  y: 273, dirs: [1, 3] },
-	{ x: 102,  y: 270, dirs: [1, 3] },
-	{ x: 102,  y: 267, dirs: [1, 3] },
-	{ x: 102,  y: 264, dirs: [1, 3] },
-	{ x: 102,  y: 261, dirs: [1, 3] },
-	{ x: 102,  y: 258, dirs: [1, 3] },
-	{ x: 102,  y: 255, dirs: [1, 3] },
+        { x: 102,  y: 276, dirs: [1, 3] },
+        { x: 102,  y: 273, dirs: [1, 3] },
+        { x: 102,  y: 270, dirs: [1, 3] },
+        { x: 102,  y: 267, dirs: [1, 3] },
+        { x: 102,  y: 264, dirs: [1, 3] },
+        { x: 102,  y: 261, dirs: [1, 3] },
+        { x: 102,  y: 258, dirs: [1, 3] },
+        { x: 102,  y: 255, dirs: [1, 3] },
   ],
   
     waypointsUnderground: [
     // Corredor de cima → repara cima e baixo
     { x: 129, y: 252, dirs: [0, 2] },
     { x: 126, y: 252, dirs: [0, 2] },
-	{ x: 123, y: 252, dirs: [0, 2] },
-	{ x: 120, y: 252, dirs: [0, 2] },
-	{ x: 117, y: 252, dirs: [0, 2] },
-	{ x: 114, y: 252, dirs: [0, 2] },
-	{ x: 111, y: 252, dirs: [0, 2] },
-	{ x: 108, y: 252, dirs: [0, 2] },
-	{ x: 105, y: 252, dirs: [0, 2] },
-	{ x: 102, y: 252, dirs: [0, 3] },
+        { x: 123, y: 252, dirs: [0, 2] },
+        { x: 120, y: 252, dirs: [0, 2] },
+        { x: 117, y: 252, dirs: [0, 2] },
+        { x: 114, y: 252, dirs: [0, 2] },
+        { x: 111, y: 252, dirs: [0, 2] },
+        { x: 108, y: 252, dirs: [0, 2] },
+        { x: 105, y: 252, dirs: [0, 2] },
+        { x: 102, y: 252, dirs: [0, 3] },
+
 
     // Corredor esqerdo → repara direita e esquerda
     { x: 102, y: 254, dirs: [1, 3] },
     { x: 102, y: 257, dirs: [1, 3] },
-	{ x: 102, y: 260, dirs: [1, 3] },
-	{ x: 102, y: 263, dirs: [1, 3] },
-	{ x: 102, y: 266, dirs: [1, 3] },
-	{ x: 102, y: 269, dirs: [1, 3] },
-	{ x: 102, y: 272, dirs: [1, 3] },
-	{ x: 102, y: 275, dirs: [1, 3] },
-	{ x: 102, y: 278, dirs: [1, 3] },
-	{ x: 102, y: 281, dirs: [1, 3] },
-	{ x: 102, y: 284, dirs: [1, 3] },
-	{ x: 102, y: 285, dirs: [2, 3] },
+        { x: 102, y: 260, dirs: [1, 3] },
+        { x: 102, y: 263, dirs: [1, 3] },
+        { x: 102, y: 266, dirs: [1, 3] },
+        { x: 102, y: 269, dirs: [1, 3] },
+        { x: 102, y: 272, dirs: [1, 3] },
+        { x: 102, y: 275, dirs: [1, 3] },
+        { x: 102, y: 278, dirs: [1, 3] },
+        { x: 102, y: 281, dirs: [1, 3] },
+        { x: 102, y: 284, dirs: [1, 3] },
+        { x: 102, y: 285, dirs: [2, 3] },
+
 
     // Corredor de baixo → repara cima e baixo
     { x: 105, y: 285, dirs: [0, 2] },
     { x: 108, y: 285, dirs: [0, 2] },
-	{ x: 111, y: 285, dirs: [0, 2] },
-	{ x: 114, y: 285, dirs: [0, 2] },
-	{ x: 117, y: 285, dirs: [0, 2] },
-	{ x: 120, y: 285, dirs: [0, 2] },
-	{ x: 123, y: 285, dirs: [0, 2] },
-	{ x: 126, y: 285, dirs: [0, 2] },
-	{ x: 129, y: 285, dirs: [0, 2] },
-	{ x: 132, y: 285, dirs: [0, 2] },
-	{ x: 135, y: 285, dirs: [0, 2] },
-	{ x: 138, y: 285, dirs: [0, 2] },
-	{ x: 141, y: 285, dirs: [0, 2] },
-	{ x: 144, y: 285, dirs: [0, 2] },
-	{ x: 147, y: 285, dirs: [0, 2] },
-	{ x: 150, y: 285, dirs: [0, 2] },
-	{ x: 153, y: 285, dirs: [0, 2] },
-	{ x: 156, y: 285, dirs: [0, 2] },
-	{ x: 158, y: 285, dirs: [1, 2] },
+        { x: 111, y: 285, dirs: [0, 2] },
+        { x: 114, y: 285, dirs: [0, 2] },
+        { x: 117, y: 285, dirs: [0, 2] },
+        { x: 120, y: 285, dirs: [0, 2] },
+        { x: 123, y: 285, dirs: [0, 2] },
+        { x: 126, y: 285, dirs: [0, 2] },
+        { x: 129, y: 285, dirs: [0, 2] },
+        { x: 132, y: 285, dirs: [0, 2] },
+        { x: 135, y: 285, dirs: [0, 2] },
+        { x: 138, y: 285, dirs: [0, 2] },
+        { x: 141, y: 285, dirs: [0, 2] },
+        { x: 144, y: 285, dirs: [0, 2] },
+        { x: 147, y: 285, dirs: [0, 2] },
+        { x: 150, y: 285, dirs: [0, 2] },
+        { x: 153, y: 285, dirs: [0, 2] },
+        { x: 156, y: 285, dirs: [0, 2] },
+        { x: 158, y: 285, dirs: [1, 2] },
+
 
     // Corredor direito → repara direita e esquerda
     { x: 158,  y: 282, dirs: [1, 3] },
     { x: 158,  y: 279, dirs: [1, 3] },
-	{ x: 158,  y: 276, dirs: [1, 3] },
-	{ x: 158,  y: 273, dirs: [1, 3] },
-	{ x: 158,  y: 270, dirs: [1, 3] },
-	{ x: 158,  y: 267, dirs: [1, 3] },
-	{ x: 158,  y: 264, dirs: [1, 3] },
-	{ x: 158,  y: 261, dirs: [1, 3] },
-	{ x: 158,  y: 258, dirs: [1, 3] },
-	{ x: 158,  y: 255, dirs: [1, 3] },
-	{ x: 158,  y: 252, dirs: [0, 1] },
-	// Corredor cima → repara cima e baixo
-	{ x: 156, y: 252, dirs: [0, 2] },
-	{ x: 153, y: 252, dirs: [0, 2] },
-	{ x: 150, y: 252, dirs: [0, 2] },
-	{ x: 147, y: 252, dirs: [0, 2] },
-	{ x: 144, y: 252, dirs: [0, 2] },
-	{ x: 141, y: 252, dirs: [0, 2] },
-	{ x: 138, y: 252, dirs: [0, 2] },
-	{ x: 135, y: 252, dirs: [0, 2] },
-	{ x: 132, y: 252, dirs: [0, 2] },
+        { x: 158,  y: 276, dirs: [1, 3] },
+        { x: 158,  y: 273, dirs: [1, 3] },
+        { x: 158,  y: 270, dirs: [1, 3] },
+        { x: 158,  y: 267, dirs: [1, 3] },
+        { x: 158,  y: 264, dirs: [1, 3] },
+        { x: 158,  y: 261, dirs: [1, 3] },
+        { x: 158,  y: 258, dirs: [1, 3] },
+        { x: 158,  y: 255, dirs: [1, 3] },
+        { x: 158,  y: 252, dirs: [0, 1] },
+        // Corredor cima → repara cima e baixo
+        { x: 156, y: 252, dirs: [0, 2] },
+        { x: 153, y: 252, dirs: [0, 2] },
+        { x: 150, y: 252, dirs: [0, 2] },
+        { x: 147, y: 252, dirs: [0, 2] },
+        { x: 144, y: 252, dirs: [0, 2] },
+        { x: 141, y: 252, dirs: [0, 2] },
+        { x: 138, y: 252, dirs: [0, 2] },
+        { x: 135, y: 252, dirs: [0, 2] },
+        { x: 132, y: 252, dirs: [0, 2] },
   ],
   
   get waypoints() {                                    // ← aqui, dentro do {}
@@ -8552,6 +13093,7 @@ dsk.baseRepair = {
   },
 };
 
+
 // ← aqui fora, logo abaixo do objeto
 function xGetWallHpByDir(dir) {
   if (dir === 0) return xGetWallHp(myself.x,     myself.y - 1);
@@ -8561,16 +13103,19 @@ function xGetWallHpByDir(dir) {
   return -1;
 }
 
+
 async function BaseRepairBot() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   if (xGoing[117] === true) return;
   xGoing[117] = true;
 
+
   // ── Troca kit quebrado ────────────────────────────────────────
   if (inv[0]?.equip === 2) {
   await xDoKeyUp(6);
   await xDelay(400);
+
 
   // Verifica se ainda tem kit no slot alvo
   if (inv[dsk.baseRepair.kitSlot - 1]?.sprite === 719) {
@@ -8587,6 +13132,7 @@ async function BaseRepairBot() {
   }
 }
 
+
   // ── Move para o waypoint atual ────────────────────────────────
   const wp = dsk.baseRepair.waypoints[dsk.baseRepair.wpIndex];
   if (!wp) {
@@ -8595,34 +13141,41 @@ async function BaseRepairBot() {
     return;
   }
 
+
   const dist = Math.abs(myself.x - wp.x) + Math.abs(myself.y - wp.y);
   if (dist > 0) {
     await xDoMove(wp.x, wp.y);
-    await xDelay(600);
+    await xDelay(700);
     xGoing[117] = false;
     return;
   }
 
+
   // ── Repara nas direções definidas no waypoint ─────────────────
   // dirs: 0=cima, 1=direita, 2=baixo, 3=esquerda
-	for (const dir of wp.dirs) {
-	  await xDoChangeDir(dir);
-	  await xDelay(350);
+        for (const dir of wp.dirs) {
+          await xDoChangeDir(dir);
+          await xDelay(450);
 
-	  // primeiro toque para revelar o HP
-	  await xDoKeyPress(6, 200);
-	  await xDelay(600);
 
-	  // continua reparando até 95% ou sumir
-	  while (xGetWallHpByDir(dir) < 99 && xGetWallHpByDir(dir) !== -1) {
-		if (inv[0]?.equip === 2) {
-		  xGoing[117] = false;
-		  return; // kit quebrou, sai para trocar
-		}
-		await xDoKeyPress(6, 200);
-		await xDelay(400);
-	  }
-	}
+          // primeiro toque para revelar o HP
+          await xDoKeyPress(6, 200);
+          await xDelay(800);
+          await xDoKeyPress(6, 200);
+          await xDelay(800);
+
+
+          // continua reparando até 99% ou sumir
+          while (xGetWallHpByDir(dir) < 99 && xGetWallHpByDir(dir) !== -1) {
+                if (inv[0]?.equip === 2) {
+                  xGoing[117] = false;
+                  return; // kit quebrou, sai para trocar
+                }
+                await xDoKeyPress(6, 200);
+                await xDelay(700);
+          }
+        }
+
 
   // ── Próximo waypoint ──────────────────────────────────────────
   dsk.baseRepair.wpIndex++;
@@ -8631,15 +13184,18 @@ async function BaseRepairBot() {
     dsk.localMsg('Base Repair: ciclo completo, reiniciando...', '#0ff');
   }
 
+
   xGoing[117] = false;
 }
+
 
 dsk.setCmd('/baserepair', () => {
   dsk.baseRepair.enabled = !dsk.baseRepair.enabled;
 
+
   if (dsk.baseRepair.enabled) {
     dsk.baseRepair.wpIndex = 0;
-	dsk.baseRepair.kitSlot = 2;
+        dsk.baseRepair.kitSlot = 2;
     dsk.localMsg(`Base Repair: Ativado (${dsk.baseRepair.waypoints.length} waypoints)`, '#5f5');
     (async function loop() {
       while (dsk.baseRepair.enabled) {
@@ -8655,7 +13211,10 @@ dsk.setCmd('/baserepair', () => {
 });
 
 
+
+
 // ── AUTO EXPLO ─────────────────────────────────────────────────
+
 
 dsk.explo = {
   enabled: false,
@@ -8674,11 +13233,13 @@ dsk.explo = {
   ],
 };
 
+
 async function xExplo() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   if (xGoing[121] === true) return;
   xGoing[121] = true;
+
 
   const wp = dsk.explo.waypoints[dsk.explo.wpIndex];
   if (!wp) {
@@ -8687,7 +13248,9 @@ async function xExplo() {
     return;
   }
 
+
   const dist = Math.abs(myself.x - wp.x) + Math.abs(myself.y - wp.y);
+
 
   // Ativa speed quando longe, desativa quando perto
   if (dist > 10 && !dsk.speed.interval) {
@@ -8697,31 +13260,38 @@ async function xExplo() {
     dsk.speed.stop();
   }
 
+
   if (dist <= 2) {
     // Chegou no waypoint → próximo
     dsk.speed.stop();
     dsk.explo.wpIndex++;
+
 
     if (dsk.explo.wpIndex >= dsk.explo.waypoints.length) {
       dsk.explo.wpIndex = 0;
       dsk.localMsg('Explo: ciclo completo, reiniciando...', '#0ff');
     }
 
+
     xMovingNow = false;
     xGoing[121] = false;
     return;
   }
+
 
   // Move para o waypoint
   if (!xMovingNow) {
     await xDoMove(wp.x, wp.y);
   }
 
+
   xGoing[121] = false;
 }
 
+
 dsk.setCmd('/explo', () => {
   dsk.explo.enabled = !dsk.explo.enabled;
+
 
   if (dsk.explo.enabled) {
     dsk.explo.wpIndex = 0;
@@ -8746,7 +13316,10 @@ dsk.setCmd('/explo', () => {
 });
 
 
+
+
 /*```
+
 
 A lógica de `dirs` fica assim:
 ```
@@ -8754,6 +13327,7 @@ dirs: [0, 2]  → repara cima (0) e baixo (2)   ← corredores top/bottom
 dirs: [1, 3]  → repara direita (1) e esquerda (3) ← corredores left/right
 dirs: [0]     → só cima (canto, por exemplo)
 dirs: [0,1,2,3] → repara todas as 4 direções (sala central)*/
+
 
 // ── TOP SKILL CALCULATOR ─────────────────────────────────────
 // Baseado na planilha "Mystera Legacy Top Skill Calculator" by Sidran (EU)
@@ -8764,18 +13338,23 @@ dirs: [0,1,2,3] → repara todas as 4 direções (sala central)*/
 //   /topskill        → abre/fecha o painel
 //   /topskill reset  → reseta as estrelas de mastery salvas
 
+
 // ── Fórmulas da planilha ──────────────────────────────────────
+
 
 const TSC_A = 1.0315834879;
 const TSC_B = 3.324817;
+
 
 function tscXP(level) {
   return TSC_A * Math.pow(level, TSC_B);
 }
 
+
 function tscRawXP(level, stars) {
   return TSC_A * Math.pow(level, TSC_B) - TSC_A * Math.pow(10 * stars, TSC_B);
 }
+
 
 function tscNomLvl(level, stars) {
   const raw = tscRawXP(level, stars);
@@ -8783,11 +13362,13 @@ function tscNomLvl(level, stars) {
   return Math.pow(raw / TSC_A, 1 / TSC_B) - 2 * stars;
 }
 
+
 function tscNeeded(level, stars, topNomLvl) {
   const goalXP = TSC_A * Math.pow(topNomLvl + 2 * stars, TSC_B)
                + TSC_A * Math.pow(10 * stars, TSC_B);
   return Math.pow(goalXP / TSC_A, 1 / TSC_B) - level;
 }
+
 
 function tscCharXP(level, stars, skillMastery) {
   // char XP = se level >= (skillMastery+1)*10 → capped, senão rawXP
@@ -8798,6 +13379,7 @@ function tscCharXP(level, stars, skillMastery) {
   }
   return tscRawXP(level, stars);
 }
+
 
 // Lê todos os skills disponíveis em jv.skills
 // data[0] = estrelas ★, data[1] = level atual
@@ -8810,10 +13392,13 @@ function tscGetSkillsFromGame() {
   })).filter(s => s.level > 0);
 }
 
+
 // ── Cálculo principal ─────────────────────────────────────────
+
 
 function tscCalculate() {
   const skills = tscGetSkillsFromGame();
+
 
   // Calcula nomLvl para cada skill usando stars do jogo
   const withNom = skills.map(s => {
@@ -8821,8 +13406,10 @@ function tscCalculate() {
     return { ...s, nom };
   });
 
+
   // Encontra o TOP (maior nomLvl)
   const topNom = Math.max(...withNom.map(s => s.nom));
+
 
   // Calcula "levels needed" para cada skill
   const result = withNom.map(s => {
@@ -8831,6 +13418,7 @@ function tscCalculate() {
     return { ...s, isTop, needed, topNom };
   });
 
+
   // Ordena: TOP primeiro, depois por "needed" crescente
   result.sort((a, b) => {
     if (a.isTop) return -1;
@@ -8838,11 +13426,14 @@ function tscCalculate() {
     return a.needed - b.needed;
   });
 
+
   const charLevel = myself?.level ?? 0;
   return { skills: result, topNom, charLevel };
 }
 
+
 // ── DIALOG ────────────────────────────────────────────────────
+
 
 dsk.tsc = {
   enabled: false,
@@ -8851,184 +13442,653 @@ dsk.tsc = {
   editSkill: null,
 };
 
-dsk.tscDialog = jv.Dialog.create(310, 310);
-const tscD = dsk.tscDialog;
-tscD.visible = false;
 
-// Header
-tscD.hdr = jv.text('Top Skill Calculator', {
-  font: '13px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
-});
-tscD.addChild(tscD.hdr);
-jv.center(tscD.hdr);
-jv.top(tscD.hdr, 4);
+// ── Top Skill Calculator (HTML overlay) ─────────────────────
 
-// Botões fechar / mover
-const tscBtnClose = jv.Button.create(0, 0, 24, 'X', tscD, 24);
-jv.top(tscBtnClose, 4); jv.right(tscBtnClose, 4);
-tscBtnClose.on_click = () => { tscD.visible = 0; dsk.tsc.enabled = false; };
 
-const tscBtnMove = jv.Button.create(0, 0, 24, '@', tscD, 24);
-jv.top(tscBtnMove, 4); jv.right(tscBtnMove, 28);
+(function () {
+  let tscPanel = null;
 
-// Drag
-tscD._px = 0; tscD._py = 0;
-window.addEventListener('mousemove', e => { tscD._px = e.clientX; tscD._py = e.clientY; });
-window.addEventListener('touchmove', e => { tscD._px = e.touches[0].clientX; tscD._py = e.touches[0].clientY; });
-dsk.on('postLoop', () => {
-  if (!tscBtnMove.is_pressed) {
-    tscD.x = Math.max(0, Math.min(tscD.x, jv.game_width  - tscD.w));
-    tscD.y = Math.max(0, Math.min(tscD.y, jv.game_height - tscD.h));
+
+  const tscD = {
+    get visible() { return !!tscPanel; },
+    set visible(v) { if (!v && tscPanel) removePanel(); else if (v && !tscPanel) createPanel(); },
+  };
+  dsk.tscDialog = tscD;
+
+
+  function renderRows() {
+    if (!tscPanel || !myself || !jv.skills) return;
+    const { skills, charLevel } = tscCalculate();
+    const page = dsk.tsc.page, perPage = dsk.tsc.perPage;
+    const total = Math.ceil(skills.length / perPage);
+    const slice = skills.slice(page * perPage, (page + 1) * perPage);
+    const top = skills.find(s => s.isTop);
+
+
+    const q = k => tscPanel.querySelector(`[data-tsc="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    set('char', `Char Level: ${charLevel}`);
+    set('top',  top ? `⚠ TREINAR: ${top.name.toUpperCase()} (nomLvl ${top.nom.toFixed(1)})` : 'TOP: -');
+    set('page', `${page + 1}/${total || 1}`);
+
+
+    const tbody = q('tbody');
+    if (!tbody) return;
+    tbody.innerHTML = '';
+    slice.forEach(sk => {
+      const tr = document.createElement('tr');
+      const n = sk.needed;
+      [
+        { t: sk.name.slice(0, 18), c: sk.isTop ? '#FFD700' : '#ddd' },
+        { t: String(sk.level),     c: '#ddd' },
+        { t: `★${sk.stars}`,       c: '#FFD700' },
+        { t: sk.nom.toFixed(1),    c: sk.isTop ? '#FFD700' : '#aaffaa' },
+        { t: sk.isTop ? 'TOP ✓' : `+${n.toFixed(1)}`, c: sk.isTop ? '#44ff44' : (n < 5 ? '#ffff44' : '#ffaaaa') },
+      ].forEach(({ t, c }) => {
+        const td = document.createElement('td');
+        td.textContent = t;
+        Object.assign(td.style, { padding: '3px 5px', fontSize: '10px', color: c, borderBottom: '1px solid #222' });
+        tr.appendChild(td);
+      });
+      tbody.appendChild(tr);
+    });
+
+
+    const pv = q('prev'), nx = q('next');
+    if (pv) pv.style.opacity = page > 0 ? '1' : '0.3';
+    if (nx) nx.style.opacity = page < total - 1 ? '1' : '0.3';
+  }
+
+
+  let _tscTimer = 0;
+  dsk.on('postLoop', () => { if (!tscPanel) return; _tscTimer++; if (_tscTimer % 300 === 0) renderRows(); });
+
+
+  function createPanel() {
+    if (tscPanel) { removePanel(); return; }
+    tscPanel = document.createElement('div');
+    Object.assign(tscPanel.style, {
+      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
+      width: '340px', background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🏆 Top Skill Calculator';
+    Object.assign(titleEl.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => { removePanel(); dsk.tsc.enabled = false; };
+    header.appendChild(titleEl); header.appendChild(closeBtn);
+
+
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - tscPanel.getBoundingClientRect().left;
+      oy = _xy.y - tscPanel.getBoundingClientRect().top;
+      tscPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); tscPanel.style.left = (_xy.x - ox) + 'px'; tscPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // Info
+    const info = document.createElement('div');
+    Object.assign(info.style, { padding: '6px 10px', borderBottom: '1px solid #333' });
+    const charEl = document.createElement('div');
+    charEl.dataset.tsc = 'char'; charEl.textContent = 'Char Level: -';
+    Object.assign(charEl.style, { color: '#88ffff', fontSize: '11px' });
+    const topEl = document.createElement('div');
+    topEl.dataset.tsc = 'top'; topEl.textContent = 'TOP: -';
+    Object.assign(topEl.style, { color: '#FFD700', fontSize: '11px', marginTop: '2px' });
+    info.appendChild(charEl); info.appendChild(topEl);
+
+
+    // Table
+    const tableWrap = document.createElement('div');
+    Object.assign(tableWrap.style, { padding: '4px 8px' });
+    const table = document.createElement('table');
+    Object.assign(table.style, { width: '100%', borderCollapse: 'collapse' });
+    const thead = document.createElement('thead');
+    const hRow = document.createElement('tr');
+    ['Skill','Lvl','★','nomLvl','needed'].forEach(t => {
+      const th = document.createElement('th');
+      th.textContent = t;
+      Object.assign(th.style, { textAlign: 'left', fontSize: '9px', color: '#888', padding: '2px 5px', borderBottom: '1px solid #333' });
+      hRow.appendChild(th);
+    });
+    thead.appendChild(hRow);
+    const tbody = document.createElement('tbody');
+    tbody.dataset.tsc = 'tbody';
+    table.appendChild(thead); table.appendChild(tbody);
+    tableWrap.appendChild(table);
+
+
+    // Footer
+    const footer = document.createElement('div');
+    Object.assign(footer.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 10px', borderTop: '1px solid #333' });
+    const pageEl = document.createElement('span');
+    pageEl.dataset.tsc = 'page'; pageEl.textContent = '1/1';
+    Object.assign(pageEl.style, { color: '#aaa', fontSize: '10px' });
+
+
+    const btnWrap = document.createElement('div');
+    Object.assign(btnWrap.style, { display: 'flex', gap: '4px' });
+    function mkBtn(txt, key, onclick) {
+      const b = document.createElement('button');
+      b.textContent = txt; b.dataset.tsc = key;
+      Object.assign(b.style, { padding: '3px 8px', borderRadius: '5px', border: '1px solid #555', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '11px' });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = onclick;
+      return b;
+    }
+    const bPrev = mkBtn('<', 'prev', () => { if (dsk.tsc.page > 0) { dsk.tsc.page--; renderRows(); } });
+    const bNext = mkBtn('>', 'next', () => {
+      if (!myself || !jv.skills) return;
+      const { skills } = tscCalculate();
+      const max = Math.ceil(skills.length / dsk.tsc.perPage) - 1;
+      if (dsk.tsc.page < max) { dsk.tsc.page++; renderRows(); }
+    });
+    const bCalc = mkBtn('↺ Recalcular', 'recalc', () => renderRows());
+    Object.assign(bCalc.style, { border: '1px solid #FFD700', color: '#FFD700' });
+    btnWrap.appendChild(bPrev); btnWrap.appendChild(bNext); btnWrap.appendChild(bCalc);
+    footer.appendChild(pageEl); footer.appendChild(btnWrap);
+
+
+    tscPanel.appendChild(header);
+    tscPanel.appendChild(info);
+    tscPanel.appendChild(tableWrap);
+    tscPanel.appendChild(footer);
+    document.body.appendChild(tscPanel);
+    renderRows();
+  }
+
+
+  function removePanel() { if (tscPanel) { tscPanel.remove(); tscPanel = null; } }
+
+
+  dsk.setCmd('/topskill', () => {
+    dsk.tsc.enabled = !dsk.tsc.enabled;
+    if (dsk.tsc.enabled) {
+      dsk.tsc.page = 0;
+      createPanel();
+      dsk.localMsg('Top Skill Calc: Aberto', '#5f5');
+    } else {
+      removePanel();
+      dsk.localMsg('Top Skill Calc: Fechado', '#f55');
+    }
+  });
+})();
+
+
+
+
+// ══════════════════════════════════════════════════════════════
+// 🌲  RECURSOS BOT  ─  by Pablo Mod
+// Config: /recursosconfig  |  Toggle: /recursos
+// ══════════════════════════════════════════════════════════════
+dsk.recursos = { enabled: false };
+
+
+// ── Lista de alvos disponíveis ────────────────────────────────
+const RECURSOS_ALL_TARGETS = [
+  { key: 'Fir Tree',    label: '🌲 Fir Tree'    },
+  { key: 'Plain Rock',  label: '🪨 Plain Rock'  },
+  { key: 'Spice Bush',  label: '🌿 Spice Bush'  },
+  { key: 'Berry Bush',  label: '🫐 Berry Bush'  },
+  { key: 'Holly Bush',  label: '🍃 Holly Bush'  },
+  { key: 'Dye Bush',    label: '🎨 Dye Bush'    },
+  { key: 'Rock',        label: '🪨 Rock'        },
+  { key: 'Shiny Rock',  label: '✨ Shiny Rock'  },
+  { key: 'Black Rock',  label: '⬛ Black Rock'  },
+];
+
+
+// Estado da seleção (persistido entre aberturas do painel)
+window.recursosConfig = window.recursosConfig ?? {
+  selected: new Set(['Fir Tree', 'Plain Rock', 'Spice Bush', 'Berry Bush', 'Holly Bush', 'Dye Bush', 'Rock', 'Shiny Rock', 'Black Rock']),
+};
+
+
+const RECURSOS_RADIUS = 15;
+
+
+// ── Calcula direção necessária para virar em direção ao alvo ──
+function xGetDirTo(ax, ay) {
+  const dx = ax - myself.x;
+  const dy = ay - myself.y;
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return dx > 0 ? 1 : 3; // direita : esquerda
+  } else {
+    return dy > 0 ? 2 : 0; // baixo : cima
+  }
+}
+
+
+// ── Função principal ──────────────────────────────────────────
+async function xRecursos() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[140] === true) return;
+  xGoing[140] = true;
+
+
+  // ── Verifica itens quebrados ──────────────────────────────────
+  if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2) {
+    xChangeStatus('[RB] Item quebrado!');
+    xGoing[140] = false;
     return;
   }
-  const canvas = document.querySelector('canvas');
-  const rect = canvas ? canvas.getBoundingClientRect() : {left:0,top:0,width:jv.game_width,height:jv.game_height};
-  tscD.x = (tscD._px - rect.left)*(jv.game_width/rect.width)  - tscD.w/2;
-  tscD.y = (tscD._py - rect.top) *(jv.game_height/rect.height) - 12;
-});
 
-// Labels de status
-tscD.lblChar = jv.text('Char Level: -', {
-  font: '11px Verdana', fill: 0x88ffff, stroke: 0x000000, strokeThickness: 2,
-});
-tscD.lblChar.x = 8; tscD.lblChar.y = 26;
-tscD.addChild(tscD.lblChar);
 
-tscD.lblTop = jv.text('TOP: -', {
-  font: '11px Verdana', fill: 0xFFD700, stroke: 0x000000, strokeThickness: 2,
-});
-tscD.lblTop.x = 8; tscD.lblTop.y = 38;
-tscD.addChild(tscD.lblTop);
-
-// Cabeçalho da tabela
-const tscMkHdr = (txt, x, y) => {
-  const l = jv.text(txt, { font: '9px Verdana', fill: 0xaaaaaa, stroke: 0x000000, strokeThickness: 2 });
-  l.x = x; l.y = y; tscD.addChild(l); return l;
-};
-tscMkHdr('Skill',    8,  52);
-tscMkHdr('Lvl',    155,  52);
-tscMkHdr('★',      185,  52);
-tscMkHdr('nomLvl', 210,  52);
-tscMkHdr('needed', 262,  52);
-
-// Linhas de skill
-tscD.rows = [];
-for (let i = 0; i < 8; i++) {
-  const y = 63 + i * 24;
-
-  const name = jv.text('-', { font: '10px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  name.x = 8; name.y = y;
-
-  const lvl = jv.text('-', { font: '10px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-  lvl.x = 155; lvl.y = y;
-
-  const stars = jv.text('-', { font: '10px Verdana', fill: 0xFFD700, stroke: 0x000000, strokeThickness: 2 });
-  stars.x = 185; stars.y = y;
-
-  const nom = jv.text('-', { font: '10px Verdana', fill: 0xaaffaa, stroke: 0x000000, strokeThickness: 2 });
-  nom.x = 210; nom.y = y;
-
-  const needed = jv.text('-', { font: '10px Verdana', fill: 0xffaaaa, stroke: 0x000000, strokeThickness: 2 });
-  needed.x = 258; needed.y = y;
-
-  [name, lvl, stars, nom, needed].forEach(el => tscD.addChild(el));
-  tscD.rows.push({ name, lvl, stars, nom, needed });
-}
-
-// Paginação
-const tscBtnPrev = jv.Button.create(0, 0, 24, '<', tscD, 22);
-jv.bottom(tscBtnPrev, 4); tscBtnPrev.x = tscD.w - 58;
-tscBtnPrev.on_click = () => { if (dsk.tsc.page > 0) { dsk.tsc.page--; tscRender(); } };
-
-const tscBtnNext = jv.Button.create(0, 0, 24, '>', tscD, 22);
-jv.bottom(tscBtnNext, 4); tscBtnNext.x = tscD.w - 30;
-tscBtnNext.on_click = () => {
-  const { skills } = tscCalculate();
-  const max = Math.ceil(skills.length / dsk.tsc.perPage) - 1;
-  if (dsk.tsc.page < max) { dsk.tsc.page++; tscRender(); }
-};
-
-tscD.lblPage = jv.text('1/1', { font: '10px Verdana', fill: 0xffffff, stroke: 0x000000, strokeThickness: 2 });
-tscD.lblPage.x = tscD.w - 100; jv.bottom(tscD.lblPage, 8);
-tscD.addChild(tscD.lblPage);
-
-// Botão Recalcular
-const tscBtnCalc = jv.Button.create(8, tscD.h - 30, 100, '↺ Recalcular', tscD, 22);
-tscBtnCalc.on_click = () => tscRender();
-
-// ── Render ────────────────────────────────────────────────────
-
-function tscRender() {
-  if (!myself || !jv.skills) return;
-
-  const { skills, charLevel } = tscCalculate();
-  const page  = dsk.tsc.page;
-  const total = Math.ceil(skills.length / dsk.tsc.perPage);
-  const slice = skills.slice(page * dsk.tsc.perPage, (page + 1) * dsk.tsc.perPage);
-
-  // Pega o TOP
-  const top = skills.find(s => s.isTop);
-  tscD.lblChar.text = `Char Level: ${charLevel}`;
-  tscD.lblTop.text  = top ? `⚠ TREINAR: ${top.name.toUpperCase()} (nomLvl ${top.nom.toFixed(1)})` : 'TOP: -';
-  tscD.lblPage.text = `${page + 1}/${total || 1}`;
-
-  // Atualiza linhas
-  for (let i = 0; i < tscD.rows.length; i++) {
-    const row = tscD.rows[i];
-    const sk  = slice[i];
-
-    if (!sk) {
-      row.name.text   = '';
-      row.lvl.text    = '';
-      row.stars.text  = '';
-      row.nom.text    = '';
-      row.needed.text = '';
-      continue;
-    }
-
-    row.name.text   = sk.name.slice(0, 18);
-    row.lvl.text    = String(sk.level);
-    row.stars.text  = `★${sk.stars}`;
-    row.nom.text    = sk.nom.toFixed(1);
-
-    if (sk.isTop) {
-      row.needed.text           = 'TOP ✓';
-      row.needed.style.fill     = 0x44ff44;
-      row.nom.style.fill        = 0xFFD700;
-      row.name.style.fill       = 0xFFD700;
-    } else {
-      const n = sk.needed;
-      row.needed.text           = `+${n.toFixed(1)}`;
-      row.needed.style.fill     = n < 5 ? 0xffff44 : 0xffaaaa;
-      row.nom.style.fill        = 0xaaffaa;
-      row.name.style.fill       = 0xffffff;
+  // ── Coleta Pinecone se perto ──────────────────────────────────
+  const pinecone = objects.items.find(el => el?.name === 'Pinecone');
+  if (pinecone) {
+    const distPine = Math.abs(pinecone.x - myself.x) + Math.abs(pinecone.y - myself.y);
+    if (distPine <= 5) {
+      await xDoMove(pinecone.x, pinecone.y);
+      await xDelay(500);
+      await xDoPickUp();
+      await xDelay(200);
     }
   }
+
+
+  const activeTargets = [...recursosConfig.selected];
+
+
+  if (activeTargets.length === 0) {
+    xChangeStatus('[RB] Nenhum alvo selecionado!');
+    xGoing[140] = false;
+    return;
+  }
+
+
+  // ── Busca recursos selecionados ───────────────────────────────
+  const recursos = objects.items.filter(el => el && activeTargets.includes(el.name));
+
+
+  if (recursos.length === 0) {
+    const lMin = 8, lMax = 15;
+    const dx = (Math.random() < 0.5 ? -1 : 1) * (Math.floor(Math.random() * (lMax - lMin + 1)) + lMin);
+    const dy = (Math.random() < 0.5 ? -1 : 1) * (Math.floor(Math.random() * (lMax - lMin + 1)) + lMin);
+    const nx = Math.min(Math.max(myself.x + dx, 0), 500);
+    const ny = Math.min(Math.max(myself.y + dy, 0), 500);
+    xMovingNow = false;
+    await xDoMove(nx, ny);
+    const startWalk = Date.now();
+    while ((myself.x !== nx || myself.y !== ny) && Date.now() - startWalk < 6000) {
+      await xDelay(100);
+    }
+    xGoing[140] = false;
+    return;
+  }
+
+
+  // ── Ordena por distância Manhattan ───────────────────────────
+  recursos.sort((a, b) =>
+    (Math.abs(a.x - myself.x) + Math.abs(a.y - myself.y)) -
+    (Math.abs(b.x - myself.x) + Math.abs(b.y - myself.y))
+  );
+
+
+  const alvo = recursos[0];
+  const dist = Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y);
+
+
+  if (dist > RECURSOS_RADIUS) {
+    xMovingNow = false;
+    await xDoMove(alvo.x, alvo.y);
+    const startApprox = Date.now();
+    while (
+      (Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y)) > RECURSOS_RADIUS &&
+      Date.now() - startApprox < 8000
+    ) {
+      await xDelay(100);
+    }
+    xGoing[140] = false;
+    return;
+  }
+
+
+  // ── Calcula melhor tile adjacente para atacar ─────────────────
+  const sides = [
+    { x: alvo.x + 1, y: alvo.y,     dir: 3 },
+    { x: alvo.x - 1, y: alvo.y,     dir: 1 },
+    { x: alvo.x,     y: alvo.y + 1, dir: 0 },
+    { x: alvo.x,     y: alvo.y - 1, dir: 2 },
+  ];
+
+
+  let bestSide = null;
+  let bestDist = Infinity;
+  for (const side of sides) {
+    if (xGetSolidByID(side.x, side.y)) continue;
+    const d = Math.abs(side.x - myself.x) + Math.abs(side.y - myself.y);
+    if (d < bestDist) { bestDist = d; bestSide = side; }
+  }
+
+
+  if (!bestSide) { xGoing[140] = false; return; }
+
+
+  // ── Move e espera chegar ──────────────────────────────────────
+  if (myself.x !== bestSide.x || myself.y !== bestSide.y) {
+    xMovingNow = false;
+    await xDoMove(bestSide.x, bestSide.y);
+    const start = Date.now();
+    while (
+      (myself.x !== bestSide.x || myself.y !== bestSide.y) &&
+      Date.now() - start < 5000
+    ) {
+      await xDelay(100);
+    }
+  }
+
+
+  // ── Checa se está adjacente (distância 1) ────────────────────
+  const distFinal = Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y);
+  if (distFinal !== 1) {
+    xGoing[140] = false;
+    return;
+  }
+
+
+  // ── Vira com base na posição real atual ───────────────────────
+  const dx = alvo.x - myself.x;
+  const dy = alvo.y - myself.y;
+  const dirFinal = Math.abs(dx) >= Math.abs(dy)
+    ? (dx > 0 ? 1 : 3)
+    : (dy > 0 ? 2 : 0);
+
+
+  if (myself.dir !== dirFinal) {
+    await xDoChangeDir(dirFinal);
+    await xDelay(350);
+  }
+
+
+  // ── Ataca segurando a tecla ───────────────────────────────────
+  const tx = alvo.x, ty = alvo.y, tn = alvo.name;
+  const aindaExiste = () => objects.items.find(el =>
+    el && el.name === tn && el.x === tx && el.y === ty
+  );
+
+
+  if (aindaExiste()) {
+    await xDoKeyDown(6);
+    while (aindaExiste() && dsk.recursos.enabled && !dskPaused) {
+      await xDelay(150);
+    }
+    await xDoKeyUp(6);
+    await xDelay(150);
+  }
+
+
+  xGoing[140] = false;
 }
+// ══════════════════════════════════════════════════════════════
+// ⚙️  RECURSOS CONFIG PANEL  (estilo craft config)
+// ══════════════════════════════════════════════════════════════
 
-// ── Atualiza automaticamente a cada 5s ───────────────────────
 
-let tscTimer = 0;
-dsk.on('postLoop', () => {
-  if (!tscD.visible) return;
-  tscTimer++;
-  if (tscTimer % 300 === 0) tscRender(); // ~5s @ 60fps
-});
+(function () {
+  let rcPanel = null;
 
-// ── Comando ───────────────────────────────────────────────────
 
-dsk.setCmd('/topskill', () => {
-  dsk.tsc.enabled = !dsk.tsc.enabled;
-  tscD.visible = dsk.tsc.enabled;
+  const rc = {
+    get visible() { return !!rcPanel; },
+    set visible(v) { if (!v && rcPanel) removePanel(); else if (v && !rcPanel) createPanel(); },
+  };
+  dsk.recursosManager = rc;
 
-  if (dsk.tsc.enabled) {
-    dsk.tsc.page = 0;
-    tscRender();
-    dsk.localMsg('Top Skill Calc: Aberto', '#5f5');
+
+  // Atualiza botão play em tempo real
+  dsk.on('postLoop', () => {
+    if (!rcPanel) return;
+    const btn = rcPanel.querySelector('[data-rc="playbtn"]');
+    if (!btn) return;
+    const on = !!dsk.recursos?.enabled;
+    btn.textContent       = on ? '⏹ Stop' : '▶ Play';
+    btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+    btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+    btn.style.color       = on ? '#e74c3c' : '#2ecc71';
+  });
+
+
+  function removePanel() {
+    if (rcPanel) { rcPanel.remove(); rcPanel = null; }
+  }
+
+
+  function createPanel() {
+    if (rcPanel) { removePanel(); return; }
+
+
+    rcPanel = document.createElement('div');
+    Object.assign(rcPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '240px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🌲 Recursos Bot';
+    Object.assign(titleEl.style, { color: '#4ade80', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - rcPanel.getBoundingClientRect().left;
+      oy = _xy.y - rcPanel.getBoundingClientRect().top;
+      rcPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); rcPanel.style.left = (_xy.x - ox) + 'px'; rcPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+
+    const secLabel = document.createElement('div');
+    secLabel.textContent = '── Alvos de Coleta ──';
+    Object.assign(secLabel.style, { color: '#777', fontSize: '10px', textAlign: 'center', paddingBottom: '2px' });
+    body.appendChild(secLabel);
+
+
+    // Botões multi-select
+    const targetBtns = {};
+
+
+    RECURSOS_ALL_TARGETS.forEach(({ key, label }) => {
+      const btn = document.createElement('button');
+      btn.textContent = label;
+
+
+      function updateBtn() {
+        const sel = recursosConfig.selected.has(key);
+        btn.style.background  = sel ? '#1a3a2a' : '#2a2a3e';
+        btn.style.borderColor = sel ? '#2ecc71' : '#444';
+        btn.style.color       = sel ? '#2ecc71' : '#ccc';
+        btn.style.fontWeight  = sel ? 'bold'    : 'normal';
+      }
+
+
+      Object.assign(btn.style, {
+        width: '100%', padding: '7px 8px', borderRadius: '6px',
+        border: '1px solid #444', background: '#2a2a3e',
+        color: '#ccc', cursor: 'pointer', fontSize: '11px',
+        textAlign: 'left', transition: 'all .15s',
+      });
+      btn.onmouseenter = () => { if (!recursosConfig.selected.has(key)) btn.style.background = '#3a3a5e'; };
+      btn.onmouseleave = () => updateBtn();
+      btn.onclick = () => {
+        if (recursosConfig.selected.has(key)) recursosConfig.selected.delete(key);
+        else recursosConfig.selected.add(key);
+        updateBtn();
+      };
+
+
+      targetBtns[key] = { el: btn, upd: updateBtn };
+      updateBtn();
+      body.appendChild(btn);
+    });
+
+
+    // Selecionar todos / nenhum
+    const selRow = document.createElement('div');
+    Object.assign(selRow.style, { display: 'flex', gap: '6px', marginTop: '2px' });
+
+
+    function makeSmallBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        flex: '1', padding: '5px 0', borderRadius: '5px',
+        border: '1px solid #555', background: '#2a2a3e',
+        color: '#aaa', cursor: 'pointer', fontSize: '10px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#2a2a3e';
+      b.onclick = fn;
+      return b;
+    }
+
+
+    selRow.appendChild(makeSmallBtn('✅ Todos', () => {
+      RECURSOS_ALL_TARGETS.forEach(({ key }) => recursosConfig.selected.add(key));
+      Object.values(targetBtns).forEach(b => b.upd());
+    }));
+    selRow.appendChild(makeSmallBtn('❌ Nenhum', () => {
+      recursosConfig.selected.clear();
+      Object.values(targetBtns).forEach(b => b.upd());
+    }));
+    body.appendChild(selRow);
+
+
+    // Divider
+    const divider = document.createElement('div');
+    Object.assign(divider.style, { borderTop: '1px solid #333', marginTop: '4px', paddingTop: '6px' });
+    body.appendChild(divider);
+
+
+    // Botão Play/Stop
+    const playBtn = document.createElement('button');
+    playBtn.dataset.rc = 'playbtn';
+
+
+    function updatePlayBtn() {
+      const on = !!dsk.recursos?.enabled;
+      playBtn.textContent       = on ? '⏹ Stop' : '▶ Play';
+      playBtn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      playBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      playBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    }
+
+
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '8px 0', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    playBtn.onclick = () => { dsk.commands['/recursos'](); setTimeout(updatePlayBtn, 150); };
+    updatePlayBtn();
+    body.appendChild(playBtn);
+
+
+    rcPanel.appendChild(header);
+    rcPanel.appendChild(body);
+    document.body.appendChild(rcPanel);
+  }
+
+
+  dsk.setCmd('/recursosconfig', () => { rc.visible = !rc.visible; });
+  window.rc = rc;
+})();
+
+
+// ── Comando /recursos ─────────────────────────────────────────
+
+
+dsk.setCmd('/recursos', () => {
+  dsk.recursos.enabled = !dsk.recursos.enabled;
+
+
+  if (dsk.recursos.enabled) {
+    if (recursosConfig.selected.size === 0) {
+      dsk.localMsg('Recursos Bot: nenhum alvo selecionado! Abra /recursosconfig', '#fa5');
+      dsk.recursos.enabled = false;
+      return;
+    }
+    dsk.localMsg(`Recursos Bot: Ativado 🌲 (${recursosConfig.selected.size} alvo(s))`, '#5f5');
+    (async function loop() {
+      while (dsk.recursos.enabled) {
+        await xRecursos();
+        await xDelay(400);
+      }
+    })();
   } else {
-    dsk.localMsg('Top Skill Calc: Fechado', '#f55');
+    xGoing[140] = false;
+    dsk.localMsg('Recursos Bot: Desativado', '#f55');
   }
 });
+
+
 
 
 // ── REPAIR BOT ─────────────────────────────────────────────────
@@ -9037,11 +14097,14 @@ dsk.setCmd('/topskill', () => {
 //   boneco {Wall}   ← repair kit no mesmo sqm do boneco
 //        {Wall}
 
+
 dsk.repair = { enabled: false };
+
 
 async function RepairBot() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
 
   // Para ao atingir o level alvo
   if (currentLevel > 0 && skillLevel >= currentLevel && skillName === 'repairing') {
@@ -9052,8 +14115,10 @@ async function RepairBot() {
     return;
   }
 
+
   if (xGoing[116] === true) return;
   xGoing[116] = true;
+
 
   // Garante direção inicial → direita
   if (myself.dir !== 1) {
@@ -9061,57 +14126,72 @@ async function RepairBot() {
     await xDelay(620);
   }
 
+
   // ── FASE 1: bater nas paredes com a arma ──────────────────────
+
 
   await xDoKeyPress(6, 183);     // bate > direita
   await xDelay(745);
+
 
   await xDoChangeDir(0);         // vira pra cima 
   await xDelay(744);
   await xDoKeyPress(6, 181);     // bate /\ cima
   await xDelay(747);
 
+
   await xDoChangeDir(2);         // vira pra baixo 
   await xDelay(744);
   await xDoKeyPress(6, 184);     // bate \/ baixo
   await xDelay(642);
 
+
   // ── PICKUP + EQUIPA repair kit ─────────────────────────────────
+
 
   await xDoPickUp();             // pega o kit do mesmo sqm (sem se mover)
   await xDelay(610);
   await xDoUseSlot(0);           // equipa (slot 0)
   await xDelay(1020);
 
+
   // ── FASE 2: reparar as paredes ────────────────────────────────
+
 
   await xDoChangeDir(1);         // vira pra direita 
   await xDelay(744);
   await xDoKeyPress(6, 182);     // repara > direita
   await xDelay(743);
 
+
   await xDoChangeDir(0);         // vira pra cima 
   await xDelay(744);
   await xDoKeyPress(6, 180);     // repara /\ cima
   await xDelay(746);
+
 
   await xDoChangeDir(2);         // vira pra baixo
   await xDelay(744);
   await xDoKeyPress(6, 183);     // repara \/ baixo
   await xDelay(744);
 
+
   // ── DROP kit + reseta direção ──────────────────────────────────
+
 
   await xDoDropSlot(1, 1);       // dropa slot 0 (1 unidade)
   await xDelay(610);
   await xDoChangeDir(1);         // vira pra frente (direita) >
   await xDelay(744);
 
+
   xGoing[116] = false;
 }
 
+
 dsk.setCmd('/repair', () => {
   dsk.repair.enabled = !dsk.repair.enabled;
+
 
   if (dsk.repair.enabled) {
     dsk.localMsg('Repair Bot: Ativado', '#5f5');
@@ -9128,6 +14208,7 @@ dsk.setCmd('/repair', () => {
   }
 });
 
+
 function xGetCarawayAmt() {
     for (i in ui_container.children) {
         if (ui_container.children[0].children[i] != undefined) {
@@ -9139,6 +14220,7 @@ function xGetCarawayAmt() {
         }
     }
 }
+
 
 function xGetEffctByName(nam) {
     for (i in ui_container.children) {
@@ -9152,16 +14234,20 @@ function xGetEffctByName(nam) {
     }
 }
 
+
 async function xEffct() {
     if (!myself || game_state !== 2) return;
     if (xGoing[109] === true) return;
+
 
     // ← Mesma condição do bandage: sem mob e sem combate recente
     const temMob   = xTemp[13] !== undefined && xTemp[13] !== myself;
     const emCombate = xRecentCombat;
     if (temMob || emCombate) return;
 
+
     xGoing[109] = true;
+
 
     const amt = xGetCarawayAmt();
     if (amt >= 1) {
@@ -9176,14 +14262,18 @@ async function xEffct() {
         await xDelay(1000);
     }
 
+
     xGoing[109] = false;
 }
 
+
 dsk.effct = { enabled: false };
+
 
 dsk.setCmd('/effct', () => {
     dsk.effct.enabled = !dsk.effct.enabled;
     dsk.localMsg(`Auto Caraway: ${dsk.effct.enabled ? 'Ativado' : 'Desativado'}`, dsk.effct.enabled ? '#5f5' : '#f55');
+
 
     if (dsk.effct.enabled) {
         (async function loop() {
@@ -9197,7 +14287,9 @@ dsk.setCmd('/effct', () => {
     }
 });
 
+
 // ── AUTO KILL ─────────────────────────────────────────────────
+
 
 function xGetMobByPos(x, y) {
   for (let i in mobs.items) {
@@ -9207,13 +14299,16 @@ function xGetMobByPos(x, y) {
   return undefined;
 }
 
+
 async function KillMobsNearMe() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   if (xGoing[120] === true) return;
   xGoing[120] = true;
 
+
   const originalDir = myself.dir;
+
 
   const adjacentes = [
     { x: myself.x,     y: myself.y - 1, dir: 0 }, // cima
@@ -9222,11 +14317,14 @@ async function KillMobsNearMe() {
     { x: myself.x - 1, y: myself.y,     dir: 3 }, // esquerda
   ];
 
+
   for (const { x, y, dir } of adjacentes) {
     const mob = xGetMobByPos(x, y);
     if (!mob || mob === myself || xPlyrTest(mob)) continue;
 
+
     mobNearMe = true;
+
 
     // Seleciona o mob como alvo
     if (target.id !== mob.id) {
@@ -9234,31 +14332,39 @@ async function KillMobsNearMe() {
       send({ type: 't', t: mob.id });
     }
 
+
     // Vira para o mob e ataca
     await xDoChangeDir(dir);
     await xDoKeyPress(6, 200);
     await xDelay(300);
+
 
     // Volta para a direção original
     if (myself.dir !== originalDir) {
       await xDoChangeDir(originalDir);
     }
 
+
     // Deseleciona o alvo
     target.id = me;
+
 
     xGoing[120] = false;
     return; // ataca 1 mob por tick
   }
 
+
   mobNearMe = false;
   xGoing[120] = false;
 }
 
+
 dsk.autokill = { enabled: false };
+
 
 dsk.setCmd('/autokill', () => {
   dsk.autokill.enabled = !dsk.autokill.enabled;
+
 
   if (dsk.autokill.enabled) {
     dsk.localMsg('AutoKill: Ativado', '#5f5');
@@ -9277,75 +14383,469 @@ dsk.setCmd('/autokill', () => {
 });
 
 
+
+
 // ── COLOR PICKER ──────────────────────────────────────────────
 
-dsk.colorPicker = jv.Dialog.create(200, 220);
-const cp = dsk.colorPicker;
-cp.visible = false;
 
-cp.header = jv.text('Color Picker', {
-  font: '14px Verdana', fill: 0xFFD700, stroke: 0x555555, strokeThickness: 2,
-});
-cp.addChild(cp.header);
-jv.center(cp.header);
-jv.top(cp.header, 4);
+// ── Color Picker HSV (HTML overlay) ─────────────────────────
 
-cp.close = jv.Button.create(0, 0, 24, 'X', cp, 24);
-jv.top(cp.close, 4); jv.right(cp.close, 4);
-cp.close.on_click = () => (cp.visible = 0);
 
-cp.move = jv.Button.create(0, 0, 24, '@', cp, 24);
-jv.top(cp.move, 4); jv.right(cp.move, 28);
+(function () {
+  let cpPanel = null;
 
-cp._px = 0; cp._py = 0;
-window.addEventListener('mousemove', e => { cp._px = e.clientX; cp._py = e.clientY; });
-window.addEventListener('touchmove', e => { cp._px = e.touches[0].clientX; cp._py = e.touches[0].clientY; });
 
-dsk.on('postLoop', () => {
-  if (!cp.move?.is_pressed) {
-    cp.x = Math.max(0, Math.min(cp.x, jv.game_width  - cp.w));
-    cp.y = Math.max(0, Math.min(cp.y, jv.game_height - cp.h));
-    return;
-  }
-  const canvas = document.querySelector('canvas');
-  const rect = canvas ? canvas.getBoundingClientRect() : { left:0, top:0, width:jv.game_width, height:jv.game_height };
-  cp.x = (cp._px - rect.left) * (jv.game_width / rect.width)  - cp.w / 2;
-  cp.y = (cp._py - rect.top)  * (jv.game_height / rect.height) - 12;
-});
-
-// ── Cores ─────────────────────────────────────────────────────
-
-const cpColors = [
-  { label: '● Rosa',     hex: 'ff4dff' },
-  { label: '● Laranja',  hex: 'ff9900' },
-  { label: '● Verde',    hex: '00FF00' },
-  { label: '● Amarelo',  hex: 'FFFF00' },
-  { label: '● Prata',    hex: 'C0C0C0' },
-  { label: '● Ciano',    hex: '00FFFF' },
-];
-
-cpColors.forEach((c, i) => {
-  const btn = jv.Button.create(20, 35 + i * 26, 160, c.label, cp, 22);
-  btn.title.style.fill = parseInt(c.hex, 16); // ← btn.title
-  btn.on_click = () => {
-    _originalSend({ type: 'chat', data: `/color ${c.hex}` });
-    dsk.localMsg(`Color: ${c.hex}`, `#${c.hex}`);
+  const cp = {
+    get visible() { return !!cpPanel; },
+    set visible(v) { if (!v && cpPanel) removePanel(); else if (v && !cpPanel) createPanel(); },
   };
-});
+  dsk.colorPicker = cp;
 
-// ── Comando ───────────────────────────────────────────────────
 
-dsk.setCmd('/colorpicker', () => {
-  cp.visible = !cp.visible;
-  dsk.localMsg(`Color Picker: ${cp.visible ? 'Aberto' : 'Fechado'}`, cp.visible ? '#5f5' : '#f55');
-});
+  // Estado HSV interno
+  let _h = 300, _s = 0.7, _v = 0.8, _a = 1.0;
+  let _savedColors = [];
+
+
+  // Converte HSV → hex string (sem #)
+  function hsvToHex(h, s, v) {
+    let r, g, b;
+    const i = Math.floor(h / 60) % 6;
+    const f = h / 60 - Math.floor(h / 60);
+    const p = v * (1 - s), q = v * (1 - f * s), t = v * (1 - (1 - f) * s);
+    switch (i) {
+      case 0: r=v; g=t; b=p; break; case 1: r=q; g=v; b=p; break;
+      case 2: r=p; g=v; b=t; break; case 3: r=p; g=q; b=v; break;
+      case 4: r=t; g=p; b=v; break; case 5: r=v; g=p; b=q; break;
+    }
+    return [r,g,b].map(x => Math.round(x*255).toString(16).padStart(2,'0')).join('');
+  }
+
+
+  function hexToHsv(hex) {
+    hex = hex.replace('#','');
+    if (hex.length !== 6) return null;
+    const r = parseInt(hex.slice(0,2),16)/255;
+    const g = parseInt(hex.slice(2,4),16)/255;
+    const b = parseInt(hex.slice(4,6),16)/255;
+    const max = Math.max(r,g,b), min = Math.min(r,g,b);
+    const d = max - min;
+    let h = 0;
+    if (d !== 0) {
+      if (max === r) h = ((g - b)/d + 6) % 6 * 60;
+      else if (max === g) h = ((b - r)/d + 2) * 60;
+      else h = ((r - g)/d + 4) * 60;
+    }
+    return { h, s: max === 0 ? 0 : d/max, v: max };
+  }
+
+
+  function hueColor(h) {
+    return '#' + hsvToHex(h, 1, 1);
+  }
+
+
+  function createPanel() {
+    if (cpPanel) { removePanel(); return; }
+
+
+    cpPanel = document.createElement('div');
+    Object.assign(cpPanel.style, {
+      position: 'fixed', top: '60px', left: '50%', transform: 'translateX(-50%)',
+      width: '260px', background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '12px', boxShadow: '0 12px 32px rgba(0,0,0,0.8)',
+      zIndex: '99998', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+
+    // ── Header ─────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '12px 12px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🎨 Color Picker';
+    Object.assign(titleEl.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background:'none', border:'none', color:'#aaa', cursor:'pointer', fontSize:'15px', padding:'0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl); header.appendChild(closeBtn);
+
+
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown',  _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - cpPanel.getBoundingClientRect().left;
+      oy = _xy.y - cpPanel.getBoundingClientRect().top;
+      cpPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); cpPanel.style.left = (_xy.x - ox) + 'px'; cpPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '10px' });
+
+
+    // ── Gradiente SV (canvas) ──────────────────────────────
+    const svCanvas = document.createElement('canvas');
+    svCanvas.width = 236; svCanvas.height = 150;
+    Object.assign(svCanvas.style, { width:'100%', height:'150px', borderRadius:'8px', cursor:'crosshair', display:'block' });
+
+
+    let svDragging = false;
+    const svCircle = document.createElement('div');
+    Object.assign(svCircle.style, {
+      position:'absolute', width:'14px', height:'14px', borderRadius:'50%',
+      border:'2px solid #fff', boxShadow:'0 0 3px rgba(0,0,0,0.8)',
+      transform:'translate(-50%,-50%)', pointerEvents:'none',
+      boxSizing:'border-box',
+    });
+
+
+    const svWrap = document.createElement('div');
+    Object.assign(svWrap.style, { position:'relative' });
+    svWrap.appendChild(svCanvas);
+    svWrap.appendChild(svCircle);
+
+
+    function drawSV() {
+      const ctx = svCanvas.getContext('2d');
+      const W = svCanvas.width, H = svCanvas.height;
+      // Fundo: branco → hue puro
+      const gradH = ctx.createLinearGradient(0,0,W,0);
+      gradH.addColorStop(0,'#fff');
+      gradH.addColorStop(1, '#'+hsvToHex(_h,1,1));
+      ctx.fillStyle = gradH;
+      ctx.fillRect(0,0,W,H);
+      // Overlay: transparente → preto (de cima pra baixo)
+      const gradV = ctx.createLinearGradient(0,0,0,H);
+      gradV.addColorStop(0,'rgba(0,0,0,0)');
+      gradV.addColorStop(1,'rgba(0,0,0,1)');
+      ctx.fillStyle = gradV;
+      ctx.fillRect(0,0,W,H);
+      // Posição do círculo
+      const px = _s * W, py = (1-_v) * H;
+      svCircle.style.left = px + 'px';
+      svCircle.style.top  = py + 'px';
+    }
+
+
+    function svFromEvent(e) {
+      const rect = svCanvas.getBoundingClientRect();
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      const cy = e.touches ? e.touches[0].clientY : e.clientY;
+      _s = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+      _v = Math.max(0, Math.min(1, 1 - (cy - rect.top) / rect.height));
+      updateAll();
+    }
+
+
+    svCanvas.addEventListener('mousedown',  e => { svDragging = true; svFromEvent(e); });
+    svCanvas.addEventListener('touchstart', e => { e.preventDefault(); svDragging = true; svFromEvent(e); }, { passive: false });
+    svCanvas.addEventListener('touchstart', e => { svDragging = true; svFromEvent(e); e.preventDefault(); }, {passive:false});
+    window.addEventListener('mousemove', e => { if (svDragging) svFromEvent(e); });
+    window.addEventListener('touchmove', e => { if (svDragging) { e.preventDefault(); svFromEvent(e); } }, { passive: false });
+    window.addEventListener('touchmove', e => { if (svDragging) svFromEvent(e); }, {passive:false});
+    window.addEventListener('mouseup', () => { svDragging = false; });
+    window.addEventListener('touchend', () => { svDragging = false; });
+
+
+    // ── Hue slider ─────────────────────────────────────────
+    const hueCanvas = document.createElement('canvas');
+    hueCanvas.width = 236; hueCanvas.height = 16;
+    Object.assign(hueCanvas.style, { width:'100%', height:'16px', borderRadius:'8px', cursor:'pointer', display:'block' });
+
+
+    const hueThumb = document.createElement('div');
+    Object.assign(hueThumb.style, {
+      position:'absolute', width:'18px', height:'18px', borderRadius:'50%',
+      border:'2px solid #fff', boxShadow:'0 0 4px rgba(0,0,0,0.8)',
+      transform:'translate(-50%,-50%)', top:'50%', pointerEvents:'none',
+      boxSizing:'border-box',
+    });
+
+
+    const hueWrap = document.createElement('div');
+    Object.assign(hueWrap.style, { position:'relative', margin:'2px 0' });
+    hueWrap.appendChild(hueCanvas);
+    hueWrap.appendChild(hueThumb);
+
+
+    let hueDragging = false;
+
+
+    function drawHue() {
+      const ctx = hueCanvas.getContext('2d');
+      const grad = ctx.createLinearGradient(0,0,hueCanvas.width,0);
+      for (let i=0;i<=6;i++) grad.addColorStop(i/6, `hsl(${i*60},100%,50%)`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,hueCanvas.width,hueCanvas.height);
+      hueThumb.style.left = (_h / 360) * 100 + '%';
+      hueThumb.style.background = hueColor(_h);
+    }
+
+
+    function hueFromEvent(e) {
+      const rect = hueCanvas.getBoundingClientRect();
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      _h = Math.max(0, Math.min(360, ((cx - rect.left) / rect.width) * 360));
+      updateAll();
+    }
+
+
+    hueCanvas.addEventListener('mousedown',  e => { hueDragging = true; hueFromEvent(e); });
+    hueCanvas.addEventListener('touchstart', e => { e.preventDefault(); hueDragging = true; hueFromEvent(e); }, { passive: false });
+    hueCanvas.addEventListener('touchstart', e => { hueDragging = true; hueFromEvent(e); e.preventDefault(); }, {passive:false});
+    window.addEventListener('mousemove', e => { if (hueDragging) hueFromEvent(e); });
+    window.addEventListener('touchmove', e => { if (hueDragging) { e.preventDefault(); hueFromEvent(e); } }, { passive: false });
+    window.addEventListener('touchmove', e => { if (hueDragging) hueFromEvent(e); }, {passive:false});
+    window.addEventListener('mouseup', () => { hueDragging = false; });
+    window.addEventListener('touchend', () => { hueDragging = false; });
+
+
+    // ── Alpha slider ───────────────────────────────────────
+    const alphaCanvas = document.createElement('canvas');
+    alphaCanvas.width = 236; alphaCanvas.height = 16;
+    Object.assign(alphaCanvas.style, { width:'100%', height:'16px', borderRadius:'8px', cursor:'pointer', display:'block' });
+
+
+    const alphaThumb = document.createElement('div');
+    Object.assign(alphaThumb.style, {
+      position:'absolute', width:'18px', height:'18px', borderRadius:'50%',
+      border:'2px solid #fff', boxShadow:'0 0 4px rgba(0,0,0,0.8)',
+      transform:'translate(-50%,-50%)', top:'50%', pointerEvents:'none',
+      boxSizing:'border-box',
+    });
+
+
+    const alphaWrap = document.createElement('div');
+    Object.assign(alphaWrap.style, { position:'relative', margin:'2px 0' });
+    alphaWrap.appendChild(alphaCanvas);
+    alphaWrap.appendChild(alphaThumb);
+
+
+    let alphaDragging = false;
+
+
+    function drawAlpha() {
+      const ctx = alphaCanvas.getContext('2d');
+      const W = alphaCanvas.width, H = alphaCanvas.height;
+      // Xadrez
+      ctx.clearRect(0,0,W,H);
+      const sq = 8;
+      for (let x=0;x<W;x+=sq) for (let y=0;y<H;y+=sq) {
+        ctx.fillStyle = ((x/sq+y/sq)%2===0) ? '#ccc' : '#fff';
+        ctx.fillRect(x,y,sq,sq);
+      }
+      const hex = hsvToHex(_h,_s,_v);
+      const grad = ctx.createLinearGradient(0,0,W,0);
+      grad.addColorStop(0, `rgba(${parseInt(hex.slice(0,2),16)},${parseInt(hex.slice(2,4),16)},${parseInt(hex.slice(4,6),16)},0)`);
+      grad.addColorStop(1, `#${hex}`);
+      ctx.fillStyle = grad;
+      ctx.fillRect(0,0,W,H);
+      alphaThumb.style.left = _a * 100 + '%';
+      alphaThumb.style.background = `rgba(${parseInt(hex.slice(0,2),16)},${parseInt(hex.slice(2,4),16)},${parseInt(hex.slice(4,6),16)},${_a})`;
+    }
+
+
+    function alphaFromEvent(e) {
+      const rect = alphaCanvas.getBoundingClientRect();
+      const cx = e.touches ? e.touches[0].clientX : e.clientX;
+      _a = Math.max(0, Math.min(1, (cx - rect.left) / rect.width));
+      updateAll();
+    }
+
+
+    alphaCanvas.addEventListener('mousedown',  e => { alphaDragging = true; alphaFromEvent(e); });
+    alphaCanvas.addEventListener('touchstart', e => { e.preventDefault(); alphaDragging = true; alphaFromEvent(e); }, { passive: false });
+    alphaCanvas.addEventListener('touchstart', e => { alphaDragging = true; alphaFromEvent(e); e.preventDefault(); }, {passive:false});
+    window.addEventListener('mousemove', e => { if (alphaDragging) alphaFromEvent(e); });
+    window.addEventListener('touchmove', e => { if (alphaDragging) { e.preventDefault(); alphaFromEvent(e); } }, { passive: false });
+    window.addEventListener('touchmove', e => { if (alphaDragging) alphaFromEvent(e); }, {passive:false});
+    window.addEventListener('mouseup', () => { alphaDragging = false; });
+    window.addEventListener('touchend', () => { alphaDragging = false; });
+
+
+    // ── Preview + Hex input ────────────────────────────────
+    const previewRow = document.createElement('div');
+    Object.assign(previewRow.style, { display:'flex', gap:'8px', alignItems:'center' });
+
+
+    const preview = document.createElement('div');
+    Object.assign(preview.style, {
+      width:'44px', height:'44px', borderRadius:'50%',
+      border:'2px solid #555', flexShrink:'0',
+      backgroundImage: 'linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%),linear-gradient(45deg,#ccc 25%,transparent 25%,transparent 75%,#ccc 75%)',
+      backgroundSize: '12px 12px', backgroundPosition: '0 0, 6px 6px',
+    });
+
+
+    const previewInner = document.createElement('div');
+    Object.assign(previewInner.style, { width:'100%', height:'100%', borderRadius:'50%' });
+    preview.appendChild(previewInner);
+
+
+    const hexInput = document.createElement('input');
+    hexInput.type = 'text'; hexInput.maxLength = 7;
+    Object.assign(hexInput.style, {
+      flex:'1', padding:'8px 10px', borderRadius:'20px',
+      border:'1px solid #555', background:'#12121e',
+      color:'#fff', fontSize:'13px', fontFamily:'monospace',
+      outline:'none', textAlign:'center',
+    });
+    hexInput.addEventListener('change', () => {
+      const hex = hexInput.value.replace('#','');
+      const hsv = hexToHsv(hex);
+      if (hsv) { _h=hsv.h; _s=hsv.s; _v=hsv.v; updateAll(); }
+    });
+
+
+    previewRow.appendChild(preview); previewRow.appendChild(hexInput);
+
+
+    // ── Botão aplicar cor ──────────────────────────────────
+    const applyBtn = document.createElement('button');
+    applyBtn.textContent = '✅ Aplicar Cor no Jogo';
+    Object.assign(applyBtn.style, {
+      width:'100%', padding:'8px 0', borderRadius:'8px',
+      border:'1px solid #5f5', background:'#1a2e1a',
+      color:'#5f5', cursor:'pointer', fontFamily:'Verdana',
+      fontSize:'12px', fontWeight:'bold',
+    });
+    applyBtn.onmouseenter = () => applyBtn.style.background = '#2a4e2a';
+    applyBtn.onmouseleave = () => applyBtn.style.background = '#1a2e1a';
+    applyBtn.onclick = () => {
+      const hex = hsvToHex(_h,_s,_v);
+      _originalSend({ type: 'chat', data: `/color ${hex}` });
+      dsk.localMsg(`Color: #${hex}`, `#${hex}`);
+    };
+
+
+    // ── Paleta salva ───────────────────────────────────────
+    const paletteLabel = document.createElement('div');
+    paletteLabel.textContent = 'Paleta salva:';
+    Object.assign(paletteLabel.style, { color:'#888', fontSize:'10px' });
+
+
+    const paletteRow = document.createElement('div');
+    Object.assign(paletteRow.style, { display:'flex', flexWrap:'wrap', gap:'5px' });
+
+
+    function renderPalette() {
+      paletteRow.innerHTML = '';
+      // Botão + salvar cor atual
+      const addBtn = document.createElement('button');
+      addBtn.textContent = '+';
+      Object.assign(addBtn.style, {
+        width:'28px', height:'28px', borderRadius:'50%', border:'2px dashed #555',
+        background:'transparent', color:'#888', cursor:'pointer', fontSize:'16px',
+        display:'flex', alignItems:'center', justifyContent:'center', flexShrink:'0',
+      });
+      addBtn.onclick = () => {
+        const hex = hsvToHex(_h,_s,_v);
+        if (!_savedColors.includes('#'+hex)) {
+          _savedColors.push('#'+hex);
+          if (_savedColors.length > 16) _savedColors.shift();
+          renderPalette();
+        }
+      };
+      paletteRow.appendChild(addBtn);
+
+
+      _savedColors.forEach((col, idx) => {
+        const dot = document.createElement('div');
+        Object.assign(dot.style, {
+          width:'28px', height:'28px', borderRadius:'50%',
+          background: col, border:'2px solid #333',
+          cursor:'pointer', flexShrink:'0', position:'relative',
+        });
+        dot.title = col;
+        dot.onclick = () => {
+          const hsv = hexToHsv(col.replace('#',''));
+          if (hsv) { _h=hsv.h; _s=hsv.s; _v=hsv.v; updateAll(); }
+        };
+        dot.addEventListener('contextmenu', e => {
+          e.preventDefault();
+          _savedColors.splice(idx, 1);
+          renderPalette();
+        });
+        paletteRow.appendChild(dot);
+      });
+    }
+
+
+    // ── updateAll ──────────────────────────────────────────
+    function updateAll() {
+      drawSV(); drawHue(); drawAlpha();
+      const hex = hsvToHex(_h,_s,_v);
+      const r = parseInt(hex.slice(0,2),16);
+      const g = parseInt(hex.slice(2,4),16);
+      const b = parseInt(hex.slice(4,6),16);
+      previewInner.style.background = `rgba(${r},${g},${b},${_a})`;
+      hexInput.value = '#' + hex;
+    }
+
+
+    body.appendChild(svWrap);
+    body.appendChild(hueWrap);
+    body.appendChild(alphaWrap);
+    body.appendChild(previewRow);
+    body.appendChild(applyBtn);
+    body.appendChild(paletteLabel);
+    body.appendChild(paletteRow);
+
+
+    cpPanel.appendChild(header);
+    cpPanel.appendChild(body);
+    document.body.appendChild(cpPanel);
+
+
+    renderPalette();
+    // Delay para garantir que o canvas está no DOM com tamanho real
+    requestAnimationFrame(() => {
+      svCanvas.width = svCanvas.offsetWidth || 236;
+      updateAll();
+    });
+  }
+
+
+  function removePanel() { if (cpPanel) { cpPanel.remove(); cpPanel = null; } }
+
+
+  dsk.setCmd('/colorpicker', () => {
+    if (cpPanel) {
+      removePanel();
+      dsk.localMsg('Color Picker: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Color Picker: Aberto', '#5f5');
+    }
+  });
+})();
+
 
 // ── Menu ──────────────────────────────────────────────────────
 
+
 dsk.sheep = { enabled: false };
+
 
 async function SheepRun() {
   if (dskPaused || !myself || game_state !== 2) return;
+
 
   const totalGates = 22;
   const firstGateX = myself.x + 1; // começa na frente do personagem
@@ -9357,12 +14857,14 @@ async function SheepRun() {
   async function checkAndSwapTool() {
     if (inv[0]?.equip !== 2) return; // não quebrou, tudo bem
 
+
     sheepToolSlot++;
     if (!inv[sheepToolSlot]?.sprite) {
       dsk.localMsg('Sheep: sem mais ferramentas!', '#f55');
       dsk.sheep.enabled = false;
       return;
     }
+
 
     dsk.localMsg(`Sheep: trocando para slot ${sheepToolSlot + 1}...`, '#ff0');
     await xDoSwapSlot(1, sheepToolSlot + 1); // traz pro slot 0
@@ -9371,24 +14873,30 @@ async function SheepRun() {
     await xDelay(500);
   }
 
+
   // Equipa item do slot 0
   if (inv[0]?.equip === 0) {
     await xDoUseSlot(0);
     await xDelay(500);
   }
 
+
   dsk.localMsg(`Sheep: iniciando 22 gates a partir de X=${firstGateX}`, '#0ff');
+
 
   for (let i = 0; i < totalGates; i++) {
     if (!dsk.sheep.enabled) return;
+
 
     const gateX   = firstGateX + i;
     const isFirst = i === 0;
     const isLast  = i === totalGates - 1;
 
+
     // Move até a gate
     await xDoMove(gateX, gateY);
     await xDelay(600);
+
 
     // Abre a gate (vira direita + ataca)
     await xDoChangeDir(1);
@@ -9396,13 +14904,14 @@ async function SheepRun() {
     await xDoKeyPress(6, 190);
     await xDelay(500);
 
+
     // Gates do meio: vira baixo, ataca ovelha 5x, volta pra direita
     if (!isFirst && !isLast) {
       await xDoChangeDir(2);
       await xDelay(400);
       for (let j = 0; j < 5; j++) {
         if (!dsk.sheep.enabled) return;
-		await checkAndSwapTool(); // ← checa a cada batida
+                await checkAndSwapTool(); // ← checa a cada batida
         await xDoKeyPress(6, 190);
         await xDelay(800);
       }
@@ -9410,7 +14919,7 @@ async function SheepRun() {
       await xDelay(400);
       for (let j = 0; j < 5; j++) {
         if (!dsk.sheep.enabled) return;
-		await checkAndSwapTool(); // ← checa a cada batida
+                await checkAndSwapTool(); // ← checa a cada batida
         await xDoKeyPress(6, 190);
         await xDelay(800);
       }
@@ -9419,6 +14928,7 @@ async function SheepRun() {
     }
   }
 
+
   // Fim: anda 1 para a direita
   await xDoMove(myself.x + 1, myself.y);
   await xDelay(500);
@@ -9426,12 +14936,12 @@ async function SheepRun() {
   await xDelay(3000);
   for (let j = 0; j < 19; j++) {
     if (!dsk.sheep.enabled) return;
-	await xDoChangeDir(0);
-	await xDelay(500);
+        await xDoChangeDir(0);
+        await xDelay(500);
     await xDoKeyPress(6, 180);
     await xDelay(800);
-	await xDoMove(myself.x - 1, myself.y);
-	await xDelay(800);
+        await xDoMove(myself.x - 1, myself.y);
+        await xDelay(800);
   }
   await xDoChangeDir(0);
   await xDelay(500);
@@ -9441,12 +14951,12 @@ async function SheepRun() {
   await xDelay(5000);
   for (let j = 0; j < 19; j++) {
     if (!dsk.sheep.enabled) return;
-	await xDoChangeDir(2);
-	await xDelay(500);
+        await xDoChangeDir(2);
+        await xDelay(500);
     await xDoKeyPress(6, 180);
     await xDelay(800);
-	await xDoMove(myself.x + 1, myself.y);
-	await xDelay(800);
+        await xDoMove(myself.x + 1, myself.y);
+        await xDelay(800);
   }
   await xDoChangeDir(2);
   await xDelay(500);
@@ -9486,8 +14996,10 @@ async function SheepRun() {
   await xDoDropByID(0, 919);
   await xDelay(400);
 
+
   dsk.localMsg('Sheep: ciclo completo! Aguardando 20min...', '#5f5');
 }
+
 
 dsk.setCmd('/sheep', () => {
   dsk.sheep.enabled = !dsk.sheep.enabled;
@@ -9512,16 +15024,21 @@ dsk.setCmd('/sheep', () => {
 });
 
 
+
+
 // ── WOOD FARM BOT ─────────────────────────────────────────────
 // Adaptado de FarmWood + RepairItemX (acao.push → async/await)
 // Usa xGoing[118] para lock
 
+
 dsk.wood = { enabled: false };
+
 
 // ── Equivalente ao RepairItemX ────────────────────────────────
 async function xRepairItemWood() {
   if (!myself || game_state !== 2) return;
   if (inv[0]?.equip !== 2) return;
+
 
   const kitSlot = xGetSlotByID(719); // Repair Kit sprite ID
   if (kitSlot === undefined) {
@@ -9529,14 +15046,17 @@ async function xRepairItemWood() {
     return;
   }
 
+
   const savedDir = myself.dir;
   const savedY   = myself.y;
+
 
   // drop → equipa kit
   await xDoDropSlot(1, 1);       // slot 1 (1-indexado = slot 0)
   await xDelay(350);
   await xDoUseSlotByID(kitSlot);
   await xDelay(350);
+
 
   if (savedDir === 1 || savedDir === 2) {
     // 'c' sobe, 'vb' vira baixo, repara, 'b' desce, pick
@@ -9552,6 +15072,7 @@ async function xRepairItemWood() {
     await xDelay(500);
     await xDoPickUp();
     if (savedDir === 1) await xDoChangeDir(1); // 'vd'
+
 
   } else {
     // 'b' desce, 'vc' vira cima, repara, 'c' sobe, pick
@@ -9569,14 +15090,17 @@ async function xRepairItemWood() {
     if (savedDir === 3) await xDoChangeDir(3); // 've'
   }
 
+
   await xDelay(300);
   await xDoUseSlot(0); // re-equipa item do slot 0
   await xDelay(300);
 }
 
+
 async function xRepairItemX2Wood() {
   if (!myself || game_state !== 2) return;
   if (inv[0]?.equip !== 2) return;
+
 
   const kitSlot = xGetSlotByID(719);
   if (kitSlot === undefined) {
@@ -9584,14 +15108,17 @@ async function xRepairItemX2Wood() {
     return;
   }
 
+
   const savedDir = myself.dir;
   const savedY   = myself.y;
+
 
   // drop item no tile atual → equipa kit
   await xDoDropSlot(1, 1);
   await xDelay(350);
   await xDoUseSlotByID(kitSlot);
   await xDelay(350);
+
 
   if (savedDir === 2) {
     // 'c' sobe, 'vb' face baixo, repara (item ficou abaixo), 'b' desce, pick
@@ -9607,6 +15134,7 @@ async function xRepairItemX2Wood() {
     await xDelay(500);
     await xDoPickUp();
     // dir 2: sem virada no fim
+
 
   } else {
     // dir 1, 3 ou 0:
@@ -9627,10 +15155,12 @@ async function xRepairItemX2Wood() {
     // dir 0: sem virada
   }
 
+
   await xDelay(300);
   await xDoUseSlot(0);  // re-equipa item
   await xDelay(300);
 }
+
 
 // ── Equivalente ao FarmWood ───────────────────────────────────
 async function FarmWood() {
@@ -9639,11 +15169,13 @@ async function FarmWood() {
   if (xGoing[118] === true) return;
   xGoing[118] = true;
 
+
   // Semente adjacente na direção → recém plantada, aguarda
   const seedR = objects.items.find(el => el?.name?.includes('Seed') && el.x === myself.x + 1 && el.y === myself.y);
   const seedL = objects.items.find(el => el?.name?.includes('Seed') && el.x === myself.x - 1 && el.y === myself.y);
   if (seedR && myself.dir === 1) { xGoing[118] = false; return; }
   if (seedL && myself.dir === 3) { xGoing[118] = false; return; }
+
 
   // Item quebrado → repara (se estiver sobre gate, sai primeiro)
    if (inv[0]?.equip === 2) {
@@ -9653,8 +15185,8 @@ async function FarmWood() {
     if (onGate) {
       await xDoMove(myself.x - 1, myself.y); // 'e' — sai da gate primeiro
       await xDelay(500);
-	  await xDoChangeDir(1);
-	  await xDelay(400);
+          await xDoChangeDir(1);
+          await xDelay(400);
       await xRepairItemX2Wood();             // ← X2: item cai fora da gate
     } else {
       await xRepairItemWood();               // ← X normal
@@ -9663,17 +15195,20 @@ async function FarmWood() {
     return;
    }
 
+
   // Tribe Gate à direita → interage (abre/fecha)
   const gateRight = objects.items.find(el => el?.name === 'Tribe Gate' && el.x === myself.x + 1 && el.y === myself.y);
   if (gateRight) {
     await xDelay(400);
     await xDoChangeDir(1);   // 'vd'
-	await xDelay(400);
+        await xDelay(400);
     await xDoKeyPress(6, 200);
     await xDelay(200);
   }
 
+
   const pinecone = item_data.find(el => el?.n?.includes('Pinecone'));
+
 
   // ── Dir 1 → direita ──────────────────────────────────────────
   if (myself.dir === 1) {
@@ -9686,9 +15221,9 @@ async function FarmWood() {
     } else {
       await xDelay(200);
       await xDoMove(myself.x + 1, myself.y); // 'd'
-	  await xDelay(400);
+          await xDelay(400);
       await xDoPickUp();
-	  await xDelay(300);
+          await xDelay(300);
       if (pinecone) await xDoUseSlot(pinecone.slot);
     }
   }
@@ -9708,21 +15243,23 @@ async function FarmWood() {
       } else {
         await xDelay(200);
         await xDoMove(myself.x - 1, myself.y); // 'e'
-		await xDelay(400);
+                await xDelay(400);
         await xDoPickUp();
-		await xDelay(300);
+                await xDelay(300);
         if (pinecone) await xDoUseSlot(pinecone.slot);
       }
     }
   }
+
 
   // Animal Gate à direita virado para direita → desce
   const animalGateR = objects.items.find(el => el?.name === 'Animal Gate' && el.x === myself.x + 1 && el.y === myself.y);
   if (animalGateR && myself.dir === 1) {
     await xDelay(200);
     await xDoChangeDir(2); // 'vb'
-	await xDelay(200);
+        await xDelay(200);
   }
+
 
   // ── Dir 2 → baixo ────────────────────────────────────────────
   if (myself.dir === 2) {
@@ -9734,14 +15271,15 @@ async function FarmWood() {
       await xDoKeyPress(6, 200); // 'atk'
       await xDelay(200);
     } else {
-	  await xDoMove(myself.x, myself.y + 1); // 'b'
+          await xDoMove(myself.x, myself.y + 1); // 'b'
       await xDelay(400);
       await xDoPickUp();
-	  await xDelay(300);
+          await xDelay(300);
       if (pinecone) await xDoUseSlot(pinecone.slot);
       await xDoChangeDir(3); // 've' = virar esquerda
     }
   }
+
 
   // Tribe Gate à esquerda, virado esquerda → virada de corredor
   const gateLeft = objects.items.find(el => el?.name === 'Tribe Gate' && el.x === myself.x - 1 && el.y === myself.y);
@@ -9751,7 +15289,7 @@ async function FarmWood() {
     await xDoKeyPress(6, 200);                              // 'atk'
     await xDelay(500);
     await xDoPickUp(); // 'pick'
-	await xDelay(500);
+        await xDelay(500);
     if (wood) await xDoDropByID(0, 249);           // 'drop'
     await xDelay(500);
     await xDoChangeDir(0);                                   // 'vc' = virar cima
@@ -9761,12 +15299,15 @@ async function FarmWood() {
     await xDoChangeDir(1);                                   // 'vd' = virar direita
   }
 
+
   xGoing[118] = false;
 }
+
 
 // ── Comando e loop ────────────────────────────────────────────
 dsk.setCmd('/wood', () => {
   dsk.wood.enabled = !dsk.wood.enabled;
+
 
   if (dsk.wood.enabled) {
     dsk.localMsg('Wood Farm: Ativado', '#5f5');
@@ -9784,12 +15325,17 @@ dsk.setCmd('/wood', () => {
 
 
 
+
+
+
 // ── Helpers internos ──────────────────────────────────────────
+
 
 function retnum(str) {
   const match = str.match(/\((\d)\)/);
   return match ? parseInt(match[1]) : 0;
 }
+
 
 function whatChatHas(text) {
   for (let i in jv.chat_box.lines) {
@@ -9799,6 +15345,7 @@ function whatChatHas(text) {
   }
   return '';
 }
+
 
 function xGetItemByPos(x, y) {
   for (let i in objects.items) {
@@ -9810,6 +15357,7 @@ function xGetItemByPos(x, y) {
   return undefined;
 }
 
+
 // checkPosition(n): retorna true se o pathfinder ainda está em movimento
 // (impede ação enquanto o personagem não chegou)
 function checkPosition(n) {
@@ -9817,7 +15365,10 @@ function checkPosition(n) {
 }
 
 
+
+
 // ── Funções de transformação de runas ─────────────────────────
+
 
 function sortTransformLetter(str) {
   let result = '';
@@ -9829,6 +15380,7 @@ function sortTransformLetter(str) {
   return result;
 }
 
+
 function sortTransformNumber(str) {
   const matches = str.match(/\b(\w+)\((\d)\)/g) || [];
   const count = matches.length;
@@ -9839,6 +15391,7 @@ function sortTransformNumber(str) {
   }
   return count * 3 - sum;
 }
+
 
 function sortGeneratePermutationsLetters(str) {
   const results = [];
@@ -9854,18 +15407,23 @@ function sortGeneratePermutationsLetters(str) {
   return results;
 }
 
+
 // ── Lógica principal ───────────────────────────────────────────
 
+
 window.sortDoTrash = true;
+
 
 async function SortFooders() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
 
+
   // Pegar item mais próximo nas posições 
   if (inv[0].sprite === undefined) {
     let closest = undefined;
     let closestDist = Infinity;
+
 
     for (let x = 113; x <= 126; x++) {
       for (let y = 290; y <= 291; y++) {
@@ -9880,7 +15438,9 @@ async function SortFooders() {
       }
     }
 
+
     if (!closest) return;
+
 
     // Tenta chegar e pegar — até 6 tentativas
     xDoMove(closest.x, closest.y);
@@ -9897,16 +15457,20 @@ async function SortFooders() {
     }
   }
 
+
   // ── Processa chat com resultado do robe ───────────────────────
   if (xIfChatHas("You wear the Noble Jacket")) {
     const fullLine = whatChatHas("You wear the Noble Jacket");
     xDoClearChat("You wear the Noble Jacket");
 
+
     const defIdx = fullLine.indexOf("def");
     const runeStr = fullLine.substring(defIdx + 4);
 
+
     if (runeStr !== "") {
       sortDoTrash = false;
+
 
       const allCombos = [
         "A","S","H","G","R",
@@ -9915,15 +15479,19 @@ async function SortFooders() {
         "ASHG","ASHR","AHGR","ASGR","SHGR","ASHGR"
       ];
 
+
       const runeLetters = sortTransformLetter(runeStr);
       const runeNumber  = sortTransformNumber(runeStr);
 
+
       let targetX = 117, targetY = 300; // default: Trash
+
 
       for (const combo of allCombos) {
         if (sortGeneratePermutationsLetters(combo).includes(runeLetters)) {
           const n  = retnum(runeStr);
           const rn = runeNumber;
+
 
           switch (combo) {
             // ── Runas simples (A/S/H/G/R) por nível 1-5 ──────────
@@ -9932,6 +15500,7 @@ async function SortFooders() {
             case "H": targetX=114; targetY=292+n; break;
             case "G": targetX=115; targetY=292+n; break;
             case "R": targetX=116; targetY=292+n; break;
+
 
             // ── Combinações duplas (sem "1" e rn<=0) ──────────────
             case "AH": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?293:300; break;
@@ -9942,6 +15511,7 @@ async function SortFooders() {
             case "HG": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?293:300; break;
             case "HR": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?294:300; break;
             case "GR": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?295:300; break;
+
 
             // ── Combinações triplas/quádruplas (rn<=0) ────────────
             case "SHG":   targetX=119; targetY=rn<=0?296:300; break;
@@ -9955,13 +15525,16 @@ async function SortFooders() {
             case "SHGR":  targetX=121; targetY=rn<=0?294:300; break;
             case "ASHGR": targetX=121; targetY=rn<=0?295:300; break;
 
+
             default: targetX=117; targetY=300; break;
           }
           break;
         }
       }
 
+
       xDoMove(targetX, targetY);
+
 
       // Tenta dropar — até 7 tentativas
       for (let attempt = 0; attempt < 7; attempt++) {
@@ -9975,6 +15548,7 @@ async function SortFooders() {
         }
         await xDelay(800);
       }
+
 
     } else {
       // runeStr vazio → vai para o Trash
@@ -9992,6 +15566,7 @@ async function SortFooders() {
       }
     }
 
+
   } else {
     // Não tem mensagem do robe ainda — aguarda
     await xDelay(800);
@@ -9999,12 +15574,16 @@ async function SortFooders() {
   }
 }
 
+
 // ── Objeto e comandos ──────────────────────────────────────────
+
 
 dsk.sort = { enabled: false };
 
+
 dsk.setCmd('/sort', () => {
   dsk.sort.enabled = !dsk.sort.enabled;
+
 
   if (dsk.sort.enabled) {
     sortDoTrash = true;
@@ -10016,24 +15595,31 @@ dsk.setCmd('/sort', () => {
 });
 
 
+
+
 // ── MINE BOT ──────────────────────────────────────────────────
 dsk.mine = { enabled: false, targetName: undefined };
 window.xMiningActive = false;
+
 
 async function xMineNearby() {
   if (xMiningActive) return;
   if (dskPaused || !myself || game_state !== 2) return;
 
+
   const targetNames = ['Rock', 'Shiny Rock'];
   let mineTarget = undefined;
+
 
   for (let i in objects.items) {
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0) continue;
     if (!targetNames.includes(obj.name)) continue;
 
+
     const dist = xGetDistance(obj.x, obj.y, myself.x, myself.y);
     if (dist >= 6) continue;
+
 
     if (!mineTarget ||
         dist < xGetDistance(mineTarget.x, mineTarget.y, myself.x, myself.y)) {
@@ -10041,13 +15627,17 @@ async function xMineNearby() {
     }
   }
 
+
   if (!mineTarget) return;
 
+
   xMiningActive = true;
+
 
   dsk.follow.enabled = false;
   _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
   await xDelay(500);
+
 
   const sides = [
     { x: mineTarget.x + 1, y: mineTarget.y,     dir: 3 },
@@ -10055,6 +15645,7 @@ async function xMineNearby() {
     { x: mineTarget.x,     y: mineTarget.y + 1, dir: 0 },
     { x: mineTarget.x,     y: mineTarget.y - 1, dir: 2 },
   ];
+
 
   let bestSide = undefined;
   for (const side of sides) {
@@ -10068,6 +15659,7 @@ async function xMineNearby() {
     }
   }
 
+
   if (!bestSide) {
     dsk.localMsg('Mine: sem lado acessível', '#f55');
     xMiningActive = false;
@@ -10076,19 +15668,24 @@ async function xMineNearby() {
     return;
   }
 
+
   await xDelay(800);
   await xDoMove(bestSide.x, bestSide.y);
   await xDelay(5000);
 
+
   await xDoChangeDir(bestSide.dir);
   await xDelay(500);
+
 
   dsk.localMsg(`Mine: minerando ${mineTarget.name}`, '#0ff');
   xDoKeyDown(6);
 
+
   const tx = mineTarget.x;
   const ty = mineTarget.y;
   const tn = mineTarget.name;
+
 
   while (true) {
     await xDelay(500);
@@ -10104,8 +15701,10 @@ async function xMineNearby() {
     if (!stillExists) break;
   }
 
+
   xDoKeyUp(6);
   await xDelay(500);
+
 
   if (dsk.mine.enabled) {
     dsk.follow.enabled = true;
@@ -10114,8 +15713,10 @@ async function xMineNearby() {
     dsk.localMsg(`Mine: concluído, seguindo ${dsk.mine.targetName}`, '#5f5');
   }
 
+
   xMiningActive = false;
 }
+
 
 dsk.setCmd('/mine', (args) => {
   // Se passou nome: /mine Mandoka → atualiza o alvo
@@ -10123,13 +15724,16 @@ dsk.setCmd('/mine', (args) => {
     dsk.mine.targetName = args.trim();
   }
 
+
   // Se nunca definiu um nome, pede para definir
   if (!dsk.mine.targetName) {
     dsk.localMsg('Mine: defina um alvo! Ex: /mine Mandoka', '#f55');
     return;
   }
 
+
   dsk.mine.enabled = !dsk.mine.enabled;
+
 
   if (dsk.mine.enabled) {
     xMiningActive = false;
@@ -10138,12 +15742,14 @@ dsk.setCmd('/mine', (args) => {
     _originalSend({ type: 'chat', data: `/follow ${dsk.mine.targetName}` });
     dsk.localMsg(`Mine Bot: Ativado | Alvo: ${dsk.mine.targetName}`, '#5f5');
 
+
     (async function loop() {
       while (dsk.mine.enabled) {
         if (!xMiningActive) await xMineNearby();
         await xDelay(1000);
       }
     })();
+
 
   } else {
     xMiningActive = false;
@@ -10154,12 +15760,272 @@ dsk.setCmd('/mine', (args) => {
   }
 });
 
+
+// ── EMOJI PANEL ───────────────────────────────────────────────
+
+
+(function () {
+  const EMOJIS = [
+    '😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊',
+    '😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗',
+    '🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮',
+    '🤐','😯','😪','😫','🥱','😴','😌','😛','😜','😝',
+    '🤤','😒','😓','😔','😕','🙃','🤑','😲','☹️','🙁',
+    '😖','😞','😟','😤','😢','😭','😦','😧','😨','😩',
+    '🤯','😬','😰','😱','🥵','🥶','😳','🤪','😵','😡',
+    '😠','🤬','😷','🤒','🤕','🤢','🤮','🤧','😇','🥳',
+    '🥸','🤠','🤡','🤥','🤫','🤭','🧐','😈','👿','👹',
+    '👺','💀','☠️','👻','👽','👾','🤖','💩','😺','😸',
+    '👍','👎','👌','🤌','✌️','🤞','🤟','🤘','🤙','👈',
+    '👉','👆','👇','☝️','👋','🤚','🖐️','✋','🖖','🤏',
+    '💪','🦾','🖕','✍️','🙏','🤝','👏','🙌','🤲','🫶',
+    '❤️','🧡','💛','💚','💙','💜','🖤','🤍','🤎','💔',
+    '❤️‍🔥','💕','💞','💓','💗','💖','💘','💝','💟','☮️',
+    '🔥','💥','✨','⭐','🌟','💫','🎉','🎊','🎈','🏆',
+    '🥇','🎯','🎮','🕹️','🎲','🧩','♟️','🃏','🎴','🀄',
+    '⚽','🏀','🏈','⚾','🥎','🏐','🏉','🎾','🏸','🏓',
+    '💰','💵','💸','💎','👑','🔑','🗝️','🔓','🔒','🛡️',
+    '⚔️','🗡️','🔫','🪃','🏹','🛠️','⛏️','🪚','🔧','🔨',
+    '💊','🩹','🩺','🧬','🔬','🔭','💉','🧪','🧫','🧲',
+    '🌈','☀️','🌤️','⛅','🌦️','🌧️','⛈️','🌩️','❄️','☃️',
+    '🌊','💧','🫧','🌀','🌪️','🌫️','🌸','🌺','🌻','🌹',
+    '🍎','🍊','🍋','🍇','🍓','🫐','🍉','🍑','🥭','🍍',
+    '🍕','🍔','🌮','🌯','🍜','🍣','🍦','🎂','🍫','☕',
+    '😻','😼','😽','🙀','😿','😾','🐶','🐱','🐭','🐹',
+    '🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸',
+  ];
+
+
+  let panel = null;
+  let toast = null;
+  let searchTerm = '';
+
+
+  function showToast(emoji) {
+    if (toast) toast.remove();
+    toast = document.createElement('div');
+    toast.textContent = `${emoji} copiado! Cole com Ctrl+V no chat`;
+    Object.assign(toast.style, {
+      position:      'fixed',
+      bottom:        '130px',
+      left:          '50%',
+      transform:     'translateX(-50%)',
+      background:    '#2ecc71',
+      color:         '#fff',
+      padding:       '7px 16px',
+      borderRadius:  '20px',
+      fontSize:      '13px',
+      fontFamily:    'sans-serif',
+      fontWeight:    'bold',
+      zIndex:        '100000',
+      pointerEvents: 'none',
+      boxShadow:     '0 4px 12px rgba(0,0,0,0.4)',
+      opacity:       '1',
+      transition:    'opacity 0.4s',
+    });
+    document.body.appendChild(toast);
+    setTimeout(() => { if (toast) toast.style.opacity = '0'; }, 1200);
+    setTimeout(() => { if (toast) { toast.remove(); toast = null; } }, 1700);
+  }
+
+
+  function sendEmoji(emoji) {
+    navigator.clipboard.writeText(emoji)
+      .then(() => showToast(emoji))
+      .catch(() => {
+        // fallback para navegadores sem permissão de clipboard
+        const ta = document.createElement('textarea');
+        ta.value = emoji;
+        Object.assign(ta.style, { position: 'fixed', opacity: '0' });
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        ta.remove();
+        showToast(emoji);
+      });
+  }
+
+
+  function createPanel() {
+    if (panel) { removePanel(); return; }
+
+
+    panel = document.createElement('div');
+    panel.id = 'dsk-emoji-panel';
+    Object.assign(panel.style, {
+      position:      'fixed',
+      bottom:        '70px',
+      left:          '50%',
+      transform:     'translateX(-50%)',
+      width:         '340px',
+      maxHeight:     '420px',
+      background:    '#1e1e2e',
+      border:        '1px solid #444',
+      borderRadius:  '12px',
+      boxShadow:     '0 8px 32px rgba(0,0,0,0.6)',
+      zIndex:        '99999',
+      display:       'flex',
+      flexDirection: 'column',
+      overflow:      'hidden',
+      fontFamily:    'sans-serif',
+    });
+
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display:        'flex',
+      alignItems:     'center',
+      justifyContent: 'space-between',
+      padding:        '10px 12px 6px',
+      borderBottom:   '1px solid #333',
+    });
+    const title = document.createElement('span');
+    title.textContent = '😀 Clique no emoji para copiar → Cole com Ctrl+V';
+    Object.assign(title.style, { color: '#aaa', fontSize: '11px' });
+
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '16px', padding: '0 4px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+
+    // Search
+    const searchWrap = document.createElement('div');
+    Object.assign(searchWrap.style, { padding: '8px 12px' });
+    const searchInput = document.createElement('input');
+    searchInput.placeholder = '🔍 Buscar...';
+    Object.assign(searchInput.style, {
+      width:        '100%',
+      boxSizing:    'border-box',
+      padding:      '6px 10px',
+      borderRadius: '8px',
+      border:       '1px solid #444',
+      background:   '#2a2a3e',
+      color:        '#fff',
+      fontSize:     '13px',
+      outline:      'none',
+    });
+    searchInput.oninput = () => {
+      searchTerm = searchInput.value.toLowerCase();
+      renderEmojis();
+    };
+    searchWrap.appendChild(searchInput);
+
+
+    // Grid
+    const grid = document.createElement('div');
+    grid.id = 'dsk-emoji-grid';
+    Object.assign(grid.style, {
+      display:   'flex',
+      flexWrap:  'wrap',
+      gap:       '4px',
+      padding:   '6px 12px 12px',
+      overflowY: 'auto',
+      maxHeight: '300px',
+    });
+
+
+    panel.appendChild(header);
+    panel.appendChild(searchWrap);
+    panel.appendChild(grid);
+    document.body.appendChild(panel);
+
+
+    renderEmojis();
+
+
+    setTimeout(() => {
+      document.addEventListener('mousedown', outsideClick);
+    }, 100);
+  }
+
+
+  function renderEmojis() {
+    const grid = document.getElementById('dsk-emoji-grid');
+    if (!grid) return;
+    grid.innerHTML = '';
+
+
+    const filtered = searchTerm
+      ? EMOJIS.filter(e => e.includes(searchTerm))
+      : EMOJIS;
+
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = 'Nenhum emoji encontrado';
+      Object.assign(empty.style, { color: '#888', fontSize: '13px', padding: '8px' });
+      grid.appendChild(empty);
+      return;
+    }
+
+
+    filtered.forEach(emoji => {
+      const btn = document.createElement('button');
+      btn.textContent = emoji;
+      btn.title = 'Clique para copiar';
+      Object.assign(btn.style, {
+        background:   'none',
+        border:       '1px solid transparent',
+        borderRadius: '6px',
+        fontSize:     '22px',
+        cursor:       'pointer',
+        padding:      '4px',
+        lineHeight:   '1',
+        transition:   'background 0.1s, border-color 0.1s',
+      });
+      btn.onmouseenter = () => {
+        btn.style.background  = '#2a2a3e';
+        btn.style.borderColor = '#555';
+      };
+      btn.onmouseleave = () => {
+        btn.style.background  = 'none';
+        btn.style.borderColor = 'transparent';
+      };
+      btn.onclick = (e) => {
+        e.stopPropagation();
+        sendEmoji(emoji);
+      };
+      grid.appendChild(btn);
+    });
+  }
+
+
+  function removePanel() {
+    document.removeEventListener('mousedown', outsideClick);
+    if (panel) { panel.remove(); panel = null; }
+    searchTerm = '';
+  }
+
+
+  function outsideClick(e) {
+    if (panel && !panel.contains(e.target)) removePanel();
+  }
+
+
+  dsk.setCmd('/emoji', () => {
+    if (panel) removePanel(); else createPanel();
+  });
+
+
+})();
+
+
 var autoSpeedHack = false;
 var speedHackInterval2 = null;
 var botaoSpeedVisible = false;
 
+
 jv.botaoMenu2 = jv.Button.create(713, 360, 20, 'SP', ui_container, 20);
 jv.botaoMenu2.visible = false; // ← começa escondido
+
 
 jv.botaoMenu2.on_click = function () {
     if (!autoSpeedHack) {
@@ -10175,33 +16041,463 @@ jv.botaoMenu2.on_click = function () {
     }
 };
 
+
 dsk.setCmd('/sp', () => {
     botaoSpeedVisible = !botaoSpeedVisible;
     jv.botaoMenu2.visible = botaoSpeedVisible;
     dsk.localMsg(`Speed Button: ${botaoSpeedVisible ? 'Visível' : 'Escondido'}`, botaoSpeedVisible ? '#5f5' : '#f55');
 });
 
-dsk.menu.items.push(
-  { label: 'Mine Bot',      state: () => dsk.mine?.enabled,       toggle: () => dsk.commands['/mine'](dsk.mine?.targetName ?? '') },
-  { label: 'Base Repair',   state: () => dsk.baseRepair?.enabled, toggle: () => dsk.commands['/baserepair']() },
-  { label: 'Auto Explo',    state: () => dsk.explo?.enabled,      toggle: () => dsk.commands['/explo']()      },
-  { label: 'Top Skill Calc',state: () => tscD?.visible,           toggle: () => dsk.commands['/topskill']()   },
-  { label: 'Repair Bot',    state: () => dsk.repair?.enabled,     toggle: () => dsk.commands['/repair']()     },
-  { label: 'AutoKill',      state: () => dsk.autokill?.enabled,   toggle: () => dsk.commands['/autokill']()   },
-  { label: 'Auto Caraway',  state: () => dsk.effct?.enabled,      toggle: () => dsk.commands['/effct']()      },
-  { label: 'Sheep Bot',     state: () => dsk.sheep?.enabled,      toggle: () => dsk.commands['/sheep']()      },
-  { label: 'Wood Farm',     state: () => dsk.wood?.enabled,       toggle: () => dsk.commands['/wood']()       },
-  { label: 'Zoom 1.5x',     state: () => dsk.zoom?.enabled,       toggle: () => dsk.commands['/zoom']()       },
-  { label: 'Color Picker',  state: () => cp?.visible,             toggle: () => dsk.commands['/colorpicker']()},
-  { label: 'Buy (via /buy N)', state: () => false,                toggle: () => dsk.localMsg('Use /buy <qtd> no chat', '#ff0') },
-  { label: 'Sort Fooders', state: () => dsk.sort?.enabled,        toggle: () => dsk.commands['/sort']() },
-);
-dsk.menu.rebuild();
+
+// ── HUNT HUB (HTML overlay — não interfere com PIXI) ─────────
+
+
+(function () {
+  let panel = null;
+
+
+  function createPanel() {
+    if (panel) { removePanel(); return; }
+
+
+    panel = document.createElement('div');
+    Object.assign(panel.style, {
+      position:      'fixed',
+      top:           '120px',
+      left:          '50%',
+      transform:     'translateX(-50%)',
+      width:         '570px',
+      background:    '#1e1e2e',
+      border:        '1px solid #555',
+      borderRadius:  '10px',
+      boxShadow:     '0 8px 24px rgba(0,0,0,0.6)',
+      zIndex:        '99998',
+      fontFamily:    'Verdana, sans-serif',
+      userSelect:    'none',
+    });
+
+
+    // ── Header (drag) ──────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display:        'flex',
+      alignItems:     'center',
+      justifyContent: 'space-between',
+      padding:        '8px 10px',
+      background:     '#2a2a3e',
+      borderRadius:   '10px 10px 0 0',
+      cursor:         'move',
+      borderBottom:   '1px solid #444',
+    });
+
+
+    const title = document.createElement('span');
+    title.textContent = '⚔️ Hunt Hub';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px', lineHeight: '1',
+    });
+    closeBtn.onclick = () => removePanel();
+
+
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown',  _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - panel.getBoundingClientRect().left;
+      oy = _xy.y - panel.getBoundingClientRect().top;
+      panel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); panel.style.left = (_xy.x - ox) + 'px'; panel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+
+    // ── Body ───────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, {
+      display: 'flex', padding: '12px 10px', gap: '10px',
+    });
+
+
+    // Coluna genérica
+    function makeCol(title, onConfig, onPlay, stateGetter) {
+      const col = document.createElement('div');
+      Object.assign(col.style, {
+        flex: '1', display: 'flex', flexDirection: 'column',
+        alignItems: 'center', gap: '6px',
+      });
+
+
+      const lbl = document.createElement('div');
+      lbl.textContent = title;
+      Object.assign(lbl.style, { color: '#fff', fontSize: '12px', fontWeight: 'bold' });
+
+
+      const btnCfg = document.createElement('button');
+      btnCfg.textContent = '⚙ Config';
+      Object.assign(btnCfg.style, {
+        width: '90px', padding: '5px 0', borderRadius: '6px',
+        background: '#2a2a3e', border: '1px solid #555',
+        color: '#fff', cursor: 'pointer', fontSize: '11px',
+      });
+      btnCfg.onclick = () => { removePanel(); onConfig(); };
+
+
+      const btnPlay = document.createElement('button');
+      Object.assign(btnPlay.style, {
+        width: '90px', padding: '5px 0', borderRadius: '6px',
+        border: '1px solid #555', cursor: 'pointer',
+        fontSize: '11px', fontWeight: 'bold',
+      });
+      btnPlay.onclick = () => { onPlay(); updatePlay(); };
+
+
+      function updatePlay() {
+        const on = stateGetter();
+        btnPlay.textContent       = on ? '⏹ Stop' : '▶ Play';
+        btnPlay.style.background  = on ? '#c0392b' : '#27ae60';
+        btnPlay.style.color       = '#fff';
+      }
+      updatePlay();
+
+
+      // Atualiza o botão play em loop
+      const interval = setInterval(() => {
+        if (!panel) { clearInterval(interval); return; }
+        updatePlay();
+      }, 500);
+
+
+      col.appendChild(lbl);
+      col.appendChild(btnCfg);
+      col.appendChild(btnPlay);
+      return col;
+    }
+
+
+    // Divisor vertical
+    const div = document.createElement('div');
+    Object.assign(div.style, {
+      width: '1px', background: '#444', margin: '0 2px',
+    });
+
+
+    const colNewbi = makeCol(
+      '🐭 Newbi',
+      () => dsk.commands['/newbiconfig'](),
+      () => dsk.commands['/newbi'](),
+      () => !!dsk.myst?.enabled,
+    );
+
+
+    const colWc = makeCol(
+      '🦊 WCave',
+      () => dsk.commands['/wcaveconfig'](),
+      () => dsk.commands['/wcave'](),
+      () => !!dsk.wcave?.enabled,
+    );
+
+
+    body.appendChild(colNewbi);
+    body.appendChild(div);
+    body.appendChild(colWc);
+
+
+    const div2 = document.createElement('div');
+    Object.assign(div2.style, { width: '1px', background: '#444', margin: '0 2px' });
+
+
+    const colCm = makeCol(
+      '⚰️ Cemetery',
+      () => dsk.commands['/cemeteryconfig'](),
+      () => dsk.commands['/cemetery'](),
+      () => !!dsk.cemetery?.enabled,
+    );
+
+
+    body.appendChild(div2);
+    body.appendChild(colCm);
+        const div3 = document.createElement('div');
+        Object.assign(div3.style, { width: '1px', background: '#444', margin: '0 2px' });
+        const colSp = makeCol(
+          '🐍 Snake Pit',
+          () => dsk.commands['/snakepitconfig'](),
+          () => dsk.commands['/snakepit'](),
+          () => !!dsk.snakepit?.enabled,
+        );
+        body.appendChild(div3);
+        body.appendChild(colSp);
+        const div4 = document.createElement('div');
+        Object.assign(div4.style, { width: '1px', background: '#444', margin: '0 2px' });
+        const colSnow = makeCol(
+          '❄️ Snow',
+          () => dsk.commands['/snowconfig'](),
+          () => dsk.commands['/snow'](),
+          () => !!dsk.snow?.enabled,
+        );
+        body.appendChild(div4);
+        body.appendChild(colSnow);
+
+
+    panel.appendChild(header);
+    panel.appendChild(body);
+    document.body.appendChild(panel);
+  }
+
+
+  function removePanel() {
+    if (panel) { panel.remove(); panel = null; }
+  }
+
+
+  dsk.setCmd('/hunt', () => {
+    if (panel) {
+      removePanel();
+      dsk.localMsg('Hunt Hub: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Hunt Hub: Aberto', '#5f5');
+    }
+  });
+})();
+
+// ── TILLING BOT ──────────────────────────────────────────────
+// Lógica:
+//   - Olha o tile NA FRENTE do personagem (baseado em myself.dir)
+//   - Se sprite == 22 (terra limpa) → anda 1 tile pra frente
+//   - Senão → ataca (xDoKeyPress(6, 180)) para remover o mato
+//   - Antes de atacar, verifica se o item equipado (slot 0) está gasto (equip == 2)
+//     → Se estiver: dropa, equipa repair kit, anda 1 tile adjacente,
+//       vira para o item no chão, repara até "is in perfect condition" no chat,
+//       move para cima do item, pega, equipa novamente e continua.
+//
+// Direções (myself.dir):
+//   0 = North (y-1)
+//   1 = East  (x+1)
+//   2 = South (y+1)
+//   3 = West  (x-1)
+// ─────────────────────────────────────────────────────────────
+
+dsk.tilling = {
+  enabled: false,
+  repairing: false,
+};
+
+// Retorna o tile sprite na frente do personagem
+function xGetTileSprInFront() {
+  const dir = myself.dir;
+  let tx = myself.x;
+  let ty = myself.y;
+  if (dir === 0) ty -= 1;
+  else if (dir === 1) tx += 1;
+  else if (dir === 2) ty += 1;
+  else if (dir === 3) tx -= 1;
+  const tile = map[loc2tile(tx, ty)];
+  return tile ? tile.spr : -1;
+}
+
+// Retorna coordenada do tile na frente
+function xGetTilePosInFront() {
+  const dir = myself.dir;
+  let tx = myself.x;
+  let ty = myself.y;
+  if (dir === 0) ty -= 1;
+  else if (dir === 1) tx += 1;
+  else if (dir === 2) ty += 1;
+  else if (dir === 3) tx -= 1;
+  return { x: tx, y: ty };
+}
+
+// Move 1 tile na direção atual
+async function xMoveForward() {
+  const pos = xGetTilePosInFront();
+  await xDoMove(pos.x, pos.y);
+  await xDelay(600);
+}
+
+// Retorna direção oposta (para virar de costas e depois virar pro item)
+function xOppDir(dir) {
+  if (dir === 0) return 2;
+  if (dir === 1) return 3;
+  if (dir === 2) return 0;
+  if (dir === 3) return 1;
+}
+
+// Retorna tile adjacente perpendicular (lado) para step de reparo
+function xSideStep(dir) {
+  // Passo lateral: se olhando N/S → passo para L (x+1), se olhando L/O → passo para S (y+1)
+  if (dir === 0 || dir === 2) return { dx: 1, dy: 0 };
+  return { dx: 0, dy: 1 };
+}
+
+// Fluxo completo de reparo do item
+async function xRepairTool() {
+  dsk.tilling.repairing = true;
+  dsk.localMsg('Tilling: reparando ferramenta...', '#fa0');
+
+  const dir = myself.dir;
+  const side = xSideStep(dir);
+
+  // 1. Desequipa / para de atacar
+  await xDoKeyUp(6);
+  await xDelay(400);
+
+  // 2. Dropa a ferramenta gasta no tile atual
+  await xDoDropSlot(1, 1);
+  const droppedX = myself.x;
+  const droppedY = myself.y;
+  await xDelay(500);
+
+  // 3. Equipa o repair kit (sprite 719)
+  const kitSlot = xGetSlotByID(719);
+  if (kitSlot === undefined) {
+    dsk.localMsg('Tilling: Sem repair kit! Pausando.', '#f55');
+    dsk.tilling.enabled = false;
+    dsk.tilling.repairing = false;
+    return;
+  }
+  await xDoUseSlotByID(kitSlot);
+  await xDelay(500);
+
+  // 4. Anda 1 tile lateral (adjacente ao item dropado)
+  await xDoMove(myself.x + side.dx, myself.y + side.dy);
+  await xDelay(700);
+
+  // 5. Vira para o item dropado
+  // O item está em droppedX, droppedY — descobrimos a direção para ele
+  let faceDrop;
+  if (droppedX > myself.x) faceDrop = 1;       // East
+  else if (droppedX < myself.x) faceDrop = 3;  // West
+  else if (droppedY < myself.y) faceDrop = 0;  // North
+  else faceDrop = 2;                            // South
+
+  await xDoChangeDir(faceDrop);
+  await xDelay(400);
+
+  // 6. Repara até aparecer "is in perfect condition" no chat
+  let repaired = false;
+  let attempts = 0;
+  while (!repaired && attempts < 60) {
+    await xDoKeyPress(6, 185);
+    await xDelay(500);
+    if (xIfChatHas('is in perfect condition')) {
+      xDoClearChat('is in perfect condition');
+      repaired = true;
+    }
+    attempts++;
+  }
+
+  await xDelay(400);
+
+  // 7. Move para cima do item dropado
+  await xDoMove(droppedX, droppedY);
+  await xDelay(700);
+
+  // 8. Pega o item
+  await xDoPickUp();
+  await xDelay(500);
+
+  // 9. Equipa a ferramenta (slot 0 após pegar)
+  await xDoUseSlot(0);
+  await xDelay(500);
+
+  // 10. Volta a olhar para a direção original
+  await xDoChangeDir(dir);
+  await xDelay(400);
+
+  dsk.tilling.repairing = false;
+  dsk.localMsg('Tilling: ferramenta reparada! Continuando.', '#5f5');
+}
+
+// Loop principal do tilling
+async function Tilling() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (dsk.tilling.repairing) return;
+
+  if (xGoing[50] === true) return;
+  xGoing[50] = true;
+
+  try {
+    // Verifica se ferramenta precisa de reparo (equip == 2 = gasta)
+    if (inv[0] && inv[0].equip === 2) {
+      await xRepairTool();
+      xGoing[50] = false;
+      return;
+    }
+
+    // Garante que a ferramenta está equipada
+    if (inv[0] && inv[0].equip === 0) {
+      await xDoUseSlot(0);
+      await xDelay(400);
+    }
+
+    const spr = xGetTileSprInFront();
+
+    if (spr === 22) {
+      // Tile já é terra limpa → anda pra frente
+      await xMoveForward();
+    } else {
+      // Tile tem mato → ataca com a hoe
+      await xDoKeyPress(6, 180);
+      await xDelay(300);
+    }
+  } catch (e) {
+    console.error('[Tilling] Erro:', e);
+  }
+
+  xGoing[50] = false;
+}
+
+dsk.setCmd('/tilling', () => {
+  dsk.tilling.enabled = !dsk.tilling.enabled;
+
+  if (dsk.tilling.enabled) {
+    dsk.tilling.repairing = false;
+    dsk.localMsg('Tilling Bot: Ativado', '#5f5');
+    dsk.botActive = true;
+
+    (async function loop() {
+      while (dsk.tilling.enabled) {
+        await Tilling();
+        await xDelay(350);
+      }
+      dsk.botActive = false;
+    })();
+  } else {
+    xGoing[50] = false;
+    xDoKeyUp(6);
+    dsk.tilling.repairing = false;
+    dsk.botActive = false;
+    dsk.localMsg('Tilling Bot: Desativado', '#f55');
+  }
+});
+
+
 //check bot para aplicar o delay e não da packet spam
+
 
 dsk.checkBotActive = () => {
   return dsk.craft?.enabled       ||
-		 dsk.repair?.enabled      ||
+         dsk.repair?.enabled      ||
          dsk.armas?.enabled       ||
          dsk.sword?.enabled       ||
          dsk.hammer?.enabled      ||
@@ -10211,82 +16507,26 @@ dsk.checkBotActive = () => {
          dsk.fish?.enabled        ||
          dsk.farm?.enabled        ||
          dsk.knit?.enabled        ||
-         dsk.myst?.enabled        ||
          dsk.clay?.enabled        ||
          dsk.healbot?.enabled     ||
          dsk.rotation?.enabled    ||
          false;
 };
 
+
 dsk.on('postLoop', () => {
   dsk.botActive = dsk.checkBotActive();
 });
 
-// Criar botão
-dsk.menu.btnDiscord = jv.Button.create(0, 0, 110, '💬 DISCORD', dsk.menu, 22);
 
-// Posição
-jv.bottom(dsk.menu.btnDiscord, 4);
-dsk.menu.btnDiscord.x = 4;
 
-// ===== ESTILO =====
-const style = dsk.menu.btnDiscord.title.style;
-
-// Texto verde neon
-style.fill = 0x00ff99;
-style.fontWeight = 'bold';
-
-// Glow (sombra)
-style.dropShadow = true;
-style.dropShadowColor = '#00ff99';
-style.dropShadowBlur = 8;
-style.dropShadowDistance = 0;
-
-// Fundo do botão (se tiver suporte)
-if (dsk.menu.btnDiscord.bg) {
-  dsk.menu.btnDiscord.bg.tint = 0x0a0a0a; // fundo escuro
-}
-
-// Borda fake (hacky style)
-dsk.menu.btnDiscord.lineStyle?.(2, 0x00ff99, 1);
-
-// ===== HOVER (PC) =====
-dsk.menu.btnDiscord.on_over = () => {
-  dsk.menu.btnDiscord.scale.set(1.05);
-};
-
-dsk.menu.btnDiscord.on_out = () => {
-  dsk.menu.btnDiscord.scale.set(1);
-};
-
-// ===== CLICK =====
-dsk.menu.btnDiscord.on_click = () => {
-  const url = 'https://discord.com/invite/XkVhYENK7k';
-
-  // efeito clique
-  dsk.menu.btnDiscord.scale.set(0.95);
-  setTimeout(() => dsk.menu.btnDiscord.scale.set(1), 100);
-
-  // MOBILE FRIENDLY
-  try {
-    const win = window.open(url, '_blank');
-
-    // fallback se bloquear
-    if (!win) {
-      window.location.href = url;
-    }
-  } catch (e) {
-    window.location.href = url;
-  }
-};
-
-// Adicionar ao menu
-dsk.menu.addChild(dsk.menu.btnDiscord);
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
+
 
 dsk.once('postPacket:accepted', () => {
   dsk.localMsg('Pablo Mod Load, type /cmd for commands', 'pink');
 });
+
 
 })();
