@@ -573,8 +573,8 @@ dsk.setCmd('/craft', () => {
 
 
   // Atualiza play btn ao vivo
-  dsk.on('postLoop', () => {
-    if (!cmPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!cmPanel || ++_t % 10 !== 0) return;
     const btn = cmPanel.querySelector('[data-cm="playbtn"]');
     if (!btn) return;
     const on = !!dsk.craft?.enabled;
@@ -582,7 +582,7 @@ dsk.setCmd('/craft', () => {
     btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
     btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
     btn.style.color       = on ? '#e74c3c' : '#2ecc71';
-  });
+  }); }
 
 
   function removePanel() {
@@ -1020,6 +1020,7 @@ dsk.invManager.updateSlots = () => {
   }
 };
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
+
 dsk.dias = {
     global: "https://discord.com/api/webhooks/1480829602791428098/H9pG9tZQitytoVLlmAD5pv3s_Yr0QOG88AbhFZWykDWIMYOTXOarRdOUCzDBO50Lag99"
   };
@@ -1049,7 +1050,6 @@ dsk.dias = {
       }
     } catch(e) { console.log('dsk.dias error:', e); }
   }
-
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
@@ -1348,15 +1348,30 @@ dsk.discord.loadConfig();
 
 
 
-dsk.discord.send = (webhookUrl, username, message) => {
+dsk.discord.send = (webhookUrl, username, message, options = {}) => {
   if (!dsk.discord.enabled) return;
+  if (!webhookUrl) return;
+
+  const { color, sendEmbed = false, title } = options;
+
+  const body = sendEmbed
+    ? {
+        username,
+        embeds: [{
+          description: message,
+          color: color ?? 0x99aab5,
+          ...(title ? { title } : {}),
+        }],
+      }
+    : {
+        username,
+        content: message,
+      };
+
   fetch(webhookUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      username: username,
-      content:  message,
-    }),
+    body: JSON.stringify(body),
   });
 };
 
@@ -1371,35 +1386,81 @@ dsk.on('postPacket:pkg', packet => {
   if (!dsk.discord.enabled) return;
   if (!packet?.data) return;
 
-
   try {
     const arr = JSON.parse(packet.data);
     arr.forEach(raw => {
       const item = JSON.parse(raw);
       if (item.type !== 'message') return;
 
-
-      const color = (item.text.match(/style=['"]?color:\s*(#[0-9a-fA-F]{6})['"]?/) || [])[1]?.toLowerCase();
-      const text = dsk.stripHTMLTags(item.text).trim();
-
+      const colorMatch = item.text.match(/color\s*:\s*(#[0-9a-fA-F]{6})/i);
+      const color = colorMatch?.[1]?.toLowerCase();
+      const text  = dsk.stripHTMLTags(item.text).trim();
 
       if (!text) return;
 
-
+      // ── TRIBE → normal, sem embed ────────────────────────
       if (color === '#ff9900') {
-        dsk.discord.send(dsk.discord.tribeUrl, '[TRIBE]', text);
-      } else if (color === '#ff0000') {
-        dsk.discord.send(dsk.discord.deathUrl, '[DEATH] 💀', text);
-      } else if (color === '#339966') {
-        dsk.discord.send(dsk.discord.respawnUrl, '[RESPAWN] ✅', text);
-      } else if (item.name) {
-                  let decoded;
-                  try { decoded = unescape(text); } catch { decoded = text; }
-                  dsk.discord.send(dsk.discord.globalUrl, `[GLOBAL] ${item.name}`, decoded);
-                }
+        dsk.discord.send(dsk.discord.tribeUrl, '[TRIBE] 🟠', text);
+        return;
+      }
+
+      // ── DEATH → embed vermelho ───────────────────────────
+      if (color === '#ff0000') {
+        dsk.discord.send(
+          dsk.discord.deathUrl,
+          '[DEATH] 💀',
+          text,
+          { sendEmbed: true, color: 0xe74c3c }
+        );
+        return;
+      }
+
+      // ── RESPAWN → embed verde ────────────────────────────
+      if (color === '#339966') {
+        dsk.discord.send(
+          dsk.discord.respawnUrl,
+          '[RESPAWN] ✅',
+          text,
+          { sendEmbed: true, color: 0x2ecc71 }
+        );
+        return;
+      }
+
+      // ── BROADCAST do servidor (reboot, level up, etc.)
+      //    Amarelos: #ffff00 (reboot) e #ffff66 (level up)
+      //    Qualquer pkg sem item.name → é broadcast, não conversa
+      if (!item.name) {
+        let embedColor = 0xffd700; // amarelo padrão
+
+        if (color === '#ff0000') embedColor = 0xe74c3c;        // vermelho
+        else if (color === '#ffff00') embedColor = 0xf1c40f;   // reboot
+        else if (color === '#ffff66') embedColor = 0xffe066;   // level up
+        else if (color === '#00ff00') embedColor = 0x2ecc71;   // verde
+
+        dsk.discord.send(
+          dsk.discord.globalUrl,
+          '[SERVER] ⚙️',
+          text,
+          { sendEmbed: true, color: embedColor }
+        );
+        return;
+      }
+
+      // ── GLOBAL com nome → conversa entre jogadores → normal
+      let decoded;
+      try { decoded = unescape(text); } catch { decoded = text; }
+      dsk.discord.send(
+        dsk.discord.globalUrl,
+        `[GLOBAL] ${item.name}`,
+        decoded
+        // sem embed → aparece como texto normal
+      );
     });
-  } catch (e) { console.log('Discord parse error:', e); }
+  } catch (e) {
+    console.log('Discord parse error:', e);
+  }
 });
+
 
 
 //funções novas//
@@ -3407,7 +3468,7 @@ dsk.setCmd('/skills', () => {
 
 
   // Atualiza em tempo real
-  dsk.on('postLoop', () => { if (acmPanel) renderValues(); });
+  { let _t = 0; dsk.on('postLoop', () => { if (!acmPanel || ++_t % 10 !== 0) return; renderValues(); }); }
 
 
   function createPanel() {
@@ -4281,14 +4342,13 @@ function xHasFood() {
 
 
 async function xCollectResources() {
-  // --- Coleta madeira ---
+  // --- Coleta madeira SEMPRE primeiro ---
   if (!xHasWood()) {
-    // Vai até a posição base (em cima da madeira)
     if (myself.x !== cookPositionX || myself.y !== cookPositionY) {
       await xDoMove(cookPositionX, cookPositionY);
       return;
     }
-    if (myself.x !== cookPositionX || myself.y !== cookPositionY) return;
+
     let tries = 0;
     while (!xHasWood() && tries < 10) {
       if (xGetGroundItemByPos(myself.x, myself.y, WOOD_IDS)) {
@@ -4299,27 +4359,37 @@ async function xCollectResources() {
       }
       tries++;
     }
+
+    // Bloqueio: se ainda não tem madeira, não avança para a comida
+    if (!xHasWood()) return;
   }
 
-
-  // --- Coleta comida (1 sqm acima do cook position) ---
+  // --- Coleta comida (só chega aqui se já tem madeira) ---
   if (!xHasFood()) {
     if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) {
       await xDoMove(cookPositionX, cookPositionY - 1);
       return;
     }
-        if (myself.x !== cookPositionX || myself.y !== cookPositionY - 1) return;
+
     let tries = 0;
     while (!xHasFood() && tries < 10) {
       await xDoPickUp();
       await xDelay(500);
       tries++;
     }
-    
+
     await xDelay(400);
   }
-}
 
+  // --- Garante ordem: madeira no slot menor que comida ---
+  const woodSlot = xGetSlotByID(WOOD_IDS[0]) ?? xGetSlotByID(WOOD_IDS[1]);
+  const foodSlot = xGetSlotByID(FOOD_IDS[0]) ?? xGetSlotByID(FOOD_IDS[1]);
+
+  if (woodSlot !== undefined && foodSlot !== undefined && woodSlot > foodSlot) {
+    await xDoSwapSlot(woodSlot + 1, foodSlot + 1);
+    await xDelay(300);
+  }
+}
 
 function xHasFirePit(direction) {
   const dy = direction === 'up' ? -1 : 1;
@@ -4346,15 +4416,15 @@ async function cook() {
     await xDelay(400);
     return;
   }
-  await xDelay(100);
+  await xDelay(150);
   await xDoKeyPress(6, 100);
-  await xDelay(150);
-  await xDropAvailable(1, WOOD_IDS);
-  await xDelay(150);
-  await xDoDropByID(1, 941);
-  await xDelay(150);
-  await xDropAvailable(1, FOOD_IDS);
   await xDelay(200);
+  await xDropAvailable(1, WOOD_IDS);
+  await xDelay(200);
+  await xDoDropByID(1, 941);
+  await xDelay(200);
+  await xDropAvailable(1, FOOD_IDS);
+  await xDelay(300);
 
 
   // --- Fogueira de baixo ---
@@ -4365,13 +4435,13 @@ async function cook() {
     await xDelay(400);
     return;
   }
-  await xDelay(100);
+  await xDelay(150);
   await xDoKeyPress(6, 100);
-  await xDelay(150);
+  await xDelay(200);
   await xDropAvailable(1, WOOD_IDS);
-  await xDelay(150);
+  await xDelay(200);
   await xDoDropByID(1, 941);
-  await xDelay(150);
+  await xDelay(200);
   await xDropAvailable(1, FOOD_IDS);
   await xDelay(300);
 }
@@ -4456,18 +4526,30 @@ function xHasOre() {
 }
 
 
+// Aguarda myself.x/y baterem com o destino (máx ~1.5s)
+async function xWaitArrival(tx, ty) {
+  let t = 0;
+  while ((myself.x !== tx || myself.y !== ty) && t < 15) {
+    await xDelay(100);
+    t++;
+  }
+}
+
 async function xCollectSmeltResources() {
-  // --- Coleta madeira ---
+  // --- Coleta madeira SEMPRE primeiro ---
   if (!xHasWood()) {
     if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) {
       await xDoMove(smeltPositionX, smeltPositionY);
+      await xWaitArrival(smeltPositionX, smeltPositionY);
       return;
     }
-        
-        if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) return;
-        
+
     let tries = 0;
     while (!xHasWood() && tries < 10) {
+      // Confirma posição antes de pegar — evita pickup no tile errado
+      if (myself.x !== smeltPositionX || myself.y !== smeltPositionY) {
+        await xWaitArrival(smeltPositionX, smeltPositionY);
+      }
       if (xGetGroundItemByPos(myself.x, myself.y, WOOD_IDS)) {
         await xDoPickUp();
         await xDelay(500);
@@ -4476,28 +4558,44 @@ async function xCollectSmeltResources() {
       }
       tries++;
     }
+
+    if (!xHasWood()) return;
   }
 
-
-  // --- Coleta minério (1 sqm acima do smelt position) ---
+  // --- Coleta minério (só chega aqui se já tem madeira) ---
   if (!xHasOre()) {
-        if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) {
+    if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) {
       await xDoMove(smeltPositionX, smeltPositionY - 1);
+      await xWaitArrival(smeltPositionX, smeltPositionY - 1);
       return;
     }
-        
-        if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) return;
-        
+
     let tries = 0;
     while (!xHasOre() && tries < 10) {
-      await xDoPickUp();
-      await xDelay(500);
+      // Confirma posição antes de pegar — evita pickup no tile errado
+      if (myself.x !== smeltPositionX || myself.y !== smeltPositionY - 1) {
+        await xWaitArrival(smeltPositionX, smeltPositionY - 1);
+      }
+      if (xGetGroundItemByPos(myself.x, myself.y, ORE_IDS)) {
+        await xDoPickUp();
+        await xDelay(500);
+      } else {
+        await xDelay(500);
+      }
       tries++;
     }
     await xDelay(400);
   }
-}
 
+  // --- Garante ordem: madeira no slot menor que minério ---
+  const woodSlot = xGetSlotByID(WOOD_IDS[0]) ?? xGetSlotByID(WOOD_IDS[1]);
+  const oreSlot  = xGetSlotByID(ORE_IDS[0])  ?? xGetSlotByID(ORE_IDS[1]);
+
+  if (woodSlot !== undefined && oreSlot !== undefined && woodSlot > oreSlot) {
+    await xDoSwapSlot(woodSlot + 1, oreSlot + 1);
+    await xDelay(300);
+  }
+}
 
 async function smelt() {
   if (dskPaused) return;
@@ -4515,19 +4613,19 @@ async function smelt() {
     await xDelay(400);
     return;
   }
-  await xDelay(150);
+  await xDelay(250);
   await xDoKeyPress(6, 100);
-  await xDelay(380);
+  await xDelay(500);
   await xDoDropByID(1, 694);
-  await xDelay(380);
+  await xDelay(480);
   await xDropAvailable(1, ORE_IDS);
-  await xDelay(300);
+  await xDelay(400);
   await xDoPickUp();
-  await xDelay(200);
+  await xDelay(350);
   await xDropAvailable(1, WOOD_IDS);
-  await xDelay(200);
+  await xDelay(350);
   await xDoDropByID(1, 711);
-  await xDelay(200);
+  await xDelay(350);
 
 
   // --- Fogueira de baixo ---
@@ -4538,19 +4636,19 @@ async function smelt() {
     await xDelay(400);
     return;
   }
-  await xDelay(150);
+  await xDelay(250);
   await xDoKeyPress(6, 100);
-  await xDelay(380);
+  await xDelay(500);
   await xDoDropByID(1, 694);
-  await xDelay(380);
+  await xDelay(480);
   await xDropAvailable(1, ORE_IDS);
-  await xDelay(300);
+  await xDelay(400);
   await xDoPickUp();
-  await xDelay(200);
+  await xDelay(350);
   await xDropAvailable(1, WOOD_IDS);
-  await xDelay(200);
+  await xDelay(350);
   await xDoDropByID(1, 711);
-  await xDelay(200);
+  await xDelay(350);
 }
 
 
@@ -4804,6 +4902,7 @@ dsk.menu.items = [
   // ─── ⛏️ Recursos ─────────────────────────────────────────
   { type: 'section', label: '⛏️  Recursos' },
   { label: '⛏️ Mine Hub',        state: () => !!(window.minm?.visible),        toggle: () => dsk.commands['/minehub']() },
+  { label: 'WC Mining',           state: () => !!dsk.wcmining?.enabled,        toggle: () => dsk.commands['/wcmining']() },
   { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
   { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
   { label: 'Fishing',            state: () => !!dsk.fish?.enabled,           toggle: () => dsk.commands['/fish']() },
@@ -4983,10 +5082,10 @@ dsk.on('postLoop', () => {
 
 
 // Atualiza o tint em tempo real no postLoop
-dsk.on('postLoop', () => {
-  if (!dsk.menu.visible) return;
+{ let _t = 0; dsk.on('postLoop', () => {
+  if (!dsk.menu.visible || ++_t % 6 !== 0) return;
   dsk.menu.refresh();
-});
+}); }
 
 
 // Botão flutuante para abrir/fechar o menu
@@ -5029,6 +5128,7 @@ dsk.menu.toggleBtn.on_click = () => {
 	  { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
 	  { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
 	  { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
+	  { label: 'Auto Resear',        state: () => !!dsk.resear?.enabled,         toggle: () => dsk.commands['/resear']() },
       { label: 'Top Skill Calc',     state: () => !!(typeof tscD !== 'undefined' && tscD?.visible), toggle: () => dsk.commands['/topskill']() },
     ]},
     { label: '🗡️  Hunt', items: [
@@ -5040,19 +5140,23 @@ dsk.menu.toggleBtn.on_click = () => {
 	  { label: 'Follow',             state: () => !!dsk.follow?.enabled,         toggle: () => dsk.commands['/follow']() },
       { label: 'WW',                 state: () => !!dsk.ww?.enabled,             toggle: () => dsk.commands['/ww']() },
       { label: 'Diso',               state: () => !!dsk.diso?.enabled,           toggle: () => dsk.commands['/diso']() },
-	  { label: 'Quest Painel', state: () => dsk.questManager?.visible, toggle: () => dsk.commands['/questhub']() },
-	  { label: 'Quest Hud', state: () => dsk.questHud?.enabled, toggle: () => dsk.commands['/questtext']() },
+	  { label: 'Quest Painel',       state: () => dsk.questManager?.visible,     toggle: () => dsk.commands['/questhub']() },
+	  { label: 'Quest Hud',          state: () => dsk.questHud?.enabled,         toggle: () => dsk.commands['/questtext']() },
     ]},
     { label: '⛏️  Recursos', items: [
       { label: '⛏️ Mine Hub',        state: () => !!(window.minm?.visible),      toggle: () => dsk.commands['/minehub']() },
+      { label: 'WC Mining',          state: () => !!dsk.wcmining?.enabled,       toggle: () => dsk.commands['/wcmining']() },
       { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
       { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
       { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
       { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
       { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
+	  { label: 'Galinha Bot',        state: () => !!dsk.gal?.enabled,            toggle: () => dsk.commands['/galconfig']() },
+	  { label: 'Tinta',              state: () => !!dsk.tinta?.enabled,          toggle: () => dsk.commands['/tinta']() },
     ]},
     { label: '🛠️  Utilidades', items: [
       { label: 'Speed',              state: () => !!dsk.speed?.enabled,          toggle: () => dsk.commands['/speed']() },
+	  { label: 'Teleport',           state: () => false,                         toggle: () => dsk.commands['/teleport']() },
       { label: 'Bússola',            state: () => !!dsk.ginfo?.label?.visible,   toggle: () => dsk.commands['/compass']() },
       { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
       { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
@@ -6188,8 +6292,8 @@ window.wcStat = window.wcStat ?? {
 
 
   // Atualiza labels em tempo real
-  dsk.on('postLoop', () => {
-    if (!wcmPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!wcmPanel || ++_t % 10 !== 0) return;
     const q = k => wcmPanel.querySelector(`[data-wcm="${k}"]`);
     const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
     const wp = xTemp[70] ?? 0, maxWp = xTemp[71] ?? 19;
@@ -6210,7 +6314,7 @@ window.wcStat = window.wcStat ?? {
       const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
       set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
     }
-  });
+  }); }
 
 
   function createPanel() {
@@ -6335,8 +6439,9 @@ window.wcStat = window.wcStat ?? {
       b.onclick = fn;
       return b;
     }
-    voltasBtns.appendChild(makeBtn('-', () => { if ((window.wcaveRepVoltas ?? 1) > 1) window.wcaveRepVoltas--; }));
-    voltasBtns.appendChild(makeBtn('+', () => { window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 1) + 1; }));
+    const updateVoltasVal = () => { voltasVal.textContent = `Voltas p/ reparar: ${window.wcaveRepVoltas ?? 1}`; };
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.wcaveRepVoltas ?? 1) > 1) { window.wcaveRepVoltas--; updateVoltasVal(); } }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 1) + 1; updateVoltasVal(); }));
     voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
     body.appendChild(voltasRow);
 
@@ -6385,6 +6490,46 @@ window.wcStat = window.wcStat ?? {
     wcmPanel.appendChild(header);
     wcmPanel.appendChild(body);
     document.body.appendChild(wcmPanel);
+
+    // ── Footer: Voltar + Play ─────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Hunt Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.huntHub?.open(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.wcave?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/wcave'](); _updatePlayBtn(); };
+    const _playInterval = setInterval(() => {
+      if (!wcmPanel) { clearInterval(_playInterval); return; }
+      _updatePlayBtn();
+    }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    wcmPanel.appendChild(_footer);
   }
 
 
@@ -6762,8 +6907,8 @@ dsk.snakepit = { enabled: false };
 
 
   // Atualiza labels em tempo real
-  dsk.on('postLoop', () => {
-    if (!spPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!spPanel || ++_t % 10 !== 0) return;
     const q   = k => spPanel.querySelector(`[data-spm="${k}"]`);
     const set  = (k, v) => { const el = q(k); if (el) el.textContent = v; };
     const wp    = xTemp[90] ?? 0;
@@ -6784,7 +6929,7 @@ dsk.snakepit = { enabled: false };
       const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
       set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
     }
-  });
+  }); }
 
 
   function createPanel() {
@@ -6873,7 +7018,7 @@ dsk.snakepit = { enabled: false };
     voltasVal.textContent = `Voltas p/ reparar: ${window.spRepVoltas ?? 3}`;
     Object.assign(voltasVal.style, { color: '#4ade80', fontSize: '11px' });
     voltasLbl.appendChild(voltasTit); voltasLbl.appendChild(voltasVal);
-    dsk.on('postLoop', () => { if (!spPanel) return; const el = spPanel.querySelector('[data-spm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.spRepVoltas ?? 3}`; });
+    { let _t = 0; dsk.on('postLoop', () => { if (!spPanel || ++_t % 10 !== 0) return; const el = spPanel.querySelector('[data-spm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.spRepVoltas ?? 3}`; }); }
 
 
     const voltasBtns = document.createElement('div');
@@ -6927,6 +7072,46 @@ dsk.snakepit = { enabled: false };
     spPanel.appendChild(header);
     spPanel.appendChild(body);
     document.body.appendChild(spPanel);
+
+    // ── Footer: Voltar + Play ─────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Hunt Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.huntHub?.open(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.snakepit?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/snakepit'](); _updatePlayBtn(); };
+    const _playInterval = setInterval(() => {
+      if (!spPanel) { clearInterval(_playInterval); return; }
+      _updatePlayBtn();
+    }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    spPanel.appendChild(_footer);
   }
 
 
@@ -7317,8 +7502,8 @@ dsk.snow = { enabled: false };
   dsk.snowManager = snm;
 
 
-  dsk.on('postLoop', () => {
-    if (!snPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!snPanel || ++_t % 10 !== 0) return;
     const q   = k => snPanel.querySelector(`[data-snm="${k}"]`);
     const set  = (k, v) => { const el = q(k); if (el) el.textContent = v; };
     const wp    = xTemp[160] ?? 0;
@@ -7339,7 +7524,7 @@ dsk.snow = { enabled: false };
       const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
       set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
     }
-  });
+  }); }
 
 
   function createPanel() {
@@ -7424,7 +7609,7 @@ dsk.snow = { enabled: false };
     voltasVal.textContent = `Voltas p/ reparar: ${window.snRepVoltas ?? 3}`;
     Object.assign(voltasVal.style, { color: '#a8d8ff', fontSize: '11px' });
     voltasLbl.appendChild(voltasTit); voltasLbl.appendChild(voltasVal);
-    dsk.on('postLoop', () => { if (!snPanel) return; const el = snPanel.querySelector('[data-snm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.snRepVoltas ?? 3}`; });
+    { let _t = 0; dsk.on('postLoop', () => { if (!snPanel || ++_t % 10 !== 0) return; const el = snPanel.querySelector('[data-snm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.snRepVoltas ?? 3}`; }); }
 
 
     const voltasBtns = document.createElement('div');
@@ -7478,6 +7663,46 @@ dsk.snow = { enabled: false };
     snPanel.appendChild(header);
     snPanel.appendChild(body);
     document.body.appendChild(snPanel);
+
+    // ── Footer: Voltar + Play ─────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Hunt Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.huntHub?.open(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.snow?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/snow'](); _updatePlayBtn(); };
+    const _playInterval = setInterval(() => {
+      if (!snPanel) { clearInterval(_playInterval); return; }
+      _updatePlayBtn();
+    }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    snPanel.appendChild(_footer);
   }
 
 
@@ -7902,8 +8127,8 @@ dsk.cemetery = { enabled: false };
 
 
   // Atualiza labels em tempo real
-  dsk.on('postLoop', () => {
-    if (!cmPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!cmPanel || ++_t % 10 !== 0) return;
     const q  = k => cmPanel.querySelector(`[data-cmm="${k}"]`);
     const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
 
@@ -7930,7 +8155,7 @@ dsk.cemetery = { enabled: false };
       const h = Math.floor(elapsed / 3600), m = Math.floor((elapsed % 3600) / 60), s = elapsed % 60;
       set('time', `Tempo: ${h > 0 ? h + 'h ' : ''}${m}m ${s}s`);
     }
-  });
+  }); }
 
 
   function createPanel() {
@@ -8040,11 +8265,11 @@ dsk.cemetery = { enabled: false };
     voltasLbl.appendChild(voltasTitle); voltasLbl.appendChild(voltasVal);
 
 
-    dsk.on('postLoop', () => {
-      if (!cmPanel) return;
+    { let _t = 0; dsk.on('postLoop', () => {
+      if (!cmPanel || ++_t % 10 !== 0) return;
       const el = cmPanel.querySelector('[data-cmm="voltas"]');
       if (el) el.textContent = `Voltas p/ reparar: ${window.cmRepVoltas ?? 3}`;
-    });
+    }); }
 
 
     const voltasBtns = document.createElement('div');
@@ -8121,6 +8346,46 @@ dsk.cemetery = { enabled: false };
     cmPanel.appendChild(header);
     cmPanel.appendChild(body);
     document.body.appendChild(cmPanel);
+
+    // ── Footer: Voltar + Play ─────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Hunt Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.huntHub?.open(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.cemetery?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/cemetery'](); _updatePlayBtn(); };
+    const _playInterval = setInterval(() => {
+      if (!cmPanel) { clearInterval(_playInterval); return; }
+      _updatePlayBtn();
+    }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    cmPanel.appendChild(_footer);
   }
 
 
@@ -9464,8 +9729,8 @@ async function xMystAtacar() {
 
 
   // Atualiza status ao vivo
-  dsk.on('postLoop', () => {
-    if (!mmPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!mmPanel || ++_t % 10 !== 0) return;
     const q = k => mmPanel.querySelector(`[data-mm="${k}"]`);
     const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
     set('mob',    `Mob: ${window.xMob ?? '-'}`);
@@ -9474,7 +9739,7 @@ async function xMystAtacar() {
     set('status', dsk.myst?.enabled ? '● ON' : '○ OFF');
     const statusEl = q('status');
     if (statusEl) statusEl.style.color = dsk.myst?.enabled ? '#5f5' : '#f55';
-  });
+  }); }
 
 
   const mobPresets = ['ratraccoon', 'wolf', 'snake', 'Polar Bear'];
@@ -9600,6 +9865,46 @@ async function xMystAtacar() {
     mmPanel.appendChild(header);
     mmPanel.appendChild(body);
     document.body.appendChild(mmPanel);
+
+    // ── Footer: Voltar + Play ─────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Hunt Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.huntHub?.open(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.myst?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/newbi'](); _updatePlayBtn(); };
+    const _playInterval = setInterval(() => {
+      if (!mmPanel) { clearInterval(_playInterval); return; }
+      _updatePlayBtn();
+    }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    mmPanel.appendChild(_footer);
   }
 
 
@@ -9640,7 +9945,7 @@ const xItensPermitidos = [
   356, 346, 343, 1, 465, 837,
   731, 665, 761, 242, 757, 758, 759, 760, 761, 762, 763, 764, 765, 766,
   806, 837, 698, 94, 74, 77, 324, 323, 602, 603, 919, 649, 650, 658, 639, 517,
-  637, 638, 622, 623, 679
+  637, 638, 622, 623, 679, 652
 ];
 
 
@@ -9723,25 +10028,38 @@ function xGetPlayerByPosList(exList, wyList) {
 
 // Encontra Shiny Rock acessível mais próxima → xTemp[170]
 async function xGetShiny() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   xTemp[170] = undefined;
+  if (!window._ssdReachCache) window._ssdReachCache = {};
+  if (!window._ssdBlacklist)  window._ssdBlacklist  = {};
+  const now = Date.now();
   for (let i in objects.items) {
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0 || obj.name !== 'Shiny Rock') continue;
-        if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
+    const _k = obj.x + ',' + obj.y;
+    if (_ssdBlacklist[_k] && now < _ssdBlacklist[_k]) continue;
+    const dist = xGetDistance(obj.x, obj.y, myself.x, myself.y);
+    if (dist > 20) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
+    // Checa lado livre: sem sólido E sem tile de água (771→325)
+    const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]) && xGetTileByPos(x, wyList[s]) !== 325);
+    if (!hasFreeSide) continue;
+    const cached = _ssdReachCache[_k];
+    if (cached && now < cached.until) continue;
     let canReach = false;
-        for (let s = 0; s < exList.length; s++) {
-          await xGetCanMove(exList[s], wyList[s]);
-          if (xCanMov) { canReach = true; break; }
-        }
-        if (!canReach) continue;
-    if (!xTemp[170] ||
-        xGetDistance(obj.x, obj.y, myself.x, myself.y) <
-        xGetDistance(xTemp[170].x, xTemp[170].y, myself.x, myself.y)) {
+    for (let s = 0; s < exList.length; s++) {
+      await xGetCanMove(exList[s], wyList[s]);
+      if (xCanMov) { canReach = true; break; }
+    }
+    if (!canReach) {
+      _ssdReachCache[_k] = { until: now + 120000 };
+      if (window._wcmBlacklist) _wcmBlacklist[_k] = now + 120000;
+      continue;
+    }
+    if (!xTemp[170] || dist < xGetDistance(xTemp[170].x, xTemp[170].y, myself.x, myself.y)) {
       xTemp[170] = obj;
     }
   }
@@ -9753,25 +10071,39 @@ async function xGetSSDStone() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   xTemp[172] = undefined;
-  const rockSprites = [-261, -618];
+  if (!window._ssdReachCache) window._ssdReachCache = {};
+  if (!window._ssdBlacklist)  window._ssdBlacklist  = {};
+  const now = Date.now();
+  const rockSprites = [-261, -618, -518];
   for (let i in objects.items) {
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0) continue;
-    // verifica por nome OU por sprite
     if (obj.name !== 'Rock' && !rockSprites.includes(obj.sprite)) continue;
-        if (xTemp[99] && xTemp[99].x === obj.x && xTemp[99].y === obj.y && Date.now() < xTemp[99].until) continue;
+    const _k = obj.x + ',' + obj.y;
+    if (_ssdBlacklist[_k] && now < _ssdBlacklist[_k]) continue;
+    // Checa também blacklist do WC Mining
+    if (window._wcmBlacklist && _wcmBlacklist[_k] && now < _wcmBlacklist[_k]) continue;
+    const dist = xGetDistance(obj.x, obj.y, myself.x, myself.y);
+    if (dist > 20) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
+    // Checa lado livre: sem sólido E sem tile de água (771→325)
+    const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]) && xGetTileByPos(x, wyList[s]) !== 325);
+    if (!hasFreeSide) continue;
+    const cached = _ssdReachCache[_k];
+    if (cached && now < cached.until) continue;
     let canReach = false;
-        for (let s = 0; s < exList.length; s++) {
-          await xGetCanMove(exList[s], wyList[s]);
-          if (xCanMov) { canReach = true; break; }
-        }
-        if (!canReach) continue;
-    if (!xTemp[172] ||
-        xGetDistance(obj.x, obj.y, myself.x, myself.y) <
-        xGetDistance(xTemp[172].x, xTemp[172].y, myself.x, myself.y)) {
+    for (let s = 0; s < exList.length; s++) {
+      await xGetCanMove(exList[s], wyList[s]);
+      if (xCanMov) { canReach = true; break; }
+    }
+    if (!canReach) {
+      _ssdReachCache[_k] = { until: now + 120000 };
+      if (window._wcmBlacklist) _wcmBlacklist[_k] = now + 120000;
+      continue;
+    }
+    if (!xTemp[172] || dist < xGetDistance(xTemp[172].x, xTemp[172].y, myself.x, myself.y)) {
       xTemp[172] = obj;
     }
   }
@@ -9779,9 +10111,8 @@ async function xGetSSDStone() {
 }
 
 
-// Encontra Baú (Odd/Treasure) acessível mais próximo → xTemp[171]
 async function xGetChest() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   xTemp[171] = undefined;
   const chestNames = ['Odd Chest', 'Treasure Chest'];
@@ -9791,12 +10122,9 @@ async function xGetChest() {
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    let canReach = false;
-        for (let s = 0; s < exList.length; s++) {
-                await xGetCanMove(exList[s], wyList[s]);
-                if (xCanMov) { canReach = true; break; }
-        }
-        if (!canReach) continue;
+    // Checagem leve: pelo menos um lado adjacente livre
+    const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]));
+    if (!hasFreeSide) continue;
     if (!xTemp[171] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y)) {
@@ -9894,8 +10222,8 @@ dsk.setCmd('/ssd', () => {
     xWCID3 = inv[2]?.sprite;
         xWCID4 = inv[3]?.sprite; // ← adiciona isso
     repItem = xGetItemNameBySlot(0) ?? '';
-        dsk.ssd.targetMode    = dsk.ssd.targetMode    ?? 'shiny'; // 'shiny' | 'stone' | 'both'
-        dsk.ssd.repairInPlace = dsk.ssd.repairInPlace ?? false;
+        dsk.ssd.targetMode    = dsk.ssd.targetMode    ?? 'both'; // 'shiny' | 'both'
+        dsk.ssd.repairInPlace = true; // sempre in-place
 
 
     if (!xWCID1 || !xWCID2 || !xWCID3 || !xWCID4) {
@@ -9906,6 +10234,8 @@ dsk.setCmd('/ssd', () => {
 
 
     // ── Reset completo ao ligar ──────────────────────────────
+    window._ssdReachCache = {}; // limpa cache de alcançabilidade
+    window._ssdBlacklist = {};   // limpa blacklist de pedras inacessíveis
     xGoing[110] = false;
     xMovingNow = false;
     xNeedsRep = false;
@@ -9983,9 +10313,9 @@ async function xSSD() {
   // ── INIT WAYPOINTS ──────────────────────────────────────────
   if (xTemp[70] === undefined) {
     xTemp[70] = 0;
-    xTemp[71] = 25;
-    const px = [9,25,30,25,39,26,27,25,27,25,56,56,56,79,79,75,85,69,52,52,52,69,85,75,79,79];
-    const py = [8,15,32,54,56,65,75,39,23,13,12,42,12,14,44,56,76,78,74,57,74,78,76,56,44,12];
+    xTemp[71] = 23;
+    const px = [9,25,30,25,39,26,27,25,27,25,56,56,56,79,79,75,85,69,48,69,85,75,79,79];
+    const py = [8,15,32,54,56,65,75,39,23,13,12,42,12,14,44,56,76,78,79,78,76,56,44,12];
     for (let i = 0; i < px.length; i++) {
       WCPosListX[i] = px[i];
       WCPosListY[i] = py[i];
@@ -10028,22 +10358,16 @@ async function xSSD() {
 
 // ── GEAR QUEBRADO ─────────────────────────────────────────────
   if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2 || inv[3]?.equip === 2) {
-    if (dsk.ssd.repairInPlace) {
-      xNeedsRep   = true;
-      xMovingNow  = false;
-      xDoKeyUp(6);
-      await xDelay(900);
-      xTemp[92]   = undefined;
-      xTemp[93]   = undefined;
-      xTemp[97]   = undefined; // ← reseta cache da pedra
-      xTemp[98]   = 0;
-      xGoing[110] = false;
-      return;
-    } else {
-      xDoLogOff();
-      xGoing[110] = false;
-      return;
-    }
+    xNeedsRep   = true;
+    xMovingNow  = false;
+    xDoKeyUp(6);
+    await xDelay(900);
+    xTemp[92]   = undefined;
+    xTemp[93]   = undefined;
+    xTemp[97]   = undefined; // reseta cache da pedra
+    xTemp[98]   = 0;
+    xGoing[110] = false;
+    return;
   }
 
 
@@ -10070,7 +10394,7 @@ async function xSSD() {
 // ── SHINY / STONE ROCK ───────────────────────────────────────
   let xunhit = false;
   const _ssdMode = dsk.ssd.targetMode ?? 'shiny';
-  const _stoneSprites = [-261, -618];
+  const _stoneSprites = [-261, -618, -518];
 
 
   if (_ssdMode === 'shiny' || _ssdMode === 'both') await xGetShiny();
@@ -10098,9 +10422,25 @@ async function xSSD() {
 
       if (isTarget) {
         xunhit = true;
-        // Vira para a pedra independente de já estar virado
-        if (myself.dir !== c.dir) xDoChangeDir(c.dir);
-        xDoKeyDown(6); // ← fix: não dependia de trocar direção
+        // Vira para a pedra se ainda não estiver virado
+        if (myself.dir !== c.dir) {
+          // Solta tecla antes de virar para não bugar o estado
+          if (keySpace.isDown) {
+            jv.key_array[6].isDown = false;
+            jv.key_array[6].isUP = true;
+            send({ type: 'a' });
+            await xDelay(60);
+          }
+          xDoChangeDir(c.dir);
+          await xDelay(80);
+        }
+        // Só chama keyDown se a tecla não estiver pressionada
+        if (!keySpace.isDown) {
+          send({ type: 'A' });
+          jv.key_array[6].isDown = true;
+          jv.key_array[6].isUP = false;
+          await xDelay(50);
+        }
         if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
         // Chegou na pedra → reseta contador de tentativas
         xTemp[97] = undefined;
@@ -10108,91 +10448,81 @@ async function xSSD() {
         break;
       }
     }
-    if (!xunhit) xDoKeyUp(6);
+    if (!xunhit) {
+      // Solta de forma limpa sem o xDoKeyPress extra do xDoKeyUp
+      if (keySpace.isDown) {
+        jv.key_array[6].isDown = false;
+        jv.key_array[6].isUP = true;
+        send({ type: 'a' });
+        await xDelay(60);
+      }
+    }
   } else {
     await xEquipSlots();
   }
-  // ── PRIORIDADE 1: MOBS ───────────────────────────────────────
-  // Inicializa blacklist de mobs se não existir
+  // ── PRIORIDADE 1: MOBS (ignora players durante mineração) ─────
   if (!xTemp[100]) xTemp[100] = {};
+	const now100 = Date.now();
+	Object.keys(xTemp[100]).forEach(id => {
+	  if (xTemp[100][id] < now100) delete xTemp[100][id];
+	});
 
+	let _foundEnemy = false;
+	await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
 
-  // Limpa entradas expiradas da blacklist
-  const now100 = Date.now();
-  Object.keys(xTemp[100]).forEach(id => {
-    if (xTemp[100][id] < now100) delete xTemp[100][id];
-  });
-  await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+	if (xTemp[13] && xTemp[13] !== myself && !xPlyrTest(xTemp[13])) {
+	  _foundEnemy = true;
+	  const mob  = xTemp[13];
+	  const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
 
+	  if (dist > 7) {
+		xTemp[13] = myself; target.id = me;
+		xGoing[110] = false; return;
+	  }
 
-  // Verifica se mob ainda existe no jogo
-  if (xTemp[13] && xTemp[13] !== myself) {
-    const mob  = xTemp[13];
-    const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
+	  if (target.id !== mob.id) { target.id = mob.id; send({ type: 't', t: target.id }); }
 
+	  if (!xTemp[96] || xTemp[96].id !== mob.id) {
+		xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+	  }
 
-    if (dist > 7) {
-      xTemp[13] = myself;
-      target.id = me;
-      xGoing[110] = false;
-      return;
-    }
+	  if (dist <= 1) {
+		xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+	  } else {
+		if (keySpace.isDown) {
+		  jv.key_array[6].isDown = false;
+		  jv.key_array[6].isUP = true;
+		  send({ type: 'a' });
+		  await xDelay(60);
+		}
+		if (xTemp[96].attempts >= 10) {
+		  if (!xTemp[100]) xTemp[100] = {};
+		  xTemp[100][mob.id] = Date.now() + 60000;
+		  xTemp[13]  = myself; xTemp[96]  = undefined;
+		  xTemp[90]  = undefined; xTemp[91]  = undefined;
+		  target.id  = me; xMovingNow = false;
+		  xGoing[110] = false; return;
+		}
+		const now = Date.now();
+		if (!xMovingNow && now - xTemp[96].lastMove > 2000) {
+		  xTemp[96].attempts++;
+		  xTemp[96].lastMove = now;
+		  xMovingNow = false;
+		  xDoMove(mob.x, mob.y);
+		}
+	  }
 
+	  xGoing[110] = false;
+	  return;
+	}
 
-    if (target.id !== mob.id) {
-      target.id = mob.id;
-      send({ type: 't', t: target.id });
-    }
-
-
-    // Inicializa rastreamento por ID do mob
-    if (!xTemp[96] || xTemp[96].id !== mob.id) {
-      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
-    }
-
-
-    if (dist <= 1) {
-      // Chegou — reseta rastreamento
-      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
-    } else {
-      // Mob inacessível por muitas tentativas → ignora
-      if (xTemp[96].attempts >= 10) {
-        dsk.localMsg('SSD: mob inacessível, ignorando...', '#ff0');
-        // Blacklista o mob por 60 segundos
-        if (!xTemp[100]) xTemp[100] = {};
-        xTemp[100][mob.id] = Date.now() + 60000;
-        xTemp[13]  = myself;
-        xTemp[96]  = undefined;
-        xTemp[90]  = undefined;
-        xTemp[91]  = undefined;
-        target.id  = me;
-        xMovingNow = false;
-        xGoing[110] = false;
-        return;
-      }
-
-
-      // Só tenta mover de novo se passou 2s desde a última tentativa
-      const now = Date.now();
-      if (!xMovingNow && now - xTemp[96].lastMove > 2000) {
-        xTemp[96].attempts++;
-        xTemp[96].lastMove = now;
-        xMovingNow = false;
-        xDoMove(mob.x, mob.y);
-      }
-    }
-
-
-    xGoing[110] = false;
-    return;
-  }
-
-
-  // Sem mob → reseta tudo e solta tecla
-  target.id  = me;
-  xTemp[13]  = myself;
-  xTemp[90]  = undefined;
-  xTemp[91]  = undefined;
+	// Só reseta se NÃO havia enemy (players são ignorados, não resetam)
+	if (!_foundEnemy) {
+	  target.id  = me;
+	  xTemp[13]  = myself;
+	  xTemp[90]  = undefined;
+	  xTemp[91]  = undefined;
+	}
 
 
   // ── PRIORIDADE 2: CHEST ──────────────────────────────────────
@@ -10225,50 +10555,107 @@ async function xSSD() {
   if (_ssdTarget) {
     if (inv[3]?.equip === 0) { xDoUseSlot(3); await xDelay(400); }
 
+    const _sides4 = [
+      { dx: 0, dy: -1, dir: 0 }, { dx: 1, dy:  0, dir: 1 },
+      { dx: 0, dy:  1, dir: 2 }, { dx: -1, dy: 0, dir: 3 }
+    ];
 
-    if (xTemp[97]?.x === _ssdTarget.x && xTemp[97]?.y === _ssdTarget.y) {
+    const _adjSide = _sides4.find(c =>
+      myself.x === _ssdTarget.x + c.dx && myself.y === _ssdTarget.y + c.dy
+    );
 
+    if (_adjSide) {
+      // está adjacente → vira e minera
+      if (myself.dir !== ((_adjSide.dir + 2) % 4)) {
+        if (keySpace.isDown) {
+          jv.key_array[6].isDown = false;
+          jv.key_array[6].isUP = true;
+          send({ type: 'a' });
+          await xDelay(60);
+        }
+        await xDoChangeDir((_adjSide.dir + 2) % 4);
+        await xDelay(80);
+      }
+      if (!keySpace.isDown) {
+        send({ type: 'A' });
+        jv.key_array[6].isDown = true;
+        jv.key_array[6].isUP = false;
+      }
+      xTemp[97] = undefined;
+      xTemp[98] = 0;
+      xTemp[99] = 0;
 
-      if (!xMovingNow) {
-        // Marca o tempo que parou de mover pela primeira vez
+    } else {
+      // NÃO está adjacente → solta tecla e vai até lado livre
+      if (keySpace.isDown) {
+        jv.key_array[6].isDown = false;
+        jv.key_array[6].isUP = true;
+        send({ type: 'a' });
+        await xDelay(60);
+      }
+
+      const _freeSides = _sides4
+        .map(c => ({
+          x: _ssdTarget.x + c.dx,
+          y: _ssdTarget.y + c.dy,
+          dir: (c.dir + 2) % 4,
+          dist: Math.abs(myself.x - (_ssdTarget.x + c.dx)) + Math.abs(myself.y - (_ssdTarget.y + c.dy))
+        }))
+        .filter(t => !xGetSolidByID(t.x, t.y))
+        .sort((a, b) => a.dist - b.dist);
+
+      if (_freeSides.length === 0) {
+        dsk.localMsg('SSD: pedra sem lado livre, ignorando...', '#ff0');
+        const _blKey = _ssdTarget.x + ',' + _ssdTarget.y;
+        if (!window._ssdBlacklist) window._ssdBlacklist = {};
+        _ssdBlacklist[_blKey] = Date.now() + 120000;
+        xTemp[97]  = undefined; xTemp[98] = 0; xTemp[99] = 0;
+        xTemp[170] = undefined; xTemp[172] = undefined;
+        xMovingNow = false;
+        xGoing[110] = false;
+        return;
+      }
+
+      const _dest = _freeSides[0];
+
+      if (xTemp[97]?.x === _dest.x && xTemp[97]?.y === _dest.y) {
         if (!xTemp[98]) xTemp[98] = Date.now();
-
-
-        // Só blacklista se ficou parado sem chegar por mais de 15 segundos
-        if (Date.now() - xTemp[98] > 15000) {
-          dsk.localMsg('SSD: pedra inacessível, ignorando...', '#ff0');
-          xTemp[99]  = { x: _ssdTarget.x, y: _ssdTarget.y, until: Date.now() + 60000 };
-          xTemp[97]  = undefined;
-          xTemp[98]  = 0;
-          xTemp[170] = undefined;
-          xTemp[172] = undefined;
+        if (Date.now() - xTemp[98] > 8000) {
+          dsk.localMsg('SSD: pedra inacessível (timeout), ignorando...', '#ff0');
+          const _blKey = _ssdTarget.x + ',' + _ssdTarget.y;
+          if (!window._ssdBlacklist) window._ssdBlacklist = {};
+          _ssdBlacklist[_blKey] = Date.now() + 120000;
+          if (window._ssdReachCache) _ssdReachCache[_blKey] = { until: Date.now() + 120000 };
+          xTemp[97]  = undefined; xTemp[98] = 0; xTemp[99] = 0;
+          xTemp[170] = undefined; xTemp[172] = undefined;
           xMovingNow = false;
           xGoing[110] = false;
           return;
         }
-
-
-        // Tenta mover de novo
-        xDoMove(_ssdTarget.x, _ssdTarget.y);
+        if (!xTemp[99] || Date.now() - xTemp[99] > 3000) {
+          xTemp[99] = Date.now();
+          xMovingNow = false;
+          xDoMove(_dest.x, _dest.y);
+        }
       } else {
-        // Ainda andando → reseta o timer (não está travado)
-        xTemp[98] = 0;
+        xTemp[97] = { x: _dest.x, y: _dest.y };
+        xTemp[98] = Date.now();
+        xTemp[99] = Date.now();
+        xMovingNow = false;
+        xDoMove(_dest.x, _dest.y);
       }
-
-
-    } else {
-      // Novo alvo → reseta tudo
-      xTemp[97] = { x: _ssdTarget.x, y: _ssdTarget.y };
-      xTemp[98] = 0;
-      xMovingNow = false;
-      xDoMove(_ssdTarget.x, _ssdTarget.y);
     }
-
 
     xGoing[110] = false;
     return;
   }
 
+  // Solta tecla ao sair da prioridade 4 sem alvo
+  if (keySpace.isDown) {
+    jv.key_array[6].isDown = false;
+    jv.key_array[6].isUP = true;
+    send({ type: 'a' });
+  }
 
   // ── PRIORIDADE 5: WAYPOINTS ──────────────────────────────────
   const wpX    = WCPosListX[xTemp[70]];
@@ -10285,17 +10672,13 @@ async function xSSD() {
       xTemp[70]++;
     }
 
-    // ← Reparo fixo: só dispara no WP 16 (85,76) — mais próximo de 94,93
-    // ← Reparo in-place: dispara em qualquer WP ao atingir o limite
-    const _ssdRepairTrigger = dsk.ssd.repairInPlace ? true : (xTemp[70] === 16);
-    if (RepTimer >= wcaveRepVoltas && _ssdRepairTrigger) {
+    if (RepTimer >= wcaveRepVoltas) {
       dsk.localMsg('SSD: indo reparar...', '#ff0');
       xNeedsRep  = true;
       RepTimer   = 0;
       xTemp[92]  = undefined;
       xTemp[93]  = undefined;
       xMovingNow = false;
-      if (!dsk.ssd.repairInPlace) await xDoMove(94, 93);
     }
 
 
@@ -10321,42 +10704,74 @@ async function xSSD() {
 
 
 async function xSSDRepairInPlace() {
-  // ── Mob check ────────────────────────────────────────────────
+  // ── Detecção de player/mob durante reparo ─────────────────────
   for (let i in mobs.items) {
     const mob = mobs.items[i];
     if (!mob || mob === myself) continue;
-    if (xPlyrTest(mob)) continue;
-    if (xGetDistance(myself.x, myself.y, mob.x, mob.y) > 6) continue;
-    await xEquipSlots();
-    await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
-    if (xTemp[13] && xTemp[13] !== myself) {
-      if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
-      if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
+    const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
+    if (dist <= 6 && !xPlyrTest(mob)) {
+      // Mob inimigo próximo: equipa gear e reage
+      await xEquipSlots();
+      await xGetMobByName('Dust Devil', 'Tentacle', 'Flame Demon', 'Snake');
+      if (xTemp[13] && xTemp[13] !== myself) {
+        if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+        if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
+      }
+      xNeedsRep = false; RepTimer = 0;
+      return;
     }
-    xNeedsRep = false; RepTimer = 0;
-    return;
+
+    if (xPlyrTest(mob) && dist <= 6) {
+      dsk.localMsg('SSD: player detectado durante reparo! Pegando item...', '#f55');
+      xDoKeyUp(6);
+      await xDelay(400);
+      xMovingNow = false;
+      await xDoPickUp(); await xDelay(200);
+      if (xTemp[94] !== undefined && xTemp[95] !== undefined) {
+        await xDoMove(xTemp[94], xTemp[95]);
+        await xDelay(500);
+        for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(180); }
+      }
+      await xEquipSlots();
+      xNeedsRep  = false; RepTimer   = 0;
+      xTemp[92]  = undefined; xTemp[93]  = undefined;
+      xTemp[94]  = undefined; xTemp[95]  = undefined;
+      xTemp[104] = undefined; xTemp[105] = undefined;
+      xTemp[106] = undefined;
+      return;
+    }
   }
 
-
-  // ── FASE 1: ainda tem gear → dropa tudo ──────────────────────
-  const hasGear = inv[0]?.sprite || inv[1]?.sprite || inv[2]?.sprite || inv[3]?.sprite;
+  // ── FASE 1: dropa apenas o item quebrado ──────────────────────
+  const brokenSlot = [0, 1, 2, 3].find(s => inv[s]?.equip === 2 && inv[s]?.sprite);
+  const hasGear = brokenSlot !== undefined;
   if (hasGear) {
-        xMovingNow = false;  // ← garante parado antes de dropa
-        xDoKeyUp(6);
-    await xDelay(900);   // ← aguarda parar completamente
+    // Checa player antes de dropar
+    const playerNear = Object.values(mobs.items).find(mob =>
+      mob && mob !== myself && xPlyrTest(mob) &&
+      xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 6
+    );
+    if (playerNear) {
+      dsk.localMsg('SSD: player perto, adiando reparo...', '#fa5');
+      xNeedsRep = false; RepTimer = 0;
+      return;
+    }
+    xMovingNow = false;
+    xDoKeyUp(6);
+    await xDelay(900);
     xTemp[94]  = myself.x;
     xTemp[95]  = myself.y;
-    xTemp[104] = undefined; // ← reseta cache do tile alvo
+    xTemp[104] = undefined;
     xTemp[105] = undefined;
-    if (inv[3]?.sprite) { xDoDropSlot(0, 4); await xDelay(300); }
-    if (inv[2]?.sprite) { xDoDropSlot(0, 3); await xDelay(300); }
-    if (inv[1]?.sprite) { xDoDropSlot(0, 2); await xDelay(300); }
-    if (inv[0]?.sprite) { xDoDropSlot(0, 1); await xDelay(300); }
+    xTemp[106] = xGetItemNameBySlot(brokenSlot) ?? repItem;
+    dsk.localMsg('SSD: reparando ' + xTemp[106] + '...', '#fa0');
+    xDoDropSlot(0, brokenSlot + 1);
+    await xDelay(400);
     return;
   }
 
-
-  // ── FASE 2: move para tile adjacente livre ───────────────────
+  // ── FASE 2: pega repair kit ───────────────────────────────────
   const kitSlot = xGetSlotByID(719);
   if (kitSlot === undefined) {
     dsk.localMsg('SSD in-place: sem Repair Kit no inventário!', '#f55');
@@ -10364,12 +10779,10 @@ async function xSSDRepairInPlace() {
     return;
   }
 
-
   const dropX = xTemp[94] ?? myself.x;
   const dropY = xTemp[95] ?? myself.y;
 
-
-  // Calcula o tile adjacente UMA VEZ e guarda no cache
+  // ── FASE 3: move para tile adjacente livre ────────────────────
   if (xTemp[104] === undefined || xTemp[105] === undefined) {
     const adjFree = [
       { x: dropX + 1, y: dropY },
@@ -10378,39 +10791,33 @@ async function xSSDRepairInPlace() {
       { x: dropX,     y: dropY - 1 },
     ].find(t => !xGetSolidByID(t.x, t.y));
 
-
     if (!adjFree) {
       dsk.localMsg('SSD in-place: sem tile livre adjacente!', '#f55');
       xNeedsRep = false; RepTimer = 0;
       return;
     }
-    xTemp[104] = adjFree.x; // ← cacheia para não recalcular
+    xTemp[104] = adjFree.x;
     xTemp[105] = adjFree.y;
   }
 
-
-  // Move para o tile cacheado, só se ainda não chegou
   if (myself.x !== xTemp[104] || myself.y !== xTemp[105]) {
     if (!xMovingNow) {
       await xDoMove(xTemp[104], xTemp[105]);
     }
-    return; // aguarda chegada sem recalcular
+    return;
   }
 
-
-  // ── FASE 3: equipa kit ───────────────────────────────────────
+  // ── FASE 4: equipa kit ────────────────────────────────────────
   if (inv[kitSlot]?.equip === 0) {
     await xDoUseSlot(kitSlot);
     await xDelay(400);
     return;
   }
 
-
-  // ── FASE 4: vira para os itens dropados ─────────────────────
+  // ── FASE 5: vira para os itens dropados ──────────────────────
   const dx = dropX - myself.x;
   const dy = dropY - myself.y;
   const facingDir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
-
 
   if (myself.dir !== facingDir) {
     await xDoChangeDir(facingDir);
@@ -10418,29 +10825,65 @@ async function xSSDRepairInPlace() {
     return;
   }
 
+  // ── FASE 6: repara em pulsos checando player a cada batida ────
+  const _repName = xTemp[106] ?? repItem;
 
-  // ── FASE 5: repara ───────────────────────────────────────────
-  if (xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
-      xDoClearChat('The ' + repItem + ' is in perfect condition.');
+  let _repairSafe = true;
+  while (_repairSafe) {
+    // Checa player antes de cada batida
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself) continue;
+      if (!xPlyrTest(mob)) continue;
+      if (xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 6) {
+        _repairSafe = false;
+        break;
+      }
+    }
+    if (!_repairSafe) break;
+
+    await xDoKeyPress(6, 200);
+    await xDelay(300);
+
+    if (xIfChatHas('The ' + _repName + ' is in perfect condition.')) {
+      xDoClearChat('The ' + _repName + ' is in perfect condition.');
+      xDoKeyUp(6);
+      await xDelay(400);
+      xMovingNow = false;
+      await xDoMove(dropX, dropY);
+      await xDelay(500);
+      for (let p = 0; p < 8; p++) { xDoPickUp(); await xDelay(180); }
+      await xEquipSlots();
+      xNeedsRep  = false; RepTimer   = 0;
+      xTemp[92]  = undefined; xTemp[93]  = undefined;
+      xTemp[94]  = undefined; xTemp[95]  = undefined;
+      xTemp[104] = undefined; xTemp[105] = undefined;
+      xTemp[106] = undefined;
+      dsk.localMsg('SSD: reparo in-place concluído!', '#5f5');
+      return;
+    }
+  }
+
+  // ── Saiu do while por player ──────────────────────────────────
+  if (!_repairSafe) {
     xDoKeyUp(6);
     await xDelay(400);
     xMovingNow = false;
-    await xDoMove(dropX, dropY);
-    await xDelay(500);
-    for (let p = 0; p < 8; p++) { xDoPickUp(); await xDelay(180); }
+    await xDoPickUp(); await xDelay(200);
+    if (xTemp[94] !== undefined) {
+      await xDoMove(xTemp[94], xTemp[95]);
+      await xDelay(500);
+      for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(180); }
+    }
     await xEquipSlots();
-    xNeedsRep  = false;
-    RepTimer   = 0;
+    xNeedsRep  = false; RepTimer   = 0;
     xTemp[92]  = undefined; xTemp[93]  = undefined;
     xTemp[94]  = undefined; xTemp[95]  = undefined;
-    xTemp[104] = undefined; xTemp[105] = undefined; // ← limpa cache
-    dsk.localMsg('SSD: reparo in-place concluído!', '#5f5');
-  } else {
-    xDoKeyDown(6);
+    xTemp[104] = undefined; xTemp[105] = undefined;
+    xTemp[106] = undefined;
+    dsk.localMsg('SSD: player detectado, abortando reparo!', '#f55');
   }
 }
-
-
 // ── REPARO ────────────────────────────────────────────────────
 async function xSSDRepair() {
   if (dsk.ssd.repairInPlace) { await xSSDRepairInPlace(); return; }
@@ -10546,354 +10989,841 @@ async function xSSDRepair() {
 }
 
 
-// ── MINING BOT ────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════
+// ⛏️  WC MINING BOT  ─  by Pablo Mod
+// Mobs: Dire Wolf, Ice Elemental, Polar Bear, Wolf
+// Reparo: in-place (dropa item, equipa kit, move 1 tile adj, vira, repara, volta, pega)
+// Alvo: both (Shiny Rock + todas as pedras)
+// Sem troca de alvo de pedra durante mineração
+// ══════════════════════════════════════════════════════════════
 
+dsk.wcmining = { enabled: false };
 
-dsk.mining = { enabled: false };
+window.wcmStat = window.wcmStat ?? {
+  startMyst:    0,
+  totalMyst:    0,
+  mystPerHour:  0,
+  timerStart:   0,
+  totalTime:    0,
+  timerRunning: false,
+  repairoTotal: 0,
+};
 
+// Mob names para WC Mining
+const _wcmMobNames = ['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf'];
 
-dsk.setCmd('/mining', () => {
-  dsk.mining.enabled = !dsk.mining.enabled;
+// Waypoints WC Mining
+const _wcmWpX = [15,11,16,31,37,35,50,58,58,56,39,40,60,67,90,78,76,72,72,68,46,31,15,15];
+const _wcmWpY = [16,21,36,43,51,65,70,60,50,38,33,20,16,25,34,48,46,45,34,59,59,47,40,27];
 
+dsk.setCmd('/wcmining', () => {
+  dsk.wcmining.enabled = !dsk.wcmining.enabled;
 
-  if (dsk.mining.enabled) {
+  if (dsk.wcmining.enabled) {
     xWCID1 = inv[0]?.sprite;
     xWCID2 = inv[1]?.sprite;
     xWCID3 = inv[2]?.sprite;
     xWCID4 = inv[3]?.sprite; // picareta
     repItem = xGetItemNameBySlot(0) ?? '';
 
-
     if (!xWCID1 || !xWCID2 || !xWCID3 || !xWCID4) {
-      dsk.localMsg('Mining: coloque itens nos slots 0-3 primeiro! (0=arma,1=escudo,2=armadura,3=picareta)', '#f55');
-      dsk.mining.enabled = false;
+      dsk.localMsg('WC Mining: coloque itens nos slots 0-3 primeiro!', '#f55');
+      dsk.wcmining.enabled = false;
       return;
     }
 
+    // Reset completo
+    window._wcmReachCache  = {};
+    window._wcmBlacklist   = {};
+    xGoing[165]   = false;
+    xMovingNow    = false;
+    xNeedsRep     = false;
+    RepTimer      = 0;
+    xTemp[13]     = myself;
+    xTemp[170]    = undefined;
+    xTemp[172]    = undefined;
+    xTemp[250]    = undefined; // wp index
+    xTemp[251]    = undefined; // wp max
+    xTemp[252]    = undefined; // cache wp x
+    xTemp[253]    = undefined; // cache wp y
+    xTemp[254]    = undefined; // current stone target (locked)
+    target.id     = me;
 
-    xTemp[70] = undefined; // força reinit dos waypoints
-    dsk.localMsg(`Mining Bot: Ativado | Picareta ID=${xWCID4}`, '#5f5');
+    wcmStat.timerStart   = Date.now();
+    wcmStat.timerRunning = true;
+    if (wcmStat.totalMyst === 0 && wcmStat.totalTime === 0) {
+      wcmStat.startMyst = jv.upgrade_number ?? 0;
+    }
 
+    dsk.localMsg(`WC Mining: Ativado | ID1=${xWCID1} ID2=${xWCID2} ID3=${xWCID3} PICK=${xWCID4}`, '#5f5');
 
     (async function loop() {
-      while (dsk.mining.enabled) {
-        await uMining();
+      while (dsk.wcmining.enabled) {
+        try {
+          const curMyst = (jv.upgrade_number ?? 0) - wcmStat.startMyst;
+          wcmStat.totalMyst = curMyst;
+          const elapsed = wcmStat.totalTime + (Date.now() - wcmStat.timerStart);
+          if (elapsed > 5000) wcmStat.mystPerHour = Math.round(curMyst / elapsed * 3600);
+          await xWCMining();
+        } catch(e) {
+          console.log('[WCMining] erro:', e);
+          xGoing[165] = false;
+          xMovingNow  = false;
+        }
         await xDelay(500);
       }
     })();
+
   } else {
-    xGoing[110] = false;
-    xMovingNow  = false;
-    target.id   = me;
-    xDoKeyUp(6);
-    dsk.localMsg('Mining Bot: Desativado', '#f55');
+    xGoing[165]  = false;
+    xMovingNow   = false;
+    xNeedsRep    = false;
+    xTemp[13]    = myself;
+    xTemp[170]   = undefined;
+    xTemp[172]   = undefined;
+    xTemp[254]   = undefined;
+    xTemp[250]   = undefined;
+    xTemp[251]   = undefined;
+    xTemp[252]   = undefined;
+    xTemp[253]   = undefined;
+    target.id    = me;
+    if (wcmStat.timerRunning) {
+      wcmStat.totalTime  += Date.now() - wcmStat.timerStart;
+      wcmStat.timerRunning = false;
+    }
+    dsk.localMsg('WC Mining: Desativado', '#f55');
   }
 });
 
-
-async function uMining() {
-  if (dskPaused) return; // ← adiciona isso
+async function xWCMining() {
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
-  if (connection?.readyState === 3) xMovingNow = false;
-  else if (!connection) xMovingNow = false;
-  if (xGoing[110] === true) return;
-  xGoing[110] = true;
+  if (connection?.readyState === 3) { xMovingNow = false; return; }
 
+  // Auto-reset se travar por mais de 10s
+  if (xGoing[165] === true) {
+    if (!xGoing._wcmTime) xGoing._wcmTime = Date.now();
+    if (Date.now() - xGoing._wcmTime > 10000) {
+      xGoing[165]     = false;
+      xGoing._wcmTime = undefined;
+      xMovingNow      = false;
+    }
+    return;
+  }
+  xGoing[165]     = true;
+  xGoing._wcmTime = undefined;
 
-  // ── REPARO ──────────────────────────────────────────────────
+  // ── INIT WAYPOINTS ──────────────────────────────────────────
+  if (xTemp[250] === undefined) {
+    xTemp[250] = 0;
+    xTemp[251] = _wcmWpX.length - 1;
+    xTemp[252] = undefined;
+    xTemp[253] = undefined;
+    dsk.localMsg('WC Mining: waypoints iniciados', '#0ff');
+  }
+
+  // ── MODO REPARO ─────────────────────────────────────────────
   if (xNeedsRep) {
-    if (xGetSlotByID(719) === undefined) {
-      xGoing[110] = false;
-      await xDelay(100);
-      const wc4 = xGetItemByID(xWCID4);
-      if (wc4) { dsk.localMsg('Pegando gear...', '#0ff'); await xDoMove(wc4.x, wc4.y); xDoPickUp(); }
-      else      { dsk.localMsg('Sem kit de reparo, saindo...', '#f55'); xDoLogOff(); }
-      return;
-    }
-
-
-    // Mob check durante reparo
-    for (let i in mobs.items) {
-      const mob = mobs.items[i];
-      if (!mob || mob === myself) continue;
-      const mobDist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
-
-
-      if (mobDist <= 6) {
-        await xDoKeyUp(6);
-        const wc4 = xGetItemByID(xWCID4);
-        if (wc4) { await xDoMove(wc4.x, wc4.y); xDoPickUp(); }
-        await xEquipSlots();
-        dsk.localMsg('Mob próximo!', '#f55');
-        await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
-        if (xTemp[13] && xTemp[13] !== myself) {
-          if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); xDoMove(xTemp[13].x, xTemp[13].y); }
-          if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
-        }
-        xGoing[110] = false;
-        return;
-      }
-
-
-      if (mob.id?.toString() in player_dict) {
-        dsk.localMsg('Jogador detectado!', '#f55');
-        xDoKeyUp(6);
-        const wc4 = xGetItemByID(xWCID4);
-        if (wc4) { await xDoMove(wc4.x, wc4.y); xDoPickUp(); }
-        await xEquipSlots();
-        await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
-        if (xTemp[13] && xTemp[13] !== myself) {
-          if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); xDoMove(xTemp[13].x, xTemp[13].y); }
-          if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
-        }
-        xGoing[110] = false;
-        return;
-      }
-    }
-
-
-    // Drop gear para reparar
-    if (inv[0]?.sprite) {
-      if (myself.x === xRepairDropX && myself.y === xRepairDropY) {
-        if      (inv[3]?.sprite) { await xDelay(300); xDoDropSlot(0, 4); }
-        else if (inv[2]?.sprite) { await xDelay(300); xDoDropSlot(0, 3); }
-        else if (inv[1]?.sprite) { xDoDropSlot(0, 2); }
-        else                     { xDoDropSlot(0, 1); }
-      } else {
-        xDoKeyUp(6);
-        xDoMove(xRepairDropX, xRepairDropY);
-        await xDelay(300);
-      }
-    } else {
-      // Kit de reparo no chão — vai reparar
-      const dropped = xGetItemByID(xWCID4);
-      if (dropped) {
-        const adjTiles = [
-          { x: dropped.x + 1, y: dropped.y, dir: 3 },
-          { x: dropped.x - 1, y: dropped.y, dir: 1 },
-          { x: dropped.x, y: dropped.y + 1, dir: 0 },
-          { x: dropped.x, y: dropped.y - 1, dir: 2 },
-        ];
-        const inAdj = adjTiles.find(t => t.x === myself.x && t.y === myself.y);
-        if (!inAdj) {
-          xDoKeyUp(6); await xDelay(100); xDoKeyUp(6);
-          await xDoMove(adjTiles[0].x, adjTiles[0].y);
-          await xDelay(300);
-        } else if (myself.dir !== inAdj.dir) {
-          await xDoChangeDir(inAdj.dir);
-          await xDoUseSlot(xGetSlotByID(719));
-          await xDelay(100);
-        } else if (inv[xGetSlotByID(719)]?.equip !== 0) {
-          if (!xRepairHoldTicks) xRepairHoldTicks = 0;
-          if (xRepairHoldTicks >= 6 && xIfChatHas('The ' + repItem + ' is in perfect condition.')) {
-            xRepairHoldTicks = 0;
-            xDoClearChat('The ' + repItem + ' is in perfect condition.');
-            xDoKeyUp(6);
-            await xDoMove(dropped.x, dropped.y); await xDelay(100);
-            for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(100); }
-            if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(50); }
-            if (inv[1]?.equip === 0) { xDoUseSlot(1); await xDelay(80); }
-            if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(80); }
-            xNeedsRep = false;
-            RepTimer  = 0;
-          } else {
-            xRepairHoldTicks++;
-            xDoKeyDown(6);
-          }
-        } else {
-          await xDoUseSlot(xGetSlotByID(719));
-          await xDelay(100);
-        }
-      }
-    }
-    xGoing[110] = false;
+    await xWCMiningRepairInPlace();
+    xGoing[165] = false;
     return;
   }
 
-
   // ── COMIDA ──────────────────────────────────────────────────
-  const foodSlot = xGetSlotFood();
-  if (foodSlot !== undefined) {
-    if (hunger_status.val <= 65) { dsk.localMsg('Comendo...', '#0ff'); xDoUseSlotByID(foodSlot); await xDelay(2000); }
-  } else { xDoLogOff(); }
+  const _wcmFood = xGetSlotFood();
+  if (_wcmFood !== undefined) {
+    if (hunger_status.val <= 70) {
+      await xDoUseSlotByID(xGetSlotByID(_wcmFood));
+      await xDelay(2000);
+    }
+  } else {
+    xDoLogOff();
+    xGoing[165] = false;
+    return;
+  }
 
-
-  // ── EQUIP QUEBRADO → sai ─────────────────────────────────────
-  if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2) { xDoLogOff(); await xDelay(100); }
-
+  // ── GEAR QUEBRADO → reparo ───────────────────────────────────
+  if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2 || inv[3]?.equip === 2) {
+    xNeedsRep   = true;
+    xMovingNow  = false;
+    xDoKeyUp(6);
+    await xDelay(900);
+    xTemp[252]  = undefined;
+    xTemp[253]  = undefined;
+    xGoing[165] = false;
+    return;
+  }
 
   // ── HP ────────────────────────────────────────────────────────
-  if (hp_status.val <= 72 && hp_status.val >= 0.1) {
-    xHeal();
-    if (hp_status.val <= 40) { xDoLogOff(); await xDelay(100); }
+  if (hp_status.val <= 70 && hp_status.val >= 0.1) {
+    await xHeal();
+    if (hp_status.val <= 40) {
+      xDoLogOff();
+      xGoing[165] = false;
+      return;
+    }
   }
-
 
   // ── SLOTS VAZIOS ─────────────────────────────────────────────
-  const pickAll = async () => {
+  if (!inv[0]?.sprite || !inv[1]?.sprite || !inv[2]?.sprite || !inv[3]?.sprite) {
     await xPickupAllGear(xWCID4, xWCID3, xWCID1, xWCID2);
-  };
-  if (!inv[0]?.sprite) { await pickAll(); xDoLogOff(); }
-  if (!inv[1]?.sprite) { await pickAll(); xDoLogOff(); }
-  if (!inv[2]?.sprite) { await pickAll(); xDoLogOff(); }
-  if (!inv[3]?.sprite) { await pickAll(); xDoLogOff(); }
-  if (!inv[5]?.sprite) { xDoLogOff(); }
-
-
-  // ── INIT WAYPOINTS DE MINERAÇÃO ──────────────────────────────
-  if (xTemp[70] === undefined) {
-    xTemp[70] = 0;
-    xTemp[71] = 23;
-    const mx = [15,11,16,31,37,35,50,58,58,56,39,40,60,67,90,78,76,72,72,68,46,31,15,15];
-    const my = [16,21,36,43,51,65,70,60,50,38,33,20,16,25,34,48,46,45,34,59,59,47,40,27];
-    for (let i = 0; i < mx.length; i++) { WCMiningListX[i] = mx[i]; WCMiningListY[i] = my[i]; }
+    xDoLogOff();
+    xGoing[165] = false;
+    return;
   }
 
+  // ── BLACKLIST cleanup ─────────────────────────────────────────
+  if (!window._wcmBlacklist)  window._wcmBlacklist  = {};
+  if (!window._wcmReachCache) window._wcmReachCache = {};
+  const _wcmNow = Date.now();
+  Object.keys(_wcmBlacklist).forEach(k => { if (_wcmBlacklist[k] < _wcmNow) delete _wcmBlacklist[k]; });
 
-        // ── BUSCA MOB ────────────────────────────────────────────────
-        await xGetMobByNameMining(['Dire Wolf', 'Ice Elemental', 'Polar Bear', 'Wolf']);
+  // ── PEDRA ADJACENTE: minera imediatamente (antes dos mobs) ───
+  // Igual ao xSSD: checa adjacência ANTES da busca de mobs
+  const _wcmStoneSprites = [-261, -618, -518];
+  await xGetShiny();
+  await xGetSSDStone();
+  const _wcmTarget  = xTemp[170] ?? xTemp[172];
+  const _wcmIsShiny = xTemp[170] !== undefined;
 
-
-        if (xTemp[13] && xTemp[13] !== myself) {
-          const mob = xTemp[13];
-          const distMob = xGetDistance(mob.x, mob.y, myself.x, myself.y);
-
-
-          // Seleciona alvo
-          if (target.id !== mob.id) {
-                target.id = mob.id;
-                send({ type: 't', t: mob.id });
+  let _wcmHitting = false;
+  if (_wcmTarget && xTemp[13] === myself) {
+    const _adjSides = [
+      { dx: 0, dy: -1, dir: 0 }, { dx: 1, dy:  0, dir: 1 },
+      { dx: 0, dy:  1, dir: 2 }, { dx: -1, dy: 0, dir: 3 }
+    ];
+    for (const c of _adjSides) {
+      const wall = xGetWallByPos(myself.x + c.dx, myself.y + c.dy);
+      if (!wall) continue;
+      const isTarget = _wcmIsShiny
+        ? wall.name === 'Shiny Rock'
+        : (wall.name === 'Rock' || _wcmStoneSprites.includes(wall.sprite));
+      if (isTarget) {
+        _wcmHitting = true;
+        if (myself.dir !== c.dir) {
+          if (keySpace.isDown) {
+            jv.key_array[6].isDown = false;
+            jv.key_array[6].isUP   = true;
+            send({ type: 'a' });
+            await xDelay(60);
           }
-
-
-          if (distMob === 0) {
-                // Mesmo tile — tenta sair para adjacente livre
-                const escapes = [
-                  { x: myself.x + 1, y: myself.y, dir: 1 },
-                  { x: myself.x - 1, y: myself.y, dir: 3 },
-                  { x: myself.x,     y: myself.y - 1, dir: 0 },
-                  { x: myself.x,     y: myself.y + 1, dir: 2 },
-                ];
-                const free = escapes.find(t => !xGetSolidByID(t.x, t.y));
-                if (free) { await xDoMove(free.x, free.y); await xDelay(300); }
-
-
-          } else if (distMob === 1) {
-                // Adjacente — vira para o mob e ataca
-                const dx = mob.x - myself.x;
-                const dy = mob.y - myself.y;
-                const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === -1 ? 0 : 2;
-                if (myself.dir !== dir) { await xDoChangeDir(dir); await xDelay(150); }
-                await xDelay(200);
-
-
-          } else if (distMob <= 3) {
-                // Longe — move até o mob
-                await xDoMove(mob.x, mob.y);
-                await xDelay(400);
-                // Confirma chegada — desiste se ainda longe
-                if (xGetDistance(mob.x, mob.y, myself.x, myself.y) > 3) {
-                  target.id = me;
-                }
-          } else {
-                // Muito longe — desiste
-                target.id = me;
-          }
+          xDoChangeDir(c.dir);
+          await xDelay(80);
         }
-
-
-  // ── SOLTA TECLA SE TEM MOB ───────────────────────────────────
-  if (xTemp[13] && xTemp[13] !== myself && keySpace.isDown) {
-    await xDoKeyUp(6); xDoKeyUp(6); await xDelay(50);
-  }
-
-
-  // ── EQUIPA GEAR SE TEM MOB ───────────────────────────────────
-  if ((xTemp[13] && xTemp[13] !== myself) || xTemp[19] === undefined) {
+        if (!keySpace.isDown) {
+          send({ type: 'A' });
+          jv.key_array[6].isDown = true;
+          jv.key_array[6].isUP   = false;
+          await xDelay(50);
+        }
+        // Garante armadura equipada (slot 2) — igual ao xSSD
+        if (inv[2]?.equip === 0) { xDoUseSlot(2); await xDelay(1000); }
+        break;
+      }
+    }
+    if (!_wcmHitting) {
+      if (keySpace.isDown) {
+        jv.key_array[6].isDown = false;
+        jv.key_array[6].isUP   = true;
+        send({ type: 'a' });
+        await xDelay(60);
+      }
+    }
+  } else {
+    // Sem pedra adjacente → equipa slots 0,1,2 (arma, shield, armadura)
     await xEquipSlots();
   }
 
+  // ── PRIORIDADE 1: MOBS ───────────────────────────────────────
+  if (!xTemp[100]) xTemp[100] = {};
+  const _wcmNow2 = Date.now();
+  Object.keys(xTemp[100]).forEach(id => { if (xTemp[100][id] < _wcmNow2) delete xTemp[100][id]; });
 
-  // ── MINERAÇÃO ────────────────────────────────────────────────
-  if ((!xTemp[13] || xTemp[13] === myself) && xTemp[19] !== undefined) {
-    if (xTemp[80] !== xTemp[19]) { xTemp[80] = xTemp[19]; await xDoKeyUp(6); }
-    xDoMoveToID(xTemp[19]);
+  let _wcmFoundEnemy = false;
+  await xGetMobByName(..._wcmMobNames);
 
+  if (xTemp[13] && xTemp[13] !== myself && !xPlyrTest(xTemp[13])) {
+    _wcmFoundEnemy = true;
+    const mob  = xTemp[13];
+    const dist = xGetDistance(mob.x, mob.y, myself.x, myself.y);
 
-    if (isRockNextToMe()) {
-      const rockSprites = [-261, -618, -518];
-      const sides = [
-        { dx: 1, dy: 0, dir: 1 }, { dx: -1, dy: 0, dir: 3 },
-        { dx: 0, dy: 1, dir: 2 }, { dx:  0, dy: -1, dir: 0 }
-      ];
-      for (const c of sides) {
-        const wall = xGetWallByPos(myself.x + c.dx, myself.y + c.dy);
-        if (wall && rockSprites.includes(wall.sprite)) {
-          if (myself.dir !== c.dir) { await xDoKeyUp(6); await xDoChangeDir(c.dir); await xDelay(50); }
-          break;
-        }
+    if (dist > 3) {
+      xTemp[13] = myself; target.id = me;
+      xGoing[165] = false; return;
+    }
+
+    if (target.id !== mob.id) { target.id = mob.id; send({ type: 't', t: target.id }); }
+
+    if (!xTemp[96] || xTemp[96].id !== mob.id) {
+      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+    }
+
+    if (dist <= 1) {
+      xTemp[96] = { id: mob.id, attempts: 0, lastMove: 0 };
+    } else {
+      // Solta picareta para se mover até o mob
+      if (keySpace.isDown) {
+        jv.key_array[6].isDown = false;
+        jv.key_array[6].isUP   = true;
+        send({ type: 'a' });
+        await xDelay(60);
       }
-      if (inv[3]?.equip === 0) { dsk.localMsg('Equipando picareta...', '#0ff'); xDoUseSlot(3); await xDelay(100); }
-      if (inv[3]?.equip === 2) {
-        await xEquipSlots();
-        xNeedsRep = true;
-        xRepairDropX = myself.x; xRepairDropY = myself.y; xRepairHoldTicks = 0;
-        xGoing[110] = false;
+      if (xTemp[96].attempts >= 10) {
+        if (!xTemp[100]) xTemp[100] = {};
+        xTemp[100][mob.id] = Date.now() + 60000;
+        xTemp[13]   = myself; xTemp[96]  = undefined;
+        xTemp[90]   = undefined; xTemp[91] = undefined;
+        target.id   = me; xMovingNow = false;
+        xGoing[165] = false; return;
+      }
+      const _now = Date.now();
+      if (!xMovingNow && _now - xTemp[96].lastMove > 2000) {
+        xTemp[96].attempts++;
+        xTemp[96].lastMove = _now;
+        xMovingNow = false;
+        xDoMove(mob.x, mob.y);
+      }
+    }
+
+    xGoing[165] = false;
+    return;
+  }
+
+  if (!_wcmFoundEnemy) {
+    target.id  = me;
+    xTemp[13]  = myself;
+    xTemp[90]  = undefined;
+    xTemp[91]  = undefined;
+  }
+
+  // ── PRIORIDADE 2: PEDRA (mover até ela e equipar picareta) ───
+  if (_wcmTarget) {
+    // Equipa picareta (slot 3) — desequipa axe/shield automaticamente
+    if (inv[3]?.equip === 0) { xDoUseSlot(3); await xDelay(400); }
+
+    const _sides4 = [
+      { dx: 0, dy: -1, dir: 0 }, { dx: 1, dy:  0, dir: 1 },
+      { dx: 0, dy:  1, dir: 2 }, { dx: -1, dy: 0, dir: 3 }
+    ];
+
+    const _adjSide4 = _sides4.find(c =>
+      myself.x === _wcmTarget.x + c.dx && myself.y === _wcmTarget.y + c.dy
+    );
+
+    if (_adjSide4) {
+      // Adjacente → vira e minera
+      const _faceDir = (_adjSide4.dir + 2) % 4;
+      if (myself.dir !== _faceDir) {
+        if (keySpace.isDown) {
+          jv.key_array[6].isDown = false;
+          jv.key_array[6].isUP   = true;
+          send({ type: 'a' });
+          await xDelay(60);
+        }
+        await xDoChangeDir(_faceDir);
+        await xDelay(80);
+      }
+      if (!keySpace.isDown) {
+        send({ type: 'A' });
+        jv.key_array[6].isDown = true;
+        jv.key_array[6].isUP   = false;
+      }
+    } else {
+      // Não adjacente → solta tecla e move até lado livre mais próximo
+      if (keySpace.isDown) {
+        jv.key_array[6].isDown = false;
+        jv.key_array[6].isUP   = true;
+        send({ type: 'a' });
+        await xDelay(60);
+      }
+
+      const _freeSides = _sides4
+        .map(c => ({
+          x: _wcmTarget.x + c.dx,
+          y: _wcmTarget.y + c.dy,
+          dist: Math.abs(myself.x - (_wcmTarget.x + c.dx)) +
+                Math.abs(myself.y - (_wcmTarget.y + c.dy))
+        }))
+        .filter(t => !xGetSolidByID(t.x, t.y))
+        .sort((a, b) => a.dist - b.dist);
+
+      if (_freeSides.length === 0) {
+        // Pedra sem lado livre → blacklist
+        const _blKey = _wcmTarget.x + ',' + _wcmTarget.y;
+        if (!window._wcmBlacklist) window._wcmBlacklist = {};
+        _wcmBlacklist[_blKey] = Date.now() + 120000;
+        if (window._wcmReachCache) _wcmReachCache[_blKey] = { until: Date.now() + 120000 };
+        xTemp[170]  = undefined;
+        xTemp[172]  = undefined;
+        xMovingNow  = false;
+        xGoing[165] = false;
         return;
       }
-      if (!keySpace.isDown && inv[3]?.equip === 1) { await xDoKeyDown(6); await xDelay(100); }
-    }
-  }
 
+      const _dest = _freeSides[0];
 
-  // ── SOLTA TECLA SE PEDRA SUMIU ───────────────────────────────
-  if (xTemp[19] === undefined && keySpace.isDown) {
-    xDoKeyUp(6); xTemp[80] = undefined; await xDelay(50); await xDoKeyUp(6);
-  }
-
-
-  // ── LIMPA xTemp[19] SE PEDRA SUMIU ───────────────────────────
-  if (xTemp[19] !== undefined) {
-    const rockSprites = [-261, -618, -518];
-    const sides = [{ dx:1,dy:0},{dx:-1,dy:0},{dx:0,dy:1},{dx:0,dy:-1}];
-    const stillExists = sides.some(c => {
-      const w = xGetWallByPos(myself.x + c.dx, myself.y + c.dy);
-      return w && rockSprites.includes(w.sprite);
-    });
-    if (!stillExists && !isRockNextToMe()) {
-      xTemp[19] = undefined; xTemp[80] = undefined;
-      xDoKeyUp(6); await xDelay(50); await xDoKeyUp(6);
-    }
-  }
-
-
-  // ── PROCURA ROCHA ────────────────────────────────────────────
-  if ((!xTemp[13] || xTemp[13] === myself) && !keySpace.isDown) {
-    WCFindRocks();
-  }
-
-
-  // ── NAVEGAÇÃO ENTRE WAYPOINTS ────────────────────────────────
-  if (!xTemp[13] || xTemp[13] === myself) {
-    const distToWP = xGetDistance(myself.x, myself.y, WCMiningListX[xTemp[70]], WCMiningListY[xTemp[70]]);
-    if (distToWP <= 2) {
-      if (xTemp[70] >= xTemp[71]) { xTemp[70] = 0; RepTimer++; }
-      else {
-        xTemp[70]++;
-        if (RepTimer >= 11 && xTemp[70] === 1) {
-          dsk.localMsg('Indo reparar...', '#ff0');
-          xNeedsRep = true;
-          xRepairDropX = myself.x; xRepairDropY = myself.y; xRepairHoldTicks = 0;
-        }
+      if (!xTemp[97]) xTemp[97] = {};
+      const _destKey = _dest.x + ',' + _dest.y;
+      if (!xTemp[97][_destKey]) xTemp[97][_destKey] = Date.now();
+      if (Date.now() - xTemp[97][_destKey] > 8000) {
+        const _blKey = _wcmTarget.x + ',' + _wcmTarget.y;
+        if (!window._wcmBlacklist) window._wcmBlacklist = {};
+        _wcmBlacklist[_blKey] = Date.now() + 120000;
+        if (window._wcmReachCache) _wcmReachCache[_blKey] = { until: Date.now() + 120000 };
+        xTemp[170]  = undefined;
+        xTemp[172]  = undefined;
+        xTemp[97]   = {};
+        xMovingNow  = false;
+        xGoing[165] = false;
+        return;
       }
-    } else if (xTemp[19] === undefined) {
-      xDoMove(WCMiningListX[xTemp[70]], WCMiningListY[xTemp[70]]);
+
+      if (!xMovingNow) xDoMove(_dest.x, _dest.y);
+    }
+
+    xGoing[165] = false;
+    return;
+  }
+
+  // Sem pedra → solta tecla
+  if (keySpace.isDown) {
+    jv.key_array[6].isDown = false;
+    jv.key_array[6].isUP   = true;
+    send({ type: 'a' });
+  }
+
+  // ── PRIORIDADE 3: WAYPOINTS ──────────────────────────────────
+  const _wpX    = _wcmWpX[xTemp[250]];
+  const _wpY    = _wcmWpY[xTemp[250]];
+  const _distWP = xGetDistance(myself.x, myself.y, _wpX, _wpY);
+
+  if (_distWP <= 2) {
+    if (xTemp[250] >= xTemp[251]) {
+      xTemp[250] = 0;
+      RepTimer++;
+      dsk.localMsg(`WC Mining: volta ${RepTimer}/${wcaveRepVoltas}`, '#0ff');
+    } else {
+      xTemp[250]++;
+    }
+    if (RepTimer >= wcaveRepVoltas) {
+      dsk.localMsg('WC Mining: indo reparar...', '#ff0');
+      xNeedsRep  = true;
+      RepTimer   = 0;
+      xTemp[252] = undefined;
+      xTemp[253] = undefined;
+      xMovingNow = false;
+    }
+    xGoing[165] = false;
+    return;
+  }
+
+  if (xTemp[252] !== _wpX || xTemp[253] !== _wpY) {
+    xTemp[252]  = _wpX;
+    xTemp[253]  = _wpY;
+    xMovingNow  = false;
+    await xDoMove(_wpX, _wpY);
+  } else if (!xMovingNow) {
+    xDoMove(_wpX, _wpY);
+  }
+
+  xGoing[165] = false;
+}
+
+
+// ── REPARO IN-PLACE (WC Mining) ───────────────────────────────
+async function xWCMiningRepairInPlace() {
+  // ── Detecção de player/mob durante reparo ─────────────────────
+  for (let i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    const dist = xGetDistance(myself.x, myself.y, mob.x, mob.y);
+
+    if (dist <= 6 && !xPlyrTest(mob)) {
+      // Mob inimigo próximo: equipa gear e reage
+      await xEquipSlots();
+      await xGetMobByName(..._wcmMobNames);
+      if (xTemp[13] && xTemp[13] !== myself) {
+        if (target.id !== xTemp[13].id) { target.id = xTemp[13].id; send({ type: 't', t: target.id }); }
+        if (xGetDistance(xTemp[13].x, xTemp[13].y, myself.x, myself.y) > 2) target.id = me;
+      }
+      xNeedsRep = false; RepTimer = 0;
+      return;
+    }
+
+    if (xPlyrTest(mob) && dist <= 6) {
+      dsk.localMsg('WC Mining: player detectado durante reparo! Pegando item...', '#f55');
+      xDoKeyUp(6);
+      await xDelay(400);
+      xMovingNow = false;
+      await xDoPickUp(); await xDelay(200);
+      if (xTemp[94] !== undefined && xTemp[95] !== undefined) {
+        await xDoMove(xTemp[94], xTemp[95]);
+        await xDelay(500);
+        for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(180); }
+      }
+      await xEquipSlots();
+      xNeedsRep  = false; RepTimer   = 0;
+      xTemp[252] = undefined; xTemp[253] = undefined;
+      xTemp[94]  = undefined; xTemp[95]  = undefined;
+      xTemp[104] = undefined; xTemp[105] = undefined;
+      xTemp[106] = undefined;
+      xTemp[254] = undefined;
+      return;
     }
   }
 
+  // ── FASE 1: dropa apenas o item quebrado ──────────────────────
+  const brokenSlot = [0, 1, 2, 3].find(s => inv[s]?.equip === 2 && inv[s]?.sprite);
+  const hasGear = brokenSlot !== undefined;
+  if (hasGear) {
+    // Checa player antes de dropar
+    const playerNear = Object.values(mobs.items).find(mob =>
+      mob && mob !== myself && xPlyrTest(mob) &&
+      xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 6
+    );
+    if (playerNear) {
+      dsk.localMsg('WC Mining: player perto, adiando reparo...', '#fa5');
+      xNeedsRep = false; RepTimer = 0;
+      return;
+    }
+    xMovingNow = false;
+    xDoKeyUp(6);
+    await xDelay(900);
+    xTemp[94]  = myself.x;
+    xTemp[95]  = myself.y;
+    xTemp[104] = undefined;
+    xTemp[105] = undefined;
+    xTemp[106] = xGetItemNameBySlot(brokenSlot) ?? repItem;
+    dsk.localMsg('WC Mining: reparando ' + xTemp[106] + '...', '#fa0');
+    xDoDropSlot(0, brokenSlot + 1);
+    await xDelay(400);
+    return;
+  }
 
-  xGoing[110] = false;
+  // ── FASE 2: pega repair kit ───────────────────────────────────
+  const kitSlot = xGetSlotByID(719);
+  if (kitSlot === undefined) {
+    dsk.localMsg('WC Mining in-place: sem Repair Kit no inventário!', '#f55');
+    xNeedsRep = false; RepTimer = 0;
+    return;
+  }
+
+  const dropX = xTemp[94] ?? myself.x;
+  const dropY = xTemp[95] ?? myself.y;
+
+  // ── FASE 3: move para tile adjacente livre ────────────────────
+  if (xTemp[104] === undefined || xTemp[105] === undefined) {
+    const adjFree = [
+      { x: dropX + 1, y: dropY },
+      { x: dropX - 1, y: dropY },
+      { x: dropX,     y: dropY + 1 },
+      { x: dropX,     y: dropY - 1 },
+    ].find(t => !xGetSolidByID(t.x, t.y));
+
+    if (!adjFree) {
+      dsk.localMsg('WC Mining in-place: sem tile livre adjacente!', '#f55');
+      xNeedsRep = false; RepTimer = 0;
+      return;
+    }
+    xTemp[104] = adjFree.x;
+    xTemp[105] = adjFree.y;
+  }
+
+  if (myself.x !== xTemp[104] || myself.y !== xTemp[105]) {
+    if (!xMovingNow) {
+      await xDoMove(xTemp[104], xTemp[105]);
+    }
+    return;
+  }
+
+  // ── FASE 4: equipa kit ────────────────────────────────────────
+  if (inv[kitSlot]?.equip === 0) {
+    await xDoUseSlot(kitSlot);
+    await xDelay(400);
+    return;
+  }
+
+  // ── FASE 5: vira para os itens dropados ──────────────────────
+  const dx = dropX - myself.x;
+  const dy = dropY - myself.y;
+  const facingDir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
+
+  if (myself.dir !== facingDir) {
+    await xDoChangeDir(facingDir);
+    await xDelay(300);
+    return;
+  }
+
+  // ── FASE 6: repara em pulsos checando player a cada batida ────
+  const _repName = xTemp[106] ?? repItem;
+
+  let _repairSafe = true;
+  while (_repairSafe) {
+    // Checa player antes de cada batida
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself) continue;
+      if (!xPlyrTest(mob)) continue;
+      if (xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 6) {
+        _repairSafe = false;
+        break;
+      }
+    }
+    if (!_repairSafe) break;
+
+    await xDoKeyPress(6, 200);
+    await xDelay(300);
+
+    if (xIfChatHas('The ' + _repName + ' is in perfect condition.')) {
+      xDoClearChat('The ' + _repName + ' is in perfect condition.');
+      xDoKeyUp(6);
+      await xDelay(400);
+      xMovingNow = false;
+      await xDoMove(dropX, dropY);
+      await xDelay(500);
+      for (let p = 0; p < 8; p++) { xDoPickUp(); await xDelay(180); }
+      await xEquipSlots();
+      xNeedsRep  = false; RepTimer   = 0;
+      xTemp[252] = undefined; xTemp[253] = undefined;
+      xTemp[94]  = undefined; xTemp[95]  = undefined;
+      xTemp[104] = undefined; xTemp[105] = undefined;
+      xTemp[106] = undefined;
+      xTemp[254] = undefined;
+      wcmStat.repairoTotal++;
+      dsk.localMsg('WC Mining: reparo in-place concluído! ✅', '#5f5');
+      return;
+    }
+  }
+
+  // ── Saiu do while por player ──────────────────────────────────
+  if (!_repairSafe) {
+    xDoKeyUp(6);
+    await xDelay(400);
+    xMovingNow = false;
+    await xDoPickUp(); await xDelay(200);
+    if (xTemp[94] !== undefined) {
+      await xDoMove(xTemp[94], xTemp[95]);
+      await xDelay(500);
+      for (let p = 0; p < 6; p++) { xDoPickUp(); await xDelay(180); }
+    }
+    await xEquipSlots();
+    xNeedsRep  = false; RepTimer   = 0;
+    xTemp[252] = undefined; xTemp[253] = undefined;
+    xTemp[94]  = undefined; xTemp[95]  = undefined;
+    xTemp[104] = undefined; xTemp[105] = undefined;
+    xTemp[106] = undefined;
+    xTemp[254] = undefined;
+    dsk.localMsg('WC Mining: player detectado, abortando reparo!', '#f55');
+  }
 }
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  WC MINING CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let wcmPanel = null;
+
+  const wcmm = {
+    get visible() { return !!wcmPanel; },
+    set visible(v) { if (!v && wcmPanel) removePanel(); else if (v && !wcmPanel) createPanel(); },
+  };
+  dsk.wcminingManager = wcmm;
+
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!wcmPanel || ++_t % 10 !== 0) return;
+    const q   = k => wcmPanel.querySelector(`[data-wcmm="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+    const wp    = xTemp[250] ?? 0;
+    const maxWp = xTemp[251] ?? (_wcmWpX.length - 1);
+    set('status', dsk.wcmining?.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('wp',     `WP: ${wp} / ${maxWp}`);
+    set('rep',    `Voltas: ${window.RepTimer ?? 0} / ${window.wcaveRepVoltas ?? 1}`);
+    set('needs',  window.xNeedsRep ? '🔧 Reparando...' : '✅ OK');
+    set('hp',     `HP: ${hp_status?.val?.toFixed(1) ?? '-'}%`);
+    set('hunger', `Fome: ${hunger_status?.val?.toFixed(1) ?? '-'}%`);
+    set('mob',    `Mob: ${xTemp[13]?.name ?? 'nenhum'}`);
+    set('stone',  xTemp[254] ? `Pedra: (${xTemp[254].x}, ${xTemp[254].y})` : 'Pedra: buscando...');
+    set('repairs',`Reparos: ${window.wcmStat?.repairoTotal ?? 0}`);
+    set('myst',   `Myst: +${window.wcmStat?.totalMyst ?? 0}`);
+    const mph = window.wcmStat?.mystPerHour ?? 0;
+    set('mph', mph >= 1000 ? `Myst/h: ${(mph/1000).toFixed(1)}M` : `Myst/h: ${mph}k`);
+    if (window.wcmStat?.timerRunning) {
+      const elapsed = Math.floor((window.wcmStat.totalTime + (Date.now() - window.wcmStat.timerStart)) / 1000);
+      const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
+      set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
+    }
+  }); }
+
+  function createPanel() {
+    if (wcmPanel) { removePanel(); return; }
+
+    wcmPanel = document.createElement('div');
+    Object.assign(wcmPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)', width: '270px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '⛏️ WC Mining Config';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - wcmPanel.getBoundingClientRect().left;
+      oy = _xy.y - wcmPanel.getBoundingClientRect().top;
+      wcmPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); wcmPanel.style.left = (_xy.x - ox) + 'px'; wcmPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+    const statusKeys = [
+      ['status','🔴 Pausado'], ['wp','WP: 0 / 23'], ['rep','Voltas: 0 / 1'],
+      ['needs','✅ OK'], ['hp','HP: -'], ['hunger','Fome: -'], ['mob','Mob: -'],
+      ['stone','Pedra: buscando...'], ['repairs','Reparos: 0'],
+      ['myst','Myst: +0'], ['mph','Myst/h: 0k'], ['time','Tempo: 0m 0s'],
+    ];
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, { background: '#12121e', borderRadius: '7px', padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '3px' });
+    statusKeys.forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.wcmm = key; el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+    // Voltas p/ reparar
+    const voltasRow = document.createElement('div');
+    Object.assign(voltasRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const voltasLbl = document.createElement('div');
+    const voltasTit = document.createElement('div');
+    voltasTit.textContent = 'Voltas p/ reparar';
+    Object.assign(voltasTit.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const voltasVal = document.createElement('div');
+    voltasVal.dataset.wcmm = 'voltas';
+    voltasVal.textContent = `Voltas p/ reparar: ${window.wcaveRepVoltas ?? 1}`;
+    Object.assign(voltasVal.style, { color: '#FFD700', fontSize: '11px' });
+    voltasLbl.appendChild(voltasTit); voltasLbl.appendChild(voltasVal);
+    { let _t = 0; dsk.on('postLoop', () => { if (!wcmPanel || ++_t % 10 !== 0) return; const el = wcmPanel.querySelector('[data-wcmm="voltas"]'); if (el) el.textContent = `Voltas p/ reparar: ${window.wcaveRepVoltas ?? 1}`; }); }
+
+    const voltasBtns = document.createElement('div');
+    Object.assign(voltasBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button'); b.textContent = txt;
+      Object.assign(b.style, { padding: '3px 10px', borderRadius: '5px', border: '1px solid #555', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px' });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn; return b;
+    }
+    voltasBtns.appendChild(makeBtn('-', () => { if ((window.wcaveRepVoltas ?? 1) > 1) window.wcaveRepVoltas--; }));
+    voltasBtns.appendChild(makeBtn('+', () => { window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 1) + 1; }));
+    voltasRow.appendChild(voltasLbl); voltasRow.appendChild(voltasBtns);
+    body.appendChild(voltasRow);
+
+    // Botões de ação
+    const actRow = document.createElement('div');
+    Object.assign(actRow.style, { display: 'flex', gap: '6px' });
+    function makeActionBtn(txt, color, fn) {
+      const b = document.createElement('button'); b.textContent = txt;
+      Object.assign(b.style, { flex: '1', padding: '7px 0', borderRadius: '7px', border: `1px solid ${color}`, background: '#1a1a2e', color, cursor: 'pointer', fontFamily: 'Verdana', fontSize: '10px' });
+      b.onmouseenter = () => b.style.background = '#2a2a3e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn; return b;
+    }
+    actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
+      window.wcmStat = { startMyst: jv.upgrade_number??0, totalMyst:0, mystPerHour:0, timerStart: Date.now(), totalTime:0, timerRunning: !!dsk.wcmining?.enabled, repairoTotal:0 };
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('WC Mining: stats resetados!', '#ff0');
+    }));
+    actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
+      xTemp[250] = undefined;
+      xTemp[252] = undefined; xTemp[253] = undefined;
+      xTemp[254] = undefined;
+      window.RepTimer = 0; window.xNeedsRep = false;
+      dsk.localMsg('WC Mining: waypoints resetados!', '#fa5');
+    }));
+    actRow.appendChild(makeActionBtn('🔧 Forçar Rep', '#0cf', () => {
+      window.xNeedsRep = true;
+      dsk.localMsg('WC Mining: reparo forçado!', '#ff0');
+    }));
+    body.appendChild(actRow);
+
+    wcmPanel.appendChild(header);
+    wcmPanel.appendChild(body);
+    document.body.appendChild(wcmPanel);
+
+    // ── Footer: Voltar + Play ──────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Mine Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.commands['/minehub']?.(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.wcmining?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/wcmining'](); _updatePlayBtn(); };
+    const _pi = setInterval(() => { if (!wcmPanel) { clearInterval(_pi); return; } _updatePlayBtn(); }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    wcmPanel.appendChild(_footer);
+  }
+
+  function removePanel() { if (wcmPanel) { wcmPanel.remove(); wcmPanel = null; } }
+
+  dsk.setCmd('/wcminingconfig', () => {
+    if (wcmPanel) { removePanel(); dsk.localMsg('WC Mining Config: Fechado', '#f55'); }
+    else          { createPanel(); dsk.localMsg('WC Mining Config: Aberto',  '#5f5'); }
+  });
+})();
 
 
 // ── LOOT TRACKER (global) ─────────────────────────────────────
@@ -11170,9 +12100,9 @@ dsk.on('postPacket:inv', () => {
     );
 
 
-    addBotCol('mining', '🪨', 'Mining',
-      () => !!dsk.mining?.enabled,
-      () => dsk.commands['/mining']()
+    addBotCol('wcmining', '⛏️', 'WC Mining',
+      () => !!dsk.wcmining?.enabled,
+      () => dsk.commands['/wcmining']()
     );
 
 
@@ -11210,7 +12140,7 @@ dsk.on('postPacket:inv', () => {
 
     const STATUS_ROWS = [
       ['mh-wp',    'WP: -'],
-      ['mh-rep',   'Rep: -'],
+
       ['mh-needs', 'Repair: não'],
       ['mh-hp',    'HP: -'],
       ['mh-hunger','Fome: -'],
@@ -11256,8 +12186,8 @@ dsk.on('postPacket:inv', () => {
 
 
     cfgRow.appendChild(mkEl('span', { color: '#7a7a9a', fontSize: '10px' }, 'Alvo:'));
-    const _modes = ['shiny', 'stone', 'both'];
-    const ssdModeBtn = mkBtn(dsk.ssd?.targetMode ?? 'shiny', '#00bfff', () => {
+    const _modes = ['shiny', 'both'];
+    const ssdModeBtn = mkBtn(dsk.ssd?.targetMode ?? 'both', '#00bfff', () => {
       const i = _modes.indexOf(dsk.ssd?.targetMode ?? 'shiny');
       if (dsk.ssd) dsk.ssd.targetMode = _modes[(i + 1) % _modes.length];
       ssdModeBtn.textContent = dsk.ssd?.targetMode ?? 'shiny';
@@ -11266,41 +12196,7 @@ dsk.on('postPacket:inv', () => {
     cfgRow.appendChild(ssdModeBtn);
 
 
-    cfgRow.appendChild(mkEl('span', { color: '#7a7a9a', fontSize: '10px' }, 'Reparo:'));
-    const repBtn = mkBtn(dsk.ssd?.repairInPlace ? 'in-place' : 'fixo', '#9090b0', () => {
-      if (dsk.ssd) dsk.ssd.repairInPlace = !dsk.ssd.repairInPlace;
-      repBtn.textContent = dsk.ssd?.repairInPlace ? 'in-place' : 'fixo';
-      dsk.localMsg(`SSD reparo: ${repBtn.textContent}`, '#0ff');
-    });
-    cfgRow.appendChild(repBtn);
     body.appendChild(cfgRow);
-
-
-    // Voltas p/ reparar
-    const voltasRow = mkEl('div', {
-      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-    });
-    voltasRow.appendChild(mkEl('span', { color: '#7a7a9a', fontSize: '10px' }, 'Voltas p/ reparar:'));
-
-
-    const vWrap = mkEl('div', { display: 'flex', alignItems: 'center', gap: '5px' });
-    const voltasVal = mkEl('span', {
-      color: '#FFD700', fontSize: '12px', fontWeight: 'bold',
-      minWidth: '24px', textAlign: 'center',
-    }, String(window.wcaveRepVoltas ?? 3));
-
-
-    vWrap.appendChild(mkSmBtn('−', () => {
-      window.wcaveRepVoltas = Math.max(1, (window.wcaveRepVoltas ?? 3) - 1);
-      voltasVal.textContent = String(window.wcaveRepVoltas);
-    }));
-    vWrap.appendChild(voltasVal);
-    vWrap.appendChild(mkSmBtn('+', () => {
-      window.wcaveRepVoltas = (window.wcaveRepVoltas ?? 3) + 1;
-      voltasVal.textContent = String(window.wcaveRepVoltas);
-    }));
-    voltasRow.appendChild(vWrap);
-    body.appendChild(voltasRow);
 
 
     // Action buttons
@@ -11402,7 +12298,7 @@ dsk.on('postPacket:inv', () => {
 
 
       s('mh-wp',    `WP: ${xTemp[70] ?? 0}/${xTemp[71] ?? '-'}`);
-      s('mh-rep',   `Rep: ${window.RepTimer ?? 0}/${window.wcaveRepVoltas ?? 3}`);
+      // rep counter removido (SSD sempre in-place)
       s('mh-needs', window.xNeedsRep ? 'Repair: ⚠ SIM' : 'Repair: não');
       s('mh-hp',    `HP: ${hp_status?.val?.toFixed(0) ?? '-'}%`);
       s('mh-hunger',`Fome: ${hunger_status?.val?.toFixed(0) ?? '-'}%`);
@@ -11416,9 +12312,7 @@ dsk.on('postPacket:inv', () => {
 
 
       // Config button sync
-      ssdModeBtn.textContent = dsk.ssd?.targetMode ?? 'shiny';
-      repBtn.textContent     = dsk.ssd?.repairInPlace ? 'in-place' : 'fixo';
-      voltasVal.textContent  = String(window.wcaveRepVoltas ?? 3);
+      ssdModeBtn.textContent = dsk.ssd?.targetMode ?? 'both';
       updLootToggle();
 
 
@@ -11459,6 +12353,7 @@ dsk.on('postPacket:inv', () => {
 
   // Compat: /miningconfig agora abre o Mine Hub
   dsk.setCmd('/miningconfig', () => dsk.commands['/minehub']());
+  dsk.setCmd('/wcminingconfig', () => dsk.commands['/minehub']());
 
 
 })();
@@ -11744,7 +12639,7 @@ async function rotRun() {
     skillName    = 'cooking';
     cookPositionX = rotationConfig.pos.cook.x;
     cookPositionY = rotationConfig.pos.cook.y;
-        skillLevel = 0;
+    skillLevel = 0;
     dsk.cooking.enabled = true;
     dsk.localMsg(`Rotation → Cook até nível ${currentLevel}`, '#5f5');
 
@@ -11763,7 +12658,7 @@ async function rotRun() {
 
     dsk.rotation.phase = 'cleanup';
     dsk.cooking.enabled = false;
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     dsk.localMsg('Rotation → Cook pronto! Dropando...', '#ff0');
     await xDelay(500);
     for (const slot of [1, 2, 3]) {
@@ -11800,7 +12695,7 @@ async function rotRun() {
     skillName     = 'smelting';
     smeltPositionX = rotationConfig.pos.smelt.x;
     smeltPositionY = rotationConfig.pos.smelt.y;
-        skillLevel = 0;
+    skillLevel = 0;
     dsk.smelting.enabled = true;
     dsk.localMsg(`Rotation → Smelt até nível ${currentLevel}`, '#5f5');
 
@@ -11819,7 +12714,7 @@ async function rotRun() {
 
     dsk.rotation.phase = 'cleanup';
     dsk.smelting.enabled = false;
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     dsk.localMsg('Rotation → Smelt pronto! Dropando...', '#ff0');
     await xDelay(500);
     for (const slot of [1, 2, 3, 4, 5, 6]) {
@@ -11851,7 +12746,7 @@ async function rotRun() {
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.swordLevel;
     skillName    = 'sword';
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     dsk.sword.enabled = true;
     dsk.localMsg(`Rotation → Sword até nível ${currentLevel}`, '#5f5');
 
@@ -11870,7 +12765,7 @@ async function rotRun() {
 
     dsk.rotation.phase = 'cleanup';
     dsk.sword.enabled = false;
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     xDoKeyUp(6);
     await xDelay(400);
     await xDoDropSlot(1, 1);
@@ -11900,7 +12795,7 @@ async function rotRun() {
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.hammerLevel;
     skillName    = 'hammer';
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     dsk.hammer.enabled = true;
     dsk.localMsg(`Rotation → Hammer até nível ${currentLevel}`, '#5f5');
 
@@ -11919,12 +12814,12 @@ async function rotRun() {
 
     dsk.rotation.phase = 'cleanup';
     dsk.hammer.enabled = false;
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     xDoKeyUp(6);
-        await xDelay(500);
-        await xDoDropSlot(1, 1);
-		await xDelay(500);
-		await xDoUseSlotByID(xGetSlotByID(649));
+    await xDelay(500);
+    await xDoDropSlot(1, 1);
+	await xDelay(500);
+	await xDoUseSlotByID(xGetSlotByID(649));
     await xDelay(500);
   }
 
@@ -11950,7 +12845,7 @@ async function rotRun() {
 
     dsk.rotation.phase = 'bot';
     currentLevel = rotationConfig.armasLevel;
-        skillLevel = 0;
+    skillLevel = 0;
     dsk.armas.enabled = true;
     dsk.localMsg(`Rotation → Armas até nível ${currentLevel}`, '#5f5');
 
@@ -11974,7 +12869,7 @@ async function rotRun() {
 
     dsk.rotation.phase = 'cleanup';
     dsk.armas.enabled = false;
-        skillLevel = 0; // ← adiciona isso
+    skillLevel = 0; // ← adiciona isso
     xDoKeyUp(6);
     await xDelay(500);
     dsk.localMsg('Rotation → Armas pronto! Dropando slots...', '#ff0');
@@ -11997,6 +12892,8 @@ async function rotRun() {
     await rotMoveTo(rotationConfig.pos.destru.x, rotationConfig.pos.destru.y);
     await xDelay(400);
     await xDoPickUp();
+	await xDelay(500);
+	await xDoUseSlotByID(xGetSlotByID(649));
     await xDelay(400);
 
 
@@ -12099,8 +12996,8 @@ async function rotRun() {
 
 
   // Status ao vivo
-  dsk.on('postLoop', () => {
-    if (!rmPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!rmPanel || ++_t % 10 !== 0) return;
     const set = (k, v) => { const el = rmPanel.querySelector(`[data-rm="${k}"]`); if (el) el.textContent = v; };
     const r = dsk.rotation;
     const alvoMap = {
@@ -12122,7 +13019,7 @@ async function rotRun() {
       const el = rmPanel.querySelector(`[data-rmpos="${key}"]`);
       if (el) el.textContent = `${label}: (${rotationConfig.pos[key]?.x ?? '-'}, ${rotationConfig.pos[key]?.y ?? '-'})`;
     });
-  });
+  }); }
 
 
   function createPanel() {
@@ -14172,8 +15069,8 @@ async function xRecursos() {
 
 
   // Atualiza botão play em tempo real
-  dsk.on('postLoop', () => {
-    if (!rcPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!rcPanel || ++_t % 10 !== 0) return;
     const btn = rcPanel.querySelector('[data-rc="playbtn"]');
     if (!btn) return;
     const on = !!dsk.recursos?.enabled;
@@ -14181,7 +15078,7 @@ async function xRecursos() {
     btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
     btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
     btn.style.color       = on ? '#e74c3c' : '#2ecc71';
-  });
+  }); }
 
 
   function removePanel() {
@@ -16609,15 +17506,16 @@ dsk.setCmd('/menu', () => {
   }
 
 
-  dsk.setCmd('/hunt', () => {
-    if (panel) {
-      removePanel();
-      dsk.localMsg('Hunt Hub: Fechado', '#f55');
-    } else {
-      createPanel();
-      dsk.localMsg('Hunt Hub: Aberto', '#5f5');
-    }
-  });
+  dsk.huntHub = {
+    open:  () => { if (!panel) createPanel(); },
+    close: () => { if (panel)  removePanel(); },
+    toggle: () => {
+      if (panel) { removePanel(); dsk.localMsg('Hunt Hub: Fechado', '#f55'); }
+      else       { createPanel(); dsk.localMsg('Hunt Hub: Aberto',  '#5f5'); }
+    },
+  };
+
+  dsk.setCmd('/hunt', () => dsk.huntHub.toggle());
 })();
 
 // ── TILLING BOT ──────────────────────────────────────────────
@@ -17333,8 +18231,8 @@ async function xSSDHuntRepair() {
   };
   dsk.ssdhuntManager = ssdhm;
 
-  dsk.on('postLoop', () => {
-    if (!ssdhPanel) return;
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!ssdhPanel || ++_t % 10 !== 0) return;
     const q   = k => ssdhPanel.querySelector(`[data-ssdhm="${k}"]`);
     const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
     const wp    = xTemp[182] ?? 0;
@@ -17356,7 +18254,7 @@ async function xSSDHuntRepair() {
       const h = Math.floor(elapsed/3600), m = Math.floor((elapsed%3600)/60), s = elapsed%60;
       set('time', `Tempo: ${h>0?h+'h ':''}${m}m ${s}s`);
     }
-  });
+  }); }
 
   function createPanel() {
     if (ssdhPanel) { removePanel(); return; }
@@ -17508,6 +18406,46 @@ async function xSSDHuntRepair() {
     ssdhPanel.appendChild(header);
     ssdhPanel.appendChild(body);
     document.body.appendChild(ssdhPanel);
+
+    // ── Footer: Voltar + Play ─────────────────────────────────
+    const _footer = document.createElement('div');
+    Object.assign(_footer.style, {
+      display: 'flex', gap: '8px', padding: '8px 10px',
+      borderTop: '1px solid #444', justifyContent: 'center',
+      background: '#1a1a2a', borderRadius: '0 0 10px 10px',
+    });
+
+    const _backBtn = document.createElement('button');
+    _backBtn.textContent = '◀ Hunt Hub';
+    Object.assign(_backBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      background: '#2a2a3e', border: '1px solid #888',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    _backBtn.onclick = () => { removePanel(); dsk.huntHub?.open(); };
+
+    const _playBtn = document.createElement('button');
+    Object.assign(_playBtn.style, {
+      padding: '5px 12px', borderRadius: '6px',
+      border: '1px solid #555', cursor: 'pointer',
+      fontSize: '11px', fontWeight: 'bold',
+    });
+    function _updatePlayBtn() {
+      const _on = !!dsk.ssdhunt?.enabled;
+      _playBtn.textContent      = _on ? '⏹ Stop' : '▶ Play';
+      _playBtn.style.background = _on ? '#c0392b' : '#27ae60';
+      _playBtn.style.color      = '#fff';
+    }
+    _updatePlayBtn();
+    _playBtn.onclick = () => { dsk.commands['/ssdhunt'](); _updatePlayBtn(); };
+    const _playInterval = setInterval(() => {
+      if (!ssdhPanel) { clearInterval(_playInterval); return; }
+      _updatePlayBtn();
+    }, 500);
+
+    _footer.appendChild(_backBtn);
+    _footer.appendChild(_playBtn);
+    ssdhPanel.appendChild(_footer);
   }
 
   function removePanel() {
@@ -18263,6 +19201,771 @@ dsk.on('postPacket:pkg', packet => {
   });
 })();
 
+
+
+
+dsk.gal = {
+  enabled:       false,
+  corredorX:     0,
+  corredorY:     0,
+  modo:          'pena',  // 'pena' | 'ovo'
+  pegando:       0,
+  // 0 = procurando item
+  // 1 = movendo no corredor até Y do item
+  // 2 = abrindo porta de entrada + andando até o item
+  // 3 = pegando o item
+  // 4 = verificando food (no tile do item, ao lado da galinha)
+  // 5 = abrindo porta de saída
+  // 6 = voltando ao corredor
+  itemX:         undefined,
+  itemY:         undefined,
+  itemDir:       undefined, // 1=direita 3=esquerda
+  chickenTarget: null,
+  waitingInfo:   false,
+  checandoFood:  false,
+};
+
+// ── Listener de food ──────────────────────────────────────────
+
+window._galWsListener = null;
+
+function _galInstallListener() {
+  if (window._galWsListener) return;
+  window._galWsListener = function(event) {
+    if (!dsk.gal.waitingInfo) return;
+    try {
+      const packet = JSON.parse(event.data);
+      if (packet.type !== 'pkg') return;
+      const entries = JSON.parse(packet.data);
+      for (const raw of entries) {
+        if (typeof raw !== 'string') continue;
+        const data = JSON.parse(raw);
+        if (data.type !== 'fx' || data.tpl !== 'player_info') continue;
+        const mobData = data.d;
+        if (mobData && mobData.food) {
+          const m = mobData.food.match(/(\d+)%/);
+          if (m) {
+            const pct = parseInt(m[1]);
+            if (dsk.gal.modo === 'pena') {
+              // Pena: dropa 1 worm se food < 12%
+              if (pct < 12) {
+                dsk.localMsg('🪶 Penas: food baixa, dropando worm!', '#fa5');
+                xDoDropSlot(1, 1);
+              }
+            } else {
+              // Ovo: dropa 2 worms se <= 50%, 1 worm se <= 70%
+              if (pct <= 50) {
+                dsk.localMsg('🥚 Ovos: food muito baixa, dropando 2 worms!', '#f55');
+                xDoDropSlot(1, 1);
+                setTimeout(() => xDoDropSlot(1, 1), 400);
+              } else if (pct <= 70) {
+                dsk.localMsg('🥚 Ovos: food moderada, dropando 1 worm!', '#fa5');
+                xDoDropSlot(1, 1);
+              }
+            }
+          }
+        }
+        dsk.gal.waitingInfo  = false;
+        dsk.gal.checandoFood = false;
+      }
+    } catch(e) {}
+  };
+  connection.addEventListener('message', window._galWsListener);
+}
+
+function _galRemoveListener() {
+  if (!window._galWsListener) return;
+  connection.removeEventListener('message', window._galWsListener);
+  window._galWsListener = null;
+}
+
+// ── Pede info da galinha mais próxima ────────────────────────
+
+function _galCheckFood() {
+  const st = dsk.gal;
+  if (!mobs || !mobs.items) { st.checandoFood = false; return; }
+  st.chickenTarget = null;
+  let minDist = 999;
+  for (const i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || !mob.name) continue;
+    if (mob.name !== 'Chicken') continue;
+    const dist = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
+    if (dist <= 3 && dist < minDist) { st.chickenTarget = mob; minDist = dist; }
+  }
+  if (!st.chickenTarget) { st.checandoFood = false; return; }
+  st.waitingInfo = true;
+  send({ type: 't', t: st.chickenTarget.id });
+  setTimeout(() => {
+    send({ type: 'c', r: 'rp', id: st.chickenTarget.id });
+    setTimeout(() => {
+      if (st.waitingInfo) { st.waitingInfo = false; st.checandoFood = false; }
+    }, 5000);
+  }, 200);
+}
+
+// ── Fecha janela de info (ESC) ────────────────────────────────
+
+function _galFecharInfo() {
+  let tentativas = 0;
+  const tentar = () => {
+    tentativas++;
+    for (const e in jv.Dialog.list) {
+      const d = jv.Dialog.list[e];
+      if (!d || !d.visible) continue;
+      if (d.children?.some(c => c.text === 'Chicken')) {
+        d.visible = false;
+        console.log(`❌ Dialog fechado na tentativa ${tentativas}`);
+        return;
+      }
+    }
+    if (tentativas < 10) {
+      setTimeout(tentar, 100);
+    }
+  };
+  tentar();
+}
+
+// ── Acha o item mais próximo válido ──────────────────────────
+
+function _galFindItem() {
+  const cx      = dsk.gal.corredorX;
+  const keyword = dsk.gal.modo === 'pena' ? 'Feat' : 'Egg';
+  return objects.items.find(obj =>
+    obj && obj.x && obj.y && obj.name && obj.name.includes(keyword) &&
+    (
+      (obj.x === cx + 2 && occupied(obj.x + 1, obj.y) === 0) ||
+      (obj.x === cx - 2 && occupied(obj.x - 1, obj.y) === 0)
+    )
+  );
+}
+
+// ── Loop principal ────────────────────────────────────────────
+
+async function GalBot() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[119] === true) {
+    if (!xGoing._galTime) xGoing._galTime = Date.now();
+    if (Date.now() - xGoing._galTime > 10000) {
+      xGoing[119]      = false;
+      xGoing._galTime  = undefined;
+      xMovingNow       = false;
+      // Reset completo do estado para evitar loop em fase corrompida
+      const st2 = dsk.gal;
+      st2.pegando      = 0;
+      st2.itemX        = undefined;
+      st2.itemY        = undefined;
+      st2.itemDir      = undefined;
+      st2.chickenTarget= null;
+      st2.waitingInfo  = false;
+      st2.checandoFood = false;
+      st2._dirRetry    = 0;
+      dsk.localMsg('Gal Bot: timeout, resetando estado...', '#fa0');
+    }
+    return;
+  }
+  xGoing._galTime = undefined;
+  xGoing[119] = true;
+
+  const st = dsk.gal;
+  const cx = st.corredorX;
+  const cy = st.corredorY;
+
+  // ── Aguarda resposta do servidor sobre food ────────────────
+  if (st.waitingInfo || st.checandoFood) {
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 6: voltando ao corredor ──────────────────────────
+  if (st.pegando === 6) {
+    if (myself.x !== cx) {
+      await xDoMove(cx, myself.y);
+      await xDelay(500);
+      xGoing[119] = false;
+      return;
+    }
+    // Chegou ao corredor — checa se tem galinha no tile da porta do quarto que acabou de visitar
+    // A porta fica sempre em cx+1 ou cx-1, no mesmo y do item (st.itemY)
+    const portaX = st.itemDir === 1 ? cx + 1 : cx - 1;
+    const chickenNaPorta = st.itemY !== undefined && mobs && mobs.items &&
+      Object.values(mobs.items).find(mob =>
+        mob && mob.name === 'Chicken' &&
+        mob.x === portaX &&
+        mob.y === st.itemY
+      );
+    if (chickenNaPorta) {
+      // Inicia timeout de espera pela galinha sair
+      if (!st._chickenWaitStart) st._chickenWaitStart = Date.now();
+      // Se a galinha não saiu em 10s, ignora e prossegue
+      if (Date.now() - st._chickenWaitStart < 10000) {
+        xGoing[119] = false;
+        return;
+      }
+      dsk.localMsg('Gal Bot: galinha não saiu da porta, prosseguindo...', '#fa0');
+    }
+    st._chickenWaitStart = undefined;
+    _galFecharInfo();
+    st.pegando       = 0;
+    st.itemX         = undefined;
+    st.itemY         = undefined;
+    st.itemDir       = undefined;
+    st.chickenTarget = null;
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 5: abrindo porta de saída ────────────────────────
+  if (st.pegando === 5) {
+    const dirSaida   = st.itemDir === 1 ? 3 : 1;
+    const gateXSaida = st.itemDir === 1 ? cx + 1 : cx - 1;
+    const gateSaida  = objects.items.find(el =>
+      el?.name === 'Personal Gate' && el.x === gateXSaida && el.y === st.itemY
+    );
+	await xDelay(300);
+    _galFecharInfo(); // fecha painel da galinha antes de voltar
+	await xDelay(300);
+    await xDoChangeDir(dirSaida);
+    await xDelay(300);
+    if (gateSaida) {
+      await xDoKeyPress(6, 180);
+      await xDelay(1500); // 1500ms: espera porta fechar antes de voltar ao corredor
+    }
+    st.pegando = 6;
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 4: verificando food (no tile do item, ao lado da galinha) ──
+  if (st.pegando === 4) {
+    st.checandoFood = true;
+    _galCheckFood();
+    st.pegando = 5;
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 3: pegando o item ────────────────────────────────
+  if (st.pegando === 3) {
+    if (myself.x === st.itemX && myself.y === st.itemY) {
+      await xDoPickUp();
+      await xDelay(300);
+      st.pegando = 4;
+    } else {
+      // Inicia timeout de movimento para evitar loop infinito
+      if (!st._moveStart) st._moveStart = Date.now();
+      if (Date.now() - st._moveStart > 15000) {
+        // Não chegou no item em 15s — reseta estado completamente
+        dsk.localMsg('Gal Bot: não conseguiu chegar ao item, resetando...', '#fa0');
+        st.pegando   = 0;
+        st.itemX     = undefined;
+        st.itemY     = undefined;
+        st.itemDir   = undefined;
+        st._moveStart = undefined;
+        xMovingNow   = false;
+        xGoing[119]  = false;
+        return;
+      }
+      xMovingNow = false; // libera lock caso esteja preso
+      await xDoMove(st.itemX, st.itemY);
+      await xDelay(500);
+    }
+    if (myself.x === st.itemX && myself.y === st.itemY) {
+      st._moveStart = undefined; // chegou, zera o timer
+    }
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 2: abrindo porta de entrada e andando até o item ─
+  if (st.pegando === 2) {
+    const gateXEntrada = st.itemDir === 1 ? cx + 1 : cx - 1;
+    const gateEntrada  = objects.items.find(el =>
+      el?.name === 'Personal Gate' && el.x === gateXEntrada && el.y === st.itemY
+    );
+    // Garante que virou antes de tentar abrir a porta
+    if (myself.dir !== st.itemDir) {
+      if (!st._dirRetry) st._dirRetry = 0;
+      st._dirRetry++;
+      // Após 5 tentativas sem virar (≈2s), desiste e reseta o estado
+      if (st._dirRetry > 5) {
+        dsk.localMsg('Gal Bot: falha ao virar, resetando...', '#fa0');
+        st.pegando    = 0;
+        st.itemX      = undefined;
+        st.itemY      = undefined;
+        st.itemDir    = undefined;
+        st._dirRetry  = 0;
+        xMovingNow    = false;
+        xGoing[119]   = false;
+        return;
+      }
+      xMovingNow = false; // libera lock caso esteja preso
+	  await xDelay(400);
+      await xDoChangeDir(st.itemDir);
+      await xDelay(400);
+      xGoing[119] = false;
+      return;
+    }
+    st._dirRetry = 0; // virou com sucesso, zera o contador
+    if (gateEntrada) {
+      await xDoKeyPress(6, 180);
+      await xDelay(500);
+    }
+    await xDoMove(st.itemX, st.itemY);
+    await xDelay(500);
+    st.pegando = 3;
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 1: movendo no corredor até o Y do item ───────────
+  if (st.pegando === 1) {
+    if (myself.x !== cx) {
+      await xDoMove(cx, myself.y);
+      await xDelay(400);
+      xGoing[119] = false;
+      return;
+    }
+    if (myself.y !== st.itemY) {
+      await xDoMove(cx, st.itemY);
+      await xDelay(400);
+      xGoing[119] = false;
+      return;
+    }
+    st.pegando = 2;
+    xGoing[119] = false;
+    return;
+  }
+
+  // ── FASE 0: procurando item ───────────────────────────────
+  if (st.pegando === 0) {
+    const item = _galFindItem();
+    if (item) {
+      st.itemX   = item.x;
+      st.itemY   = item.y;
+      st.itemDir = item.x > cx ? 1 : 3;
+      st.pegando = 1;
+      xGoing[119] = false;
+      return;
+    }
+
+    // Sem item → vai para posição de espera (corredorY)
+    if (myself.y !== cy && myself.x === cx) {
+      await xDoMove(cx, cy);
+      await xDelay(400);
+      xGoing[119] = false;
+      return;
+    }
+
+    // Na posição de espera → olha para o lado onde os itens caem
+    const blockL = map_index?.[getkey(cx - 1, myself.y)]?.block === 0;
+    const blockR = map_index?.[getkey(cx + 1, myself.y)]?.block === 0;
+    if (blockL && myself.dir !== 3) await xDoChangeDir(3);
+    else if (blockR && myself.dir !== 1) await xDoChangeDir(1);
+  }
+
+  xGoing[119] = false;
+}
+
+// ── Comando /gal ──────────────────────────────────────────────
+
+dsk.setCmd('/gal', () => {
+  dsk.gal.enabled = !dsk.gal.enabled;
+
+  if (dsk.gal.enabled) {
+    dsk.gal.corredorX     = myself.x;
+    dsk.gal.corredorY     = myself.y;
+    dsk.gal.pegando       = 0;
+    dsk.gal.itemX         = undefined;
+    dsk.gal.itemY         = undefined;
+    dsk.gal.itemDir       = undefined;
+    dsk.gal.chickenTarget = null;
+    dsk.gal.waitingInfo   = false;
+    dsk.gal.checandoFood  = false;
+    dsk.gal._dirRetry     = 0;
+    xGoing[119]           = false;
+
+    _galInstallListener();
+    dsk.botActive = true;
+
+    const emoji = dsk.gal.modo === 'pena' ? '🪶' : '🥚';
+    dsk.localMsg(`Gal Bot [${emoji}]: Ativado @ (${dsk.gal.corredorX}, ${dsk.gal.corredorY})`, '#5f5');
+
+    (async function loop() {
+      while (dsk.gal.enabled) {
+        await GalBot();
+        await xDelay(300);
+      }
+      dsk.botActive = false;
+    })();
+
+  } else {
+    xGoing[119]            = false;
+    dsk.gal.pegando        = 0;
+    dsk.gal.itemX          = undefined;
+    dsk.gal.itemY          = undefined;
+    dsk.gal.itemDir        = undefined;
+    dsk.gal.waitingInfo    = false;
+    dsk.gal.checandoFood   = false;
+    _galRemoveListener();
+    dsk.botActive = false;
+    dsk.localMsg('Gal Bot: Desativado', '#f55');
+  }
+});
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  GAL CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let gcPanel = null;
+
+  const gc = {
+    get visible() { return !!gcPanel; },
+    set visible(v) { if (!v && gcPanel) removePanel(); else if (v && !gcPanel) createPanel(); },
+  };
+  dsk.galManager = gc;
+
+  const FASES = [
+    '🔍 Procurando item',
+    '🚶 Indo até o item',
+    '🚪 Abrindo entrada',
+    '🪶🥚 Pegando item',
+    '🍗 Verificando food',
+    '🚪 Abrindo saída',
+    '🏠 Voltando corredor',
+  ];
+
+  // Atualiza botão play e labels em tempo real
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!gcPanel || ++_t % 10 !== 0) return;
+
+    const playBtn = gcPanel.querySelector('[data-gc="playbtn"]');
+    if (playBtn) {
+      const on = !!dsk.gal?.enabled;
+      playBtn.textContent       = on ? '⏹ Stop' : '▶ Play';
+      playBtn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      playBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      playBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    }
+
+    const posEl = gcPanel.querySelector('[data-gc="pos"]');
+    if (posEl) posEl.textContent = `Corredor: (${dsk.gal.corredorX}, ${dsk.gal.corredorY})`;
+
+    const faseEl = gcPanel.querySelector('[data-gc="fase"]');
+    if (faseEl) faseEl.textContent = `Fase: ${FASES[dsk.gal.pegando] ?? '-'}`;
+
+    const modoBtn = gcPanel.querySelector('[data-gc="modobtn"]');
+    if (modoBtn) {
+      const isPena = dsk.gal.modo === 'pena';
+      modoBtn.textContent       = isPena ? '🪶 Pena' : '🥚 Ovo';
+      modoBtn.style.borderColor = isPena ? '#FFD700' : '#a78bfa';
+      modoBtn.style.color       = isPena ? '#FFD700' : '#a78bfa';
+    }
+
+    const infoEl = gcPanel.querySelector('[data-gc="modoinfo"]');
+    if (infoEl) {
+      infoEl.textContent = dsk.gal.modo === 'pena'
+        ? 'Dropa 1 worm se food < 12%'
+        : 'Dropa 2 worms se ≤50%  |  1 worm se ≤70%';
+    }
+  }); }
+
+  function removePanel() {
+    if (gcPanel) { gcPanel.remove(); gcPanel = null; }
+  }
+
+  function createPanel() {
+    if (gcPanel) { removePanel(); return; }
+
+    gcPanel = document.createElement('div');
+    Object.assign(gcPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '250px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🐔 Gal Bot Config';
+    Object.assign(titleEl.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - gcPanel.getBoundingClientRect().left;
+      oy = _xy.y - gcPanel.getBoundingClientRect().top;
+      gcPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); gcPanel.style.left = (_xy.x - ox) + 'px'; gcPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+    // ── Toggle Pena / Ovo ─────────────────────────────────────
+    const modoRow = document.createElement('div');
+    Object.assign(modoRow.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      background: '#2a2a3e', borderRadius: '7px', padding: '8px 10px',
+    });
+    const modoLbl = document.createElement('span');
+    modoLbl.textContent = 'Modo de coleta';
+    Object.assign(modoLbl.style, { color: '#aaa', fontSize: '11px' });
+
+    const modoBtn = document.createElement('button');
+    modoBtn.dataset.gc = 'modobtn';
+    const isPena0 = dsk.gal.modo === 'pena';
+    modoBtn.textContent = isPena0 ? '🪶 Pena' : '🥚 Ovo';
+    Object.assign(modoBtn.style, {
+      padding: '4px 14px', borderRadius: '6px',
+      border: `1px solid ${isPena0 ? '#FFD700' : '#a78bfa'}`,
+      background: '#1a1a2e',
+      color: isPena0 ? '#FFD700' : '#a78bfa',
+      cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+      transition: 'all .15s',
+    });
+    modoBtn.onmouseenter = () => modoBtn.style.background = '#2a2a3e';
+    modoBtn.onmouseleave = () => modoBtn.style.background = '#1a1a2e';
+    modoBtn.onclick = () => {
+      if (dsk.gal.enabled) {
+        dsk.localMsg('Gal Bot: pare o bot antes de trocar o modo!', '#f55');
+        return;
+      }
+      dsk.gal.modo = dsk.gal.modo === 'pena' ? 'ovo' : 'pena';
+    };
+    modoRow.appendChild(modoLbl);
+    modoRow.appendChild(modoBtn);
+    body.appendChild(modoRow);
+
+    // ── Info do modo ──────────────────────────────────────────
+    const infoEl = document.createElement('div');
+    infoEl.dataset.gc = 'modoinfo';
+    infoEl.textContent = dsk.gal.modo === 'pena'
+      ? 'Dropa 1 worm se food < 12%'
+      : 'Dropa 2 worms se ≤50%  |  1 worm se ≤70%';
+    Object.assign(infoEl.style, {
+      color: '#666', fontSize: '10px', textAlign: 'center',
+      fontStyle: 'italic', marginTop: '-2px',
+    });
+    body.appendChild(infoEl);
+
+    // ── Status ao vivo ────────────────────────────────────────
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '4px',
+    });
+
+    const posEl = document.createElement('div');
+    posEl.dataset.gc = 'pos';
+    posEl.textContent = `Corredor: (${dsk.gal.corredorX}, ${dsk.gal.corredorY})`;
+    Object.assign(posEl.style, { color: '#FFD700', fontSize: '11px' });
+
+    const faseEl = document.createElement('div');
+    faseEl.dataset.gc = 'fase';
+    faseEl.textContent = `Fase: ${FASES[dsk.gal.pegando] ?? '-'}`;
+    Object.assign(faseEl.style, { color: '#aaa', fontSize: '10px' });
+
+    statusBox.appendChild(posEl);
+    statusBox.appendChild(faseEl);
+    body.appendChild(statusBox);
+
+    // ── Botão capturar posição ────────────────────────────────
+    const captureBtn = document.createElement('button');
+    captureBtn.textContent = '📍 Capturar Posição Atual';
+    Object.assign(captureBtn.style, {
+      width: '100%', padding: '7px 0', borderRadius: '6px',
+      border: '1px solid #7289DA', background: '#1a1a2e',
+      color: '#7289DA', cursor: 'pointer', fontSize: '11px',
+      fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    captureBtn.onmouseenter = () => captureBtn.style.background = '#2a2a3e';
+    captureBtn.onmouseleave = () => captureBtn.style.background = '#1a1a2e';
+    captureBtn.onclick = () => {
+      dsk.gal.corredorX = myself.x;
+      dsk.gal.corredorY = myself.y;
+      dsk.localMsg(`Gal Bot: corredor capturado @ (${myself.x}, ${myself.y})`, '#0ff');
+    };
+    body.appendChild(captureBtn);
+
+    // ── Divider ───────────────────────────────────────────────
+    const divider = document.createElement('div');
+    Object.assign(divider.style, { borderTop: '1px solid #333' });
+    body.appendChild(divider);
+
+    // ── Botão Play/Stop ───────────────────────────────────────
+    const playBtn = document.createElement('button');
+    playBtn.dataset.gc = 'playbtn';
+
+    function updatePlayBtn() {
+      const on = !!dsk.gal?.enabled;
+      playBtn.textContent       = on ? '⏹ Stop' : '▶ Play';
+      playBtn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      playBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      playBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    }
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '8px 0', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    playBtn.onclick = () => {
+      dsk.commands['/gal']();
+      setTimeout(updatePlayBtn, 150);
+    };
+    updatePlayBtn();
+    body.appendChild(playBtn);
+
+    gcPanel.appendChild(header);
+    gcPanel.appendChild(body);
+    document.body.appendChild(gcPanel);
+  }
+
+  dsk.setCmd('/galconfig', (context) => {
+    if (context) {
+      const parts = context.trim().split(/\s+/);
+      const nx = parseInt(parts[0]);
+      const ny = parseInt(parts[1]);
+      if (!isNaN(nx) && !isNaN(ny)) {
+        dsk.gal.corredorX = nx;
+        dsk.gal.corredorY = ny;
+        dsk.localMsg(`Gal Config: corredor definido para (${nx}, ${ny})`, '#0ff');
+        return;
+      }
+    }
+    gc.visible = !gc.visible;
+  });
+
+  window.gc = gc;
+})();
+
+// ── AUTO RESEAR ──────────────────────────────────────────────
+
+dsk.resear = {
+  enabled: false,
+  slot: 0,
+};
+
+dsk.setCmd('/resear', () => {
+  dsk.resear.enabled = !dsk.resear.enabled;
+  dsk.localMsg(
+    dsk.resear.enabled ? 'AutoResear: Ativado' : 'AutoResear: Desativado',
+    dsk.resear.enabled ? '#5f5' : '#f55'
+  );
+  if (dsk.resear.enabled) dsk.resear.slot = 0;
+});
+
+dsk.resear.loop = async () => {
+  if (!dsk.resear.enabled) return;
+  if (acao.length > 0) return;
+  if (dskPaused || game_state !== 2) return;
+
+  await dsk.wait(300);
+  if (inv[dsk.resear.slot]?.sprite != undefined) {
+    await dsk.wait(150);
+    await xDoUseSlot(dsk.resear.slot);
+    if (xIfChatHas("You've already learned this.")) {
+      xDoClearChat("You've already learned this.");
+    }
+  }
+  dsk.resear.slot = (dsk.resear.slot + 1) % 15;
+};
+
+dsk.on('postLoop', () => { dsk.resear.loop(); });
+
+
+// ── FAZ TINTA ────────────────────────────────────────────────
+
+dsk.tinta = {
+  enabled: false,
+};
+
+dsk.setCmd('/tinta', () => {
+  dsk.tinta.enabled = !dsk.tinta.enabled;
+  dsk.localMsg(
+    dsk.tinta.enabled ? 'FazTinta: Ativado' : 'FazTinta: Desativado',
+    dsk.tinta.enabled ? '#5f5' : '#f55'
+  );
+});
+
+dsk.tinta.loop = async () => {
+  if (!dsk.tinta.enabled) return;
+  if (acao.length > 0) return;
+  if (dskPaused || game_state !== 2) return;
+
+  await xDoDropSlot(0, 1);
+  await dsk.wait(100);
+  await xDoDropSlot(1, 1);
+  await dsk.wait(100);
+  await xDoPickUp();
+  await xDoPickUp();
+  await dsk.wait(50);
+  await xDoUseSlot(0);
+  await dsk.wait(50);
+  await xDoKeyPress(6, 180);
+  await dsk.wait(50);
+};
+
+dsk.on('postLoop', () => { dsk.tinta.loop(); });
+
+
+// ── TELEPORT ─────────────────────────────────────────────────
+
+window.myselfDirValue = () => {
+  if (myself.dir === 0) return -1;
+  else if (myself.dir === 1) return 1;
+  else if (myself.dir === 2) return 1;
+  else return -1;
+};
+
+window.teleport = () => {
+  const num = window.myselfDirValue();
+  const x = myself.dir === 1 || myself.dir === 3 ? num : 0;
+  const y = myself.dir === 0 || myself.dir === 2 ? num : 0;
+  send({
+    type: 'h',
+    x: myself.x + x,
+    y: myself.y + y,
+    d: myself.dir,
+  });
+};
+
+dsk.setCmd('/teleport', () => {
+  window.teleport();
+  dsk.localMsg('Teleport executado!', '#0ff');
+});
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
 
