@@ -19873,6 +19873,7 @@ dsk.setCmd('/gal', () => {
 
 // ── AUTO RESEAR ──────────────────────────────────────────────
 
+// ── MACRO: AutoResear ────────────────────────────────────────
 dsk.resear = {
   enabled: false,
   slot: 0,
@@ -19880,65 +19881,150 @@ dsk.resear = {
 
 dsk.setCmd('/resear', () => {
   dsk.resear.enabled = !dsk.resear.enabled;
-  dsk.localMsg(
-    dsk.resear.enabled ? 'AutoResear: Ativado' : 'AutoResear: Desativado',
-    dsk.resear.enabled ? '#5f5' : '#f55'
-  );
-  if (dsk.resear.enabled) dsk.resear.slot = 0;
-});
 
-dsk.resear.loop = async () => {
-  if (!dsk.resear.enabled) return;
-  if (acao.length > 0) return;
-  if (dskPaused || game_state !== 2) return;
+  if (dsk.resear.enabled) {
+    dsk.localMsg('AutoResear: Ativado', '#5f5');
+    dsk.resear.slot = 0;
 
-  await dsk.wait(300);
-  if (inv[dsk.resear.slot]?.sprite != undefined) {
-    await dsk.wait(150);
-    await xDoUseSlot(dsk.resear.slot);
-    if (xIfChatHas("You've already learned this.")) {
-      xDoClearChat("You've already learned this.");
-    }
+    (async function loop() {
+      while (dsk.resear.enabled) {
+
+        if (acao.length > 0) {
+          await xDelay(100);
+          continue;
+        }
+
+        if (dskPaused || game_state !== 2) {
+          await xDelay(100);
+          continue;
+        }
+
+        await xDelay(300);
+
+        if (inv[dsk.resear.slot]?.sprite != undefined) {
+          await xDelay(150);
+
+          await xDoUseSlot(dsk.resear.slot);
+
+          if (xIfChatHas("You've already learned this.")) {
+            xDoClearChat("You've already learned this.");
+          }
+        }
+
+        dsk.resear.slot = (dsk.resear.slot + 1) % 15;
+
+        await xDelay(100);
+      }
+    })();
+
+  } else {
+    dsk.localMsg('AutoResear: Desativado', '#f55');
   }
-  dsk.resear.slot = (dsk.resear.slot + 1) % 15;
-};
-
-dsk.on('postLoop', () => { dsk.resear.loop(); });
-
+});
 
 // ── FAZ TINTA ────────────────────────────────────────────────
 
-dsk.tinta = {
-  enabled: false,
-};
+dsk.tinta = { enabled: false };
 
 dsk.setCmd('/tinta', () => {
   dsk.tinta.enabled = !dsk.tinta.enabled;
-  dsk.localMsg(
-    dsk.tinta.enabled ? 'FazTinta: Ativado' : 'FazTinta: Desativado',
-    dsk.tinta.enabled ? '#5f5' : '#f55'
-  );
+  
+	if (dsk.tinta.enabled) {
+		dsk.localMsg('Tinta: Ativado', '#5f5');
+		(async function loop() {
+		  while (dsk.tinta.enabled) {
+			await xDelay(100);
+			await xDoDropSlot(0, 1);
+			await xDelay(100);
+			await xDoDropSlot(1, 2);
+			await xDelay(100);
+			await xDoPickUp();
+			await xDoPickUp();
+			await xDelay(50);
+			await xDoUseSlot(0);
+			await xDelay(50);
+			await xDoKeyPress(6, 180);
+			await xDelay(50);
+		  }
+		})();
+	} else {
+	  dsk.localMsg('Tinta: Desativado', '#f55');
+	}
 });
 
-dsk.tinta.loop = async () => {
-  if (!dsk.tinta.enabled) return;
-  if (acao.length > 0) return;
-  if (dskPaused || game_state !== 2) return;
+// ── MACRO: Drop slot 1 (loop) ─────────────────────────────────
+dsk.drop1 = { enabled: false };
 
-  await xDoDropSlot(0, 1);
-  await dsk.wait(100);
-  await xDoDropSlot(1, 1);
-  await dsk.wait(100);
-  await xDoPickUp();
-  await xDoPickUp();
-  await dsk.wait(50);
-  await xDoUseSlot(0);
-  await dsk.wait(50);
-  await xDoKeyPress(6, 180);
-  await dsk.wait(50);
-};
+dsk.setCmd('/drop1', () => {
+  dsk.drop1.enabled = !dsk.drop1.enabled;
 
-dsk.on('postLoop', () => { dsk.tinta.loop(); });
+  if (dsk.drop1.enabled) {
+    dsk.localMsg('Drop1: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.drop1.enabled) {
+        await xDelay(200);
+        await xDoDropSlot(1, 1);
+        await xDelay(100);
+      }
+    })();
+  } else {
+    dsk.localMsg('Drop1: Desativado', '#f55');
+  }
+});
+
+
+// ---- troca de local de habilidades ------
+let hudVertical = false;
+
+function verticalSkills() {
+    for(let i = 0; i < jv.ability.length; i++) {
+        jv.ability[i].x = 520;
+        jv.ability[i].y = 115 + ((jv.ability.length - 1 - i) * 60);
+    }
+}
+
+function horizontalSkills() {
+    for(let i = 0; i < jv.ability.length; i++) {
+        jv.ability[i].x = 520 - (i * 60);
+        jv.ability[i].y = 362;
+    }
+}
+
+// ── MACRO: Alternar HUD de skills ─────────────────────────────
+dsk.hudVertical = false;
+
+dsk.setCmd('/spells', () => {
+    dsk.hudVertical = !dsk.hudVertical;
+
+    if (dsk.hudVertical) {
+        verticalSkills();
+        dsk.localMsg('HUD Vertical: Ativado', '#5f5');
+    } else {
+        horizontalSkills();
+        dsk.localMsg('HUD Horizontal: Ativado', '#55f');
+    }
+});
+
+// ── MACRO: Drop slot 1 + pegar (loop) ────────────────────────
+dsk.droppick = { enabled: false };
+
+dsk.setCmd('/droppick', () => {
+  dsk.droppick.enabled = !dsk.droppick.enabled;
+
+  if (dsk.droppick.enabled) {
+    dsk.localMsg('DropPick: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.droppick.enabled) {
+        await xDelay(200);
+        await xDoDropSlot(1, 1);
+        await xDelay(100);
+        await xDoPickUp();
+      }
+    })();
+  } else {
+    dsk.localMsg('DropPick: Desativado', '#f55');
+  }
+});
 
 
 // ── TELEPORT ─────────────────────────────────────────────────
