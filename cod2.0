@@ -1022,6 +1022,7 @@ dsk.invManager.updateSlots = () => {
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
 
 
+
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
 
@@ -21037,6 +21038,74 @@ dsk.setCmd('/smith', () => {
 
 })();
 
+// OPTIONS
+ui_container.options.set_text("⚙ Menu");
+ui_container.options.title.style.strokeThickness = 1;
+ui_container.options.title.style.fill = 0x01ffe6;
+
+
+let bgOptions = new PIXI.Graphics();
+bgOptions.beginFill(0x87cefa, 0.30);
+bgOptions.drawRoundedRect(0, 0, 60, 32, 6);
+bgOptions.endFill();
+
+ui_container.options.addChildAt(bgOptions, 0);
+
+
+// STATS
+ui_container.stats.set_text("⚔ Stats");
+ui_container.stats.title.style.strokeThickness = 1;
+ui_container.stats.title.style.fill = 0x01ffe6;
+
+jv.stat_dialog.skill.title.style.fill = 0x01ffe6;
+jv.stat_dialog.upgrades.title.style.fill = 0x01ffe6;
+jv.stat_dialog.reincarnate.title.style.fill = 0x01ffe6;
+jv.stat_dialog.pvp.title.style.fill = 0x01ffe6;
+jv.stat_dialog.quest.title.style.fill = 0x01ffe6;
+jv.stat_dialog.appearance.title.style.fill = 0x01ffe6;
+
+
+
+let bgStats = new PIXI.Graphics();
+bgStats.beginFill(0x87cefa, 0.30);
+bgStats.drawRoundedRect(0, 0, 60, 32, 6);
+bgStats.endFill();
+
+ui_container.stats.addChildAt(bgStats, 0);
+
+let old = jv.skill_dialog.do_update;
+
+jv.skill_dialog.do_update = function() {
+    old.apply(this, arguments);
+
+    for (let o = 0; o < jv.skill_dialog.slot.length; o++) {
+        let slot = jv.skill_dialog.slot[o];
+        if (!slot?.stars?.row) continue;
+
+        for (let s = 0; s < slot.stars.row.length; s++) {
+            let star = slot.stars.row[s];
+            if (!star) continue;
+
+            // 🟢 permanente (azul anil)
+            if (star.tint === 43775) {
+                star.tint = 0x01ffe6;
+                star.alpha = 1;
+            }
+
+            // 🟡 completo (neon amarelo forte)
+            else if (star.alpha === 1) {
+                star.tint = 0xffff00;
+                star.alpha = 1;
+            }
+
+            // ⚪ incompleto (mais visível agora)
+            else {
+                star.tint = 0xff00ff;
+                star.alpha = 0.35;
+            }
+        }
+    }
+};
 
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
