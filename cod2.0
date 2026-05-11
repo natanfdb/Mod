@@ -3284,6 +3284,7 @@ window.skillName    = '';
 window.xGoing       = new Array(10).fill(false);
 window.xCurrentTool = undefined;
 window.acao         = [];
+window.skillConfig  = {};  // { skillName: levelAlvo } — ausente = usa currentLevel geral
 
 
 // ── SKILL TRACKER ─────────────────────────────────────────────
@@ -3599,6 +3600,146 @@ dsk.setCmd('/skills', () => {
     body.appendChild(statusBox);
 
 
+    // ── Config por Skill ───────────────────────────────────────
+    const skillSection = document.createElement('div');
+    Object.assign(skillSection.style, {
+      display: 'flex', flexDirection: 'column', gap: '4px',
+    });
+
+    const skillSecHeader = document.createElement('div');
+    skillSecHeader.textContent = '⚙️ Nivel alvo por skill (opcional)';
+    Object.assign(skillSecHeader.style, {
+      color: '#aaa', fontSize: '10px', marginTop: '4px', marginBottom: '2px',
+    });
+    skillSection.appendChild(skillSecHeader);
+
+    // Renderiza linhas das skills configuradas
+    function renderSkillRows() {
+      const old = skillSection.querySelectorAll('.skill-row');
+      old.forEach(r => r.remove());
+
+      const cfg = window.skillConfig || {};
+      Object.keys(cfg).forEach(sk => {
+        skillSection.insertBefore(makeSkillRow(sk, cfg[sk]), addRow);
+      });
+    }
+
+    function makeSkillRow(skillKey, levelVal) {
+      const row = document.createElement('div');
+      row.className = 'skill-row';
+      Object.assign(row.style, {
+        background: '#1e2a1e', border: '1px solid #3a5a3a',
+        borderRadius: '6px', padding: '5px 8px',
+        display: 'flex', alignItems: 'center', gap: '5px',
+      });
+
+      // Label skill (editável)
+      const inpSkill = document.createElement('input');
+      inpSkill.type = 'text';
+      inpSkill.value = skillKey;
+      Object.assign(inpSkill.style, {
+        width: '90px', padding: '2px 5px', borderRadius: '4px',
+        border: '1px solid #555', background: '#111', color: '#FFD700',
+        fontSize: '10px', fontWeight: 'bold',
+      });
+      inpSkill.addEventListener('keydown', e => e.stopPropagation());
+      inpSkill.addEventListener('keyup',   e => e.stopPropagation());
+      inpSkill.addEventListener('mousedown', e => e.stopPropagation());
+      inpSkill.onchange = () => {
+        const oldKey = skillKey;
+        const newKey = inpSkill.value.trim().toLowerCase();
+        if (!newKey || newKey === oldKey) { inpSkill.value = oldKey; return; }
+        const lvl = window.skillConfig[oldKey];
+        delete window.skillConfig[oldKey];
+        window.skillConfig[newKey] = lvl;
+        skillKey = newKey;
+      };
+
+      // Input nivel
+      const inpLvl = document.createElement('input');
+      inpLvl.type = 'number';
+      inpLvl.min = 0; inpLvl.max = 100;
+      inpLvl.value = levelVal || '';
+      Object.assign(inpLvl.style, {
+        width: '56px', padding: '2px 5px', borderRadius: '4px',
+        border: '1px solid #555', background: '#111', color: '#fff',
+        fontSize: '10px',
+      });
+      inpLvl.oninput = () => {
+        const v = parseInt(inpLvl.value);
+        window.skillConfig[skillKey] = isNaN(v) ? 0 : v;
+      };
+
+      // Botão remover
+      const clrBtn = document.createElement('button');
+      clrBtn.textContent = '✕';
+      Object.assign(clrBtn.style, {
+        padding: '1px 6px', borderRadius: '4px', border: '1px solid #555',
+        background: '#1a1a2e', color: '#aaa', cursor: 'pointer', fontSize: '10px',
+        marginLeft: 'auto',
+      });
+      clrBtn.onclick = () => {
+        delete window.skillConfig[skillKey];
+        row.remove();
+      };
+
+      row.appendChild(inpSkill);
+      row.appendChild(inpLvl);
+      row.appendChild(clrBtn);
+      return row;
+    }
+
+    // Linha de adicionar nova skill
+    const addRow = document.createElement('div');
+    Object.assign(addRow.style, {
+      display: 'flex', alignItems: 'center', gap: '5px',
+    });
+    const addInpSkill = document.createElement('input');
+    addInpSkill.type = 'text';
+    addInpSkill.placeholder = 'skill name';
+    Object.assign(addInpSkill.style, {
+      width: '90px', padding: '2px 5px', borderRadius: '4px',
+      border: '1px solid #555', background: '#111', color: '#fff', fontSize: '10px',
+    });
+    addInpSkill.addEventListener('keydown', e => e.stopPropagation());
+    addInpSkill.addEventListener('keyup',   e => e.stopPropagation());
+    addInpSkill.addEventListener('mousedown', e => e.stopPropagation());
+    const addInpLvl = document.createElement('input');
+    addInpLvl.type = 'number';
+    addInpLvl.placeholder = 'lvl';
+    addInpLvl.min = 0; addInpLvl.max = 100;
+    Object.assign(addInpLvl.style, {
+      width: '56px', padding: '2px 5px', borderRadius: '4px',
+      border: '1px solid #555', background: '#111', color: '#fff', fontSize: '10px',
+    });
+    addInpLvl.addEventListener('keydown', e => e.stopPropagation());
+    addInpLvl.addEventListener('keyup',   e => e.stopPropagation());
+    addInpLvl.addEventListener('mousedown', e => e.stopPropagation());
+    const addBtn = document.createElement('button');
+    addBtn.textContent = '+ add';
+    Object.assign(addBtn.style, {
+      padding: '2px 8px', borderRadius: '4px', border: '1px solid #5a5',
+      background: '#1a2e1a', color: '#5f5', cursor: 'pointer', fontSize: '10px',
+    });
+    addBtn.onclick = () => {
+      const sk = addInpSkill.value.trim().toLowerCase();
+      const lv = parseInt(addInpLvl.value);
+      if (!sk || isNaN(lv) || lv <= 0) return;
+      if (!window.skillConfig) window.skillConfig = {};
+      window.skillConfig[sk] = lv;
+      skillSection.insertBefore(makeSkillRow(sk, lv), addRow);
+      addInpSkill.value = '';
+      addInpLvl.value = '';
+    };
+    addRow.appendChild(addInpSkill);
+    addRow.appendChild(addInpLvl);
+    addRow.appendChild(addBtn);
+    skillSection.appendChild(addRow);
+
+    renderSkillRows();
+    body.appendChild(skillSection);
+
+
     // ── Skip Water toggle ─────────────────────────────────────
     const skipRow = document.createElement('div');
     Object.assign(skipRow.style, {
@@ -3782,22 +3923,31 @@ async function Armas() {
   }
 
 
-  if (skillLevel >= currentLevel && currentLevel > 0 && skillName !== 'repairing' && skillName !== 'questing' && !emTroca) {
-    emTroca = true;
-    await xDoKeyUp(6);
-    await xDelay(600);
-    await xDoSwapSlot(1, slotAtual);
-    await xDelay(500);
-    await xDoUseSlot(0);
-    await xDelay(500);
-    skillLevel = 0;
-    await xDelay(500);
-    await xDoKeyUp(6);
-    await xDelay(2000);
-    emTroca = false;
-    slotAtual++;
-    await xDelay(1000);
-    return;
+  {
+    // Nivel alvo: usa config da skill atual se existir, senão usa geral
+    const _lvl = (window.skillConfig?.[skillName] > 0)
+      ? window.skillConfig[skillName]
+      : currentLevel;
+
+    const _notIgnore = skillName !== 'repairing' && skillName !== 'questing';
+
+    if (_lvl > 0 && skillLevel >= _lvl && _notIgnore && !emTroca) {
+      emTroca = true;
+      await xDoKeyUp(6);
+      await xDelay(600);
+      await xDoSwapSlot(1, slotAtual);
+      await xDelay(500);
+      await xDoUseSlot(0);
+      await xDelay(500);
+      skillLevel = 0;
+      await xDelay(500);
+      await xDoKeyUp(6);
+      await xDelay(2000);
+      emTroca = false;
+      slotAtual++;
+      await xDelay(1000);
+      return;
+    }
   }
 
 
@@ -5136,6 +5286,7 @@ dsk.menu.toggleBtn.on_click = () => {
       { label: 'Habilidades',        state: () => !!dsk.ablManager?.enabled,     toggle: () => dsk.commands['/abl']() },
       { label: 'Inventario',         state: () => !!dsk.invManager?.enabled,     toggle: () => dsk.commands['/inv']() },
 	  { label: 'Inv HTML',           state: () => !!document.getElementById('pablo-inv-html'), toggle: () => dsk.commands['/invhtml']() },
+	  { label: 'Gem Skills',  		 state: () => !!document.getElementById('pablo-gem-skills'), toggle: () => dsk.commands['/gemskills']() },
       { label: 'Onlines',            state: () => !!dsk.whoManager?.enabled,     toggle: () => dsk.commands['/on']() },
       { label: 'Tribe List',         state: () => !!dsk.tribeManager?.enabled,   toggle: () => dsk.commands['/tlist']() },
       { label: 'Radar',              state: () => !!dsk.radar?.enabled,          toggle: () => dsk.commands['/radar']() },
@@ -20139,8 +20290,7 @@ dsk.setCmd('/gal', () => {
 })();
 
 
-// ── AUTO RESEAR ──────────────────────────────────────────────
-
+// ── MACRO: AutoResear ────────────────────────────────────────
 dsk.resear = {
   enabled: false,
   slot: 0,
@@ -20148,65 +20298,151 @@ dsk.resear = {
 
 dsk.setCmd('/resear', () => {
   dsk.resear.enabled = !dsk.resear.enabled;
-  dsk.localMsg(
-    dsk.resear.enabled ? 'AutoResear: Ativado' : 'AutoResear: Desativado',
-    dsk.resear.enabled ? '#5f5' : '#f55'
-  );
-  if (dsk.resear.enabled) dsk.resear.slot = 0;
-});
 
-dsk.resear.loop = async () => {
-  if (!dsk.resear.enabled) return;
-  if (acao.length > 0) return;
-  if (dskPaused || game_state !== 2) return;
+  if (dsk.resear.enabled) {
+    dsk.localMsg('AutoResear: Ativado', '#5f5');
+    dsk.resear.slot = 0;
 
-  await dsk.wait(300);
-  if (inv[dsk.resear.slot]?.sprite != undefined) {
-    await dsk.wait(150);
-    await xDoUseSlot(dsk.resear.slot);
-    if (xIfChatHas("You've already learned this.")) {
-      xDoClearChat("You've already learned this.");
-    }
+    (async function loop() {
+      while (dsk.resear.enabled) {
+
+        if (acao.length > 0) {
+          await xDelay(100);
+          continue;
+        }
+
+        if (dskPaused || game_state !== 2) {
+          await xDelay(100);
+          continue;
+        }
+
+        await xDelay(300);
+
+        if (inv[dsk.resear.slot]?.sprite != undefined) {
+          await xDelay(150);
+
+          await xDoUseSlot(dsk.resear.slot);
+
+          if (xIfChatHas("You've already learned this.")) {
+            xDoClearChat("You've already learned this.");
+          }
+        }
+
+        dsk.resear.slot = (dsk.resear.slot + 1) % 15;
+
+        await xDelay(100);
+      }
+    })();
+
+  } else {
+    dsk.localMsg('AutoResear: Desativado', '#f55');
   }
-  dsk.resear.slot = (dsk.resear.slot + 1) % 15;
-};
-
-dsk.on('postLoop', () => { dsk.resear.loop(); });
+});
 
 
 // ── FAZ TINTA ────────────────────────────────────────────────
 
-dsk.tinta = {
-  enabled: false,
-};
+dsk.tinta = { enabled: false };
 
 dsk.setCmd('/tinta', () => {
   dsk.tinta.enabled = !dsk.tinta.enabled;
-  dsk.localMsg(
-    dsk.tinta.enabled ? 'FazTinta: Ativado' : 'FazTinta: Desativado',
-    dsk.tinta.enabled ? '#5f5' : '#f55'
-  );
+  
+	if (dsk.tinta.enabled) {
+		dsk.localMsg('Tinta: Ativado', '#5f5');
+		(async function loop() {
+		  while (dsk.tinta.enabled) {
+			await xDelay(100);
+			await xDoDropSlot(0, 1);
+			await xDelay(100);
+			await xDoDropSlot(1, 2);
+			await xDelay(100);
+			await xDoPickUp();
+			await xDoPickUp();
+			await xDelay(50);
+			await xDoUseSlot(0);
+			await xDelay(50);
+			await xDoKeyPress(6, 180);
+			await xDelay(50);
+		  }
+		})();
+	} else {
+	  dsk.localMsg('Tinta: Desativado', '#f55');
+	}
 });
 
-dsk.tinta.loop = async () => {
-  if (!dsk.tinta.enabled) return;
-  if (acao.length > 0) return;
-  if (dskPaused || game_state !== 2) return;
+// ── MACRO: Drop slot 1 (loop) ─────────────────────────────────
+dsk.drop1 = { enabled: false };
 
-  await xDoDropSlot(0, 1);
-  await dsk.wait(100);
-  await xDoDropSlot(1, 1);
-  await dsk.wait(100);
-  await xDoPickUp();
-  await xDoPickUp();
-  await dsk.wait(50);
-  await xDoUseSlot(0);
-  await dsk.wait(50);
-  await xDoKeyPress(6, 180);
-  await dsk.wait(50);
-};
+dsk.setCmd('/drop1', () => {
+  dsk.drop1.enabled = !dsk.drop1.enabled;
 
-dsk.on('postLoop', () => { dsk.tinta.loop(); });
+  if (dsk.drop1.enabled) {
+    dsk.localMsg('Drop1: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.drop1.enabled) {
+        await xDelay(200);
+        await xDoDropSlot(1, 1);
+        await xDelay(100);
+      }
+    })();
+  } else {
+    dsk.localMsg('Drop1: Desativado', '#f55');
+  }
+});
+
+
+// ---- troca de local de habilidades ------
+let hudVertical = false;
+
+function verticalSkills() {
+    for(let i = 0; i < jv.ability.length; i++) {
+        jv.ability[i].x = 520;
+        jv.ability[i].y = 115 + ((jv.ability.length - 1 - i) * 60);
+    }
+}
+
+function horizontalSkills() {
+    for(let i = 0; i < jv.ability.length; i++) {
+        jv.ability[i].x = 520 - (i * 60);
+        jv.ability[i].y = 362;
+    }
+}
+
+// ── MACRO: Alternar HUD de skills ─────────────────────────────
+dsk.hudVertical = false;
+
+dsk.setCmd('/spells', () => {
+    dsk.hudVertical = !dsk.hudVertical;
+
+    if (dsk.hudVertical) {
+        verticalSkills();
+        dsk.localMsg('HUD Vertical: Ativado', '#5f5');
+    } else {
+        horizontalSkills();
+        dsk.localMsg('HUD Horizontal: Ativado', '#55f');
+    }
+});
+
+// ── MACRO: Drop slot 1 + pegar (loop) ────────────────────────
+dsk.droppick = { enabled: false };
+
+dsk.setCmd('/droppick', () => {
+  dsk.droppick.enabled = !dsk.droppick.enabled;
+
+  if (dsk.droppick.enabled) {
+    dsk.localMsg('DropPick: Ativado', '#5f5');
+    (async function loop() {
+      while (dsk.droppick.enabled) {
+        await xDelay(200);
+        await xDoDropSlot(1, 1);
+        await xDelay(100);
+        await xDoPickUp();
+      }
+    })();
+  } else {
+    dsk.localMsg('DropPick: Desativado', '#f55');
+  }
+});
 
 
 // ── TELEPORT ─────────────────────────────────────────────────
@@ -21106,6 +21342,405 @@ jv.skill_dialog.do_update = function() {
         }
     }
 };
+
+// ══════════════════════════════════════════════════════════════
+// 💎  GEM SKILLS PANEL  ─  by Pablo Mod
+// Mostra as 37 skills com nome, gemas necessárias e sprites
+// Cole este bloco no fim do modpablo.js
+// Comando: /gemskills
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let gsPanel = null;
+
+  // ── Dados das 37 skills ──────────────────────────────────────
+  const GEM_SKILLS = [
+    { skill: 'Archery',      gems: ['Citrine',    'Garnet',    'Peridot'   ] },
+    { skill: 'Assassin',     gems: ['Citrine',    'Garnet',    'Topaz'     ] },
+    { skill: 'Axe',          gems: ['Amethyst',   'Citrine',   'Quartz'    ] },
+    { skill: 'Chopping',     gems: ['Garnet',     'Quartz',    'Sapphire'  ] },
+    { skill: 'Clubbing',     gems: ['Garnet',     'Quartz',    'Topaz'     ] },
+    { skill: 'Construction', gems: ['Aquamarine', 'Quartz',    'Sapphire'  ] },
+    { skill: 'Cooking',      gems: ['Amethyst',   'Peridot',   'Sapphire'  ] },
+    { skill: 'Crafting',     gems: ['Quartz',     'Sapphire',  'Topaz'     ] },
+    { skill: 'Dagger',       gems: ['Citrine',    'Sapphire',  'Topaz'     ] },
+    { skill: 'Destruction',  gems: ['Citrine',    'Garnet',    'Quartz'    ] },
+    { skill: 'Digging',      gems: ['Amethyst',   'Aquamarine','Quartz'    ] },
+    { skill: 'Exploration',  gems: ['Amethyst',   'Aquamarine','Garnet'    ] },
+    { skill: 'Farming',      gems: ['Amethyst',   'Aquamarine','Peridot'   ] },
+    { skill: 'Fishing',      gems: ['Aquamarine', 'Garnet',    'Sapphire'  ] },
+    { skill: 'Foraging',     gems: ['Amethyst',   'Sapphire',  'Topaz'     ] },
+    { skill: 'Hammer',       gems: ['Aquamarine', 'Citrine',   'Garnet'    ] },
+    { skill: 'Healing',      gems: ['Amethyst',   'Quartz',    'Topaz'     ] },
+    { skill: 'Heavy Armor',  gems: ['Aquamarine', 'Peridot',   'Topaz'     ] },
+    { skill: 'Hunting',      gems: ['Amethyst',   'Garnet',    'Topaz'     ] },
+    { skill: 'Knitting',     gems: ['Citrine',    'Peridot',   'Sapphire'  ] },
+    { skill: 'Light Armor',  gems: ['Aquamarine', 'Citrine',   'Peridot'   ] },
+    { skill: 'Logic',        gems: ['Amethyst',   'Aquamarine','Citrine'   ] },
+    { skill: 'Medium Armor', gems: ['Aquamarine', 'Garnet',    'Peridot'   ] },
+    { skill: 'Mining',       gems: ['Citrine',    'Quartz',    'Sapphire'  ] },
+    { skill: 'Pickaxe',      gems: ['Citrine',    'Quartz',    'Topaz'     ] },
+    { skill: 'Questing',     gems: ['Amethyst',   'Quartz',    'Sapphire'  ] },
+    { skill: 'Repairing',    gems: ['Peridot',    'Quartz',    'Sapphire'  ] },
+    { skill: 'Research',     gems: ['Amethyst',   'Aquamarine','Sapphire'  ] },
+    { skill: 'Shield Block', gems: ['Aquamarine', 'Peridot',   'Sapphire'  ] },
+    { skill: 'Smelting',     gems: ['Peridot',    'Sapphire',  'Topaz'     ] },
+    { skill: 'Smithing',     gems: ['Garnet',     'Peridot',   'Quartz'    ] },
+    { skill: 'Spear',        gems: ['Amethyst',   'Citrine',   'Garnet'    ] },
+    { skill: 'Sword',        gems: ['Garnet',     'Sapphire',  'Topaz'     ] },
+    { skill: 'Tilling',      gems: ['Amethyst',   'Garnet',    'Quartz'    ] },
+    { skill: 'Whip',         gems: ['Citrine',    'Sapphire',  'Garnet'    ] },
+    { skill: 'Unarmed',      gems: ['Citrine',    'Peridot',   'Topaz'     ] },
+    { skill: 'Unarmored',    gems: ['Amethyst',   'Aquamarine','Topaz'     ] },
+  ];
+
+  // ── Cores por gema ───────────────────────────────────────────
+  const GEM_STYLE = {
+    'Amethyst':   { color: '#b066ff', bg: '#1e0a30' },
+    'Aquamarine': { color: '#00e5cc', bg: '#00201c' },
+    'Citrine':    { color: '#ffe066', bg: '#1e1a00' },
+    'Garnet':     { color: '#ff4444', bg: '#200808' },
+    'Peridot':    { color: '#66ff88', bg: '#00200c' },
+    'Quartz':     { color: '#c8d8e8', bg: '#141c24' },
+    'Sapphire':   { color: '#4488ff', bg: '#081228' },
+    'Topaz':      { color: '#ff9944', bg: '#201000' },
+  };
+
+  // ── Sprite IDs fixos das gemas (não dependem do inventário) ──
+  const GEM_SPR_IDS = {
+    'Amethyst':   764,
+    'Aquamarine': 762,
+    'Citrine':    760,
+    'Garnet':     765,
+    'Peridot':    766,
+    'Quartz':     757,
+    'Sapphire':   763,
+    'Topaz':      759,
+  };
+
+  // ── Extrai canvas da sprite via WebGL readPixels ──────────────
+  const _sprCache = {};
+
+  function getSprCanvas(spr) {
+    if (!spr || spr <= 0) return null;
+    if (_sprCache[spr]) return _sprCache[spr];
+    try {
+      const tex   = dsk.textureById(spr);
+      if (!tex) return null;
+      const glTex = tex.baseTexture._glTextures[0];
+      if (!glTex) return null;
+      const gl    = glTex.gl;
+      const f     = tex.frame;
+      const fb    = gl.createFramebuffer();
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fb);
+      gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, glTex.texture, 0);
+      const pixels = new Uint8Array(f.width * f.height * 4);
+      gl.readPixels(f.x, f.y, f.width, f.height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.deleteFramebuffer(fb);
+      const cv  = document.createElement('canvas');
+      cv.width  = f.width; cv.height = f.height;
+      const ctx = cv.getContext('2d');
+      const img = ctx.createImageData(f.width, f.height);
+      for (let i = 0; i < pixels.length; i++) img.data[i] = pixels[i];
+      ctx.putImageData(img, 0, 0);
+      _sprCache[spr] = cv;
+      return cv;
+    } catch (e) { return null; }
+  }
+
+  // ── Badge visual de uma gema ─────────────────────────────────
+  function makeGemBadge(gemName) {
+    const gs  = GEM_STYLE[gemName] || { color: '#aaa', bg: '#111' };
+    const img = getSprCanvas(GEM_SPR_IDS[gemName]);
+
+    const wrap = document.createElement('div');
+    Object.assign(wrap.style, {
+      display: 'flex', flexDirection: 'column',
+      alignItems: 'center', gap: '2px',
+    });
+
+    const cv = document.createElement('canvas');
+    cv.width = 22; cv.height = 22;
+    Object.assign(cv.style, {
+      imageRendering: 'pixelated',
+      borderRadius: '3px',
+      border: `1px solid ${gs.color}55`,
+      display: 'block',
+    });
+
+    const ctx = cv.getContext('2d');
+    if (img) {
+      ctx.drawImage(img, 0, 0, 22, 22);
+    } else {
+      // Fallback: gem shape colorida
+      ctx.fillStyle = gs.bg;
+      ctx.fillRect(0, 0, 22, 22);
+      ctx.fillStyle = gs.color;
+      ctx.beginPath();
+      ctx.moveTo(11, 2);
+      ctx.lineTo(20, 8);
+      ctx.lineTo(20, 14);
+      ctx.lineTo(11, 20);
+      ctx.lineTo(2, 14);
+      ctx.lineTo(2, 8);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = 'rgba(255,255,255,0.35)';
+      ctx.beginPath();
+      ctx.moveTo(11, 2);
+      ctx.lineTo(20, 8);
+      ctx.lineTo(11, 11);
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    const lbl = document.createElement('div');
+    lbl.textContent = gemName.slice(0, 3).toUpperCase();
+    Object.assign(lbl.style, {
+      color: gs.color, fontSize: '7px',
+      fontFamily: 'Verdana', lineHeight: '1',
+      textAlign: 'center', letterSpacing: '0.3px',
+    });
+
+    wrap.appendChild(cv);
+    wrap.appendChild(lbl);
+    return wrap;
+  }
+
+  // ── Estado dos filtros ────────────────────────────────────────
+  let filterText    = '';
+  let filterGem     = 'All';
+  let listContainer = null;
+
+  function renderList() {
+    if (!listContainer) return;
+    listContainer.innerHTML = '';
+
+    const ft = filterText.toLowerCase();
+    const fg = filterGem;
+
+    const filtered = GEM_SKILLS.filter(row => {
+      if (ft && !row.skill.toLowerCase().includes(ft) && !row.gems.some(g => g.toLowerCase().includes(ft))) return false;
+      if (fg !== 'All' && !row.gems.includes(fg)) return false;
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      const empty = document.createElement('div');
+      empty.textContent = 'Nenhuma skill encontrada.';
+      Object.assign(empty.style, { color:'#555', fontSize:'11px', textAlign:'center', padding:'16px 0', fontStyle:'italic' });
+      listContainer.appendChild(empty);
+      return;
+    }
+
+    filtered.forEach(row => {
+      const card = document.createElement('div');
+      Object.assign(card.style, {
+        display: 'flex', alignItems: 'center', gap: '8px',
+        padding: '5px 8px', borderRadius: '6px',
+        background: '#0e0e1c', border: '1px solid #1a1a30',
+        transition: 'border-color .12s, background .12s',
+      });
+      card.onmouseenter = () => { card.style.borderColor = '#FFD70044'; card.style.background = '#12121e'; };
+      card.onmouseleave = () => { card.style.borderColor = '#1a1a30';   card.style.background = '#0e0e1c'; };
+
+      const name = document.createElement('div');
+      name.textContent = row.skill;
+      Object.assign(name.style, {
+        color: '#e0d8ff', fontSize: '10px', fontFamily: 'Verdana',
+        minWidth: '82px', maxWidth: '82px', fontWeight: 'bold',
+        overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+      });
+
+      const sep = document.createElement('div');
+      Object.assign(sep.style, { width: '1px', background: '#1e1e38', alignSelf: 'stretch' });
+
+      const gems = document.createElement('div');
+      Object.assign(gems.style, { display: 'flex', gap: '5px', alignItems: 'center', flex: '1' });
+      row.gems.forEach((gem, i) => {
+        if (i > 0) {
+          const dot = document.createElement('span');
+          dot.textContent = '·';
+          Object.assign(dot.style, { color: '#2a2a4a', fontSize: '12px', lineHeight: '1' });
+          gems.appendChild(dot);
+        }
+        gems.appendChild(makeGemBadge(gem));
+      });
+
+      card.appendChild(name);
+      card.appendChild(sep);
+      card.appendChild(gems);
+      listContainer.appendChild(card);
+    });
+  }
+
+  // ── Cria o painel ────────────────────────────────────────────
+  function createPanel() {
+    if (gsPanel) { removePanel(); return; }
+
+    filterText = '';
+    filterGem  = 'All';
+
+    gsPanel = document.createElement('div');
+    gsPanel.id = 'pablo-gem-skills';
+    Object.assign(gsPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '360px',
+      background: 'linear-gradient(160deg,#0e0e1c 0%,#0a0a18 100%)',
+      border: '1px solid #2a2a4a',
+      borderRadius: '12px',
+      boxShadow: '0 16px 48px rgba(0,0,0,0.9), 0 0 0 1px #FFD70011',
+      zIndex: '99998', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      display: 'flex', flexDirection: 'column',
+    });
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '10px 14px',
+      background: 'linear-gradient(90deg,#141428,#1c1c38)',
+      borderRadius: '12px 12px 0 0', cursor: 'move',
+      borderBottom: '1px solid #2a2a4a',
+    });
+
+    const hLeft = document.createElement('div');
+    Object.assign(hLeft.style, { display: 'flex', alignItems: 'center', gap: '8px' });
+
+    const hIcon = document.createElement('span');
+    hIcon.textContent = '💎'; hIcon.style.fontSize = '16px';
+    const hTitle = document.createElement('span');
+    hTitle.textContent = 'Gem Skills';
+    Object.assign(hTitle.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px', letterSpacing: '.5px' });
+    const countBadge = document.createElement('span');
+    countBadge.id = 'gs-count-badge';
+    countBadge.textContent = '37';
+    Object.assign(countBadge.style, {
+      background: '#FFD70022', color: '#FFD700', fontSize: '9px',
+      padding: '2px 7px', borderRadius: '10px', border: '1px solid #FFD70033', fontWeight: 'bold',
+    });
+    hLeft.appendChild(hIcon); hLeft.appendChild(hTitle); hLeft.appendChild(countBadge);
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: '1px solid #333', color: '#666',
+      cursor: 'pointer', fontSize: '12px', padding: '2px 8px', borderRadius: '4px',
+    });
+    closeBtn.onmouseenter = () => { closeBtn.style.borderColor='#f55'; closeBtn.style.color='#f55'; };
+    closeBtn.onmouseleave = () => { closeBtn.style.borderColor='#333'; closeBtn.style.color='#666'; };
+    closeBtn.onclick = removePanel;
+    header.appendChild(hLeft); header.appendChild(closeBtn);
+
+    // Drag
+    let dg = false, ox = 0, oy = 0;
+    const xy = e => e.touches ? { x:e.touches[0].clientX, y:e.touches[0].clientY } : { x:e.clientX, y:e.clientY };
+    header.addEventListener('mousedown', e => { if (e.target===closeBtn) return; dg=true; gsPanel.style.transform='none'; const r=gsPanel.getBoundingClientRect(); ox=xy(e).x-r.left; oy=xy(e).y-r.top; });
+    header.addEventListener('touchstart', e => { e.preventDefault(); dg=true; gsPanel.style.transform='none'; const r=gsPanel.getBoundingClientRect(); ox=xy(e).x-r.left; oy=xy(e).y-r.top; }, { passive:false });
+    window.addEventListener('mousemove', e => { if(dg){ gsPanel.style.left=(xy(e).x-ox)+'px'; gsPanel.style.top=(xy(e).y-oy)+'px'; } });
+    window.addEventListener('touchmove', e => { if(dg){ gsPanel.style.left=(xy(e).x-ox)+'px'; gsPanel.style.top=(xy(e).y-oy)+'px'; } }, { passive:false });
+    window.addEventListener('mouseup', ()=>{ dg=false; });
+    window.addEventListener('touchend', ()=>{ dg=false; });
+
+    // Filtros
+    const filterBox = document.createElement('div');
+    Object.assign(filterBox.style, {
+      padding: '8px 10px', display: 'flex', flexDirection: 'column', gap: '6px',
+      borderBottom: '1px solid #141428',
+    });
+
+    const searchEl = document.createElement('input');
+    searchEl.placeholder = '🔍 Buscar skill ou gema...';
+    Object.assign(searchEl.style, {
+      width: '100%', boxSizing: 'border-box',
+      padding: '6px 10px', borderRadius: '8px',
+      border: '1px solid #1e1e38', background: '#0a0a16',
+      color: '#ddd', fontSize: '11px', outline: 'none',
+    });
+    searchEl.onfocus = () => searchEl.style.borderColor = '#FFD70066';
+    searchEl.onblur  = () => searchEl.style.borderColor = '#1e1e38';
+    searchEl.oninput = () => { filterText = searchEl.value; _updateCount(); renderList(); };
+    filterBox.appendChild(searchEl);
+
+    const ALL_GEMS = ['All','Amethyst','Aquamarine','Citrine','Garnet','Peridot','Quartz','Sapphire','Topaz'];
+    const pillRow = document.createElement('div');
+    Object.assign(pillRow.style, { display:'flex', flexWrap:'wrap', gap:'3px' });
+    const pills = {};
+
+    function activatePill(gem) {
+      filterGem = gem;
+      ALL_GEMS.forEach(g => {
+        const p   = pills[g];
+        const pgs = GEM_STYLE[g] || { color:'#FFD700', bg:'#1a1a10' };
+        const on  = filterGem === g;
+        p.style.background  = on ? (pgs.bg  || '#1a1a10') : 'transparent';
+        p.style.borderColor = on ? (pgs.color|| '#FFD700') : '#1e1e38';
+        p.style.color       = on ? (pgs.color|| '#FFD700') : '#444';
+        p.style.fontWeight  = on ? 'bold' : 'normal';
+      });
+      _updateCount();
+      renderList();
+    }
+
+    ALL_GEMS.forEach(gem => {
+      const pill = document.createElement('button');
+      pill.textContent = gem === 'All' ? 'All' : gem.slice(0,3);
+      const pgs = GEM_STYLE[gem] || { color:'#FFD700' };
+      Object.assign(pill.style, {
+        padding: '2px 7px', borderRadius: '10px',
+        border: '1px solid #1e1e38', background: 'transparent',
+        color: '#444', cursor: 'pointer', fontSize: '9px',
+        fontFamily: 'Verdana', transition: 'all .12s',
+      });
+      pill.onmouseenter = () => { if (filterGem!==gem) { pill.style.borderColor=pgs.color||'#FFD700'; pill.style.color=pgs.color||'#FFD700'; } };
+      pill.onmouseleave = () => { if (filterGem!==gem) { pill.style.borderColor='#1e1e38'; pill.style.color='#444'; } };
+      pill.onclick = () => activatePill(gem);
+      pills[gem] = pill;
+      pillRow.appendChild(pill);
+    });
+    activatePill('All');
+    filterBox.appendChild(pillRow);
+
+    listContainer = document.createElement('div');
+    Object.assign(listContainer.style, {
+      overflowY: 'auto', maxHeight: '400px',
+      display: 'flex', flexDirection: 'column', gap: '2px',
+      padding: '8px 10px',
+    });
+    listContainer.style.cssText += 'scrollbar-width:thin;scrollbar-color:#1e1e38 transparent;';
+
+    gsPanel.appendChild(header);
+    gsPanel.appendChild(filterBox);
+    gsPanel.appendChild(listContainer);
+    document.body.appendChild(gsPanel);
+    renderList();
+  }
+
+  function _updateCount() {
+    const badge = document.getElementById('gs-count-badge');
+    if (!badge) return;
+    const ft = filterText.toLowerCase();
+    const fg = filterGem;
+    const n  = GEM_SKILLS.filter(r => {
+      if (ft && !r.skill.toLowerCase().includes(ft) && !r.gems.some(g=>g.toLowerCase().includes(ft))) return false;
+      if (fg !== 'All' && !r.gems.includes(fg)) return false;
+      return true;
+    }).length;
+    badge.textContent = n;
+  }
+
+  function removePanel() {
+    if (gsPanel) { gsPanel.remove(); gsPanel = null; listContainer = null; }
+  }
+
+  dsk.setCmd('/gemskills', () => {
+    if (gsPanel) { removePanel(); dsk.localMsg('Gem Skills: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Gem Skills: Aberto',  '#5f5'); }
+  });
+
+})();
 
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
