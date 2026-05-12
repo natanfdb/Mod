@@ -4684,10 +4684,9 @@ async function xLookDown() {
 
 
 async function Armas() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   
-  // ← 687 precisa ser checado ANTES do lock
   if (inv[0]?.sprite === 687) {
     dsk.armas.enabled = false;
     xGoing[0] = false;
@@ -4696,46 +4695,34 @@ async function Armas() {
     return;
   }
 
-
-  {
-    // Nivel alvo: usa config da skill atual se existir, senão usa geral
-    const _lvl = (window.skillConfig?.[skillName] > 0)
-      ? window.skillConfig[skillName]
-      : currentLevel;
-
-    const _notIgnore = skillName !== 'repairing' && skillName !== 'questing';
-
-    if (_lvl > 0 && skillLevel >= _lvl && _notIgnore && !emTroca) {
-      emTroca = true;
-      await xDoKeyUp(6);
-      await xDelay(600);
-      await xDoSwapSlot(1, slotAtual);
-      await xDelay(500);
-      await xDoUseSlot(0);
-      await xDelay(500);
-      skillLevel = 0;
-      await xDelay(500);
-      await xDoKeyUp(6);
-      await xDelay(2000);
-      emTroca = false;
-      slotAtual++;
-      await xDelay(1000);
-      return;
-    }
+  if (skillLevel >= currentLevel && currentLevel > 0 && skillName !== 'repairing' && skillName !== 'questing' && !emTroca) {
+    emTroca = true;
+    await xDoKeyUp(6);
+    await xDelay(600);
+    await xDoSwapSlot(1, slotAtual);
+    await xDelay(500);
+    await xDoUseSlot(0);
+    await xDelay(500);
+    skillLevel = 0;
+    await xDelay(500);
+    await xDoKeyUp(6);
+    await xDelay(2000);
+    emTroca = false;
+    slotAtual++;
+    await xDelay(1000);
+    return;
   }
-
 
   if (xIfChatHas("Disconnected (Packet Spamming)")) {
     await xDelay(500);
     keySpace.isDown = false;
-        xGoing[0] = false;
+    xGoing[0] = false;
     await xDoClearChat("Disconnected (Packet Spamming)");
     await xDelay(500);
     await xDoKeyUp(6);
     await xDelay(500);
     return;
   }
-
 
   if (xIfChatHas("Welcome back ")) {
     await xDelay(800);
@@ -4745,21 +4732,16 @@ async function Armas() {
     await xDelay(500);
   }
 
-
   if (xGoing[0] === true) return;
   xGoing[0] = true;
 
-
   if (inv[0].sprite === 719) {
-    // ── COM REPAIR KIT ──────────────────────────────
-
 
     if (inv[0].equip === 2) {
 
-
       if (dsk.armas.repairingTarget === 'dummy') {
-                await xDoKeyUp(6);
-            await xDelay(630);
+        await xDoKeyUp(6);
+        await xDelay(630);
         await xDoMove(myself.x - 1, myself.y);
         await xDelay(820);
         await xDoDropSlot(1, 1);
@@ -4774,164 +4756,129 @@ async function Armas() {
         await xDelay(805);
         await xDoChangeDir(0);
         await xDelay(604);
-                await xDoKeyUp(6);
-
+        await xDoKeyUp(6);
 
       } else {
-                await xDoKeyUp(6);
-            await xDelay(630);
-        await xDoMove(myself.x - 2, myself.y);
-        await xDelay(1205);
-        await xDoDropSlot(1, 1);
+        await xDoKeyUp(6);
+        await xDelay(630);
+        await xDoMove(myself.x + 1, myself.y);  // anda 1 direita
+        await xDelay(820);
+        await xDoDropSlot(1, 1);                // dropa kit quebrado
         await xDelay(620);
-        await xDoMove(myself.x + 2, myself.y);
-        await xDelay(1210);
-        await xDoPickUp();
+        await xDoMove(myself.x - 1, myself.y);  // volta 1 esquerda
+        await xDelay(820);
+        await xDoPickUp();                      // pega kit novo
         await xDelay(503);
-        await xDoUseSlot(0);
+        await xDoUseSlot(0);                    // equipa
         await xDelay(502);
         await xDoChangeDir(3);
         await xDelay(506);
-                await xDoKeyUp(6);
+        await xDoKeyUp(6);
       }
-
 
       dsk.armas.repairingTarget = null;
       xGoing[0] = false;
       return;
     }
-        await xDelay(567);
-        await xDoKeyPress(6, 189);
 
+    await xDelay(567);
+    await xDoKeyPress(6, 189);
 
     if (xIfChatHas("is in perfect condition")) {
       xDoClearChat("is in perfect condition");
       dsk.armas.repairing = false;
-          dsk.armas.repairingTarget = 'dummy'; // ← novo
+      dsk.armas.repairingTarget = 'dummy';
 
-
-      // Volta pra x → vira pra cima
-          await xDelay(630);
+      await xDelay(630);
       await xDoMove(myself.x - 1, myself.y);
       await xDelay(608);
       await xDoChangeDir(0);
       await xDelay(612);
 
-
-      // Repara Dummy N — 1 toque para revelar HP, depois repara enquanto < 90%
       await xDoKeyPress(6, 185); await xDelay(560);
       while (xGetWallHp(myself.x, myself.y - 1) < 90 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
         await xDoKeyPress(6, 184);
         await xDelay(561);
       }
 
-
-      // Vai pra x+1 → dropa kit
-          await xDelay(630);
+      await xDelay(630);
       await xDoMove(myself.x + 1, myself.y);
       await xDelay(560);
       await xDoDropSlot(1, 1);
       await xDelay(652);
 
-
-      // Volta pra x → pega arma → equipa → vira pra cima
-          await xDelay(630);
+      await xDelay(630);
       await xDoMove(myself.x - 1, myself.y);
       await xDelay(560);
       await xDoPickUp();
       await xDelay(530);
       await xDoUseSlot(0);
       await xDelay(540);
-      await xDoChangeDir(0); 
-          await xDelay(510);
-
+      await xDoChangeDir(0);
+      await xDelay(510);
 
     } else if (dsk.armas.repairing) {
-      // Aguardando "is in perfect condition"
       xGoing[0] = false;
       return;
     }
 
-
   } else {
-    // ── COM ARMA ──────────────────────────────────
 
-
-    // Equipa slot 0 se desequipado
     if (inv[0].equip === 0) {
       await xDoUseSlot(0);
       await xDelay(610);
     }
 
-
-    // Dummy com HP baixo → inicia reparo do dummy
     if (xGetWallHp(myself.x, myself.y - 1) <= 20 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
       dsk.armas.repairing = true;
-          await xDelay(545);
-          await xDoKeyUp(6);
-          await xDelay(567);
+      await xDelay(545);
+      await xDoKeyUp(6);
+      await xDelay(567);
       await xDoDropSlot(1, 1);
-          await xDelay(630);
-
+      await xDelay(630);
 
       await xDoMove(myself.x + 1, myself.y);
       await xDelay(632);
       await xDoPickUp();
       await xDelay(610);
 
-
       await xDoChangeDir(3);
       await xDelay(610);
       await xDoUseSlot(0);
       await xDelay(630);
 
-
       xGoing[0] = false;
       return;
     }
 
-
-    // Arma gasta (equip == 2) — inicia sequência de reparo da arma
     if (inv[0].equip === 2) {
       dsk.armas.repairing = true;
-      dsk.armas.repairingTarget = 'arma'; // ← novo
+      dsk.armas.repairingTarget = 'arma';
 
-
-      // Dropa arma em x
-          await xDoKeyUp(6);
-          await xDelay(649);
+      await xDoKeyUp(6);
+      await xDelay(649);
       await xDoDropSlot(1, 1);
       await xDelay(630);
 
-
-      // Vai pra x+1 → pega kit
-          await xDelay(630);
       await xDoMove(myself.x + 1, myself.y);
       await xDelay(633);
       await xDoPickUp();
       await xDelay(540);
 
-
-      // Vira pra esquerda → equipa kit
-      await xDelay(620);
       await xDoChangeDir(3);
       await xDelay(610);
       await xDoUseSlot(0);
       await xDelay(610);
 
-
       xGoing[0] = false;
       return;
     }
 
-
-    // Ataca se parado e com arma equipada
     if (!keySpace.isDown && inv[0].sprite !== undefined && inv[0].equip === 1) {
       await xDoKeyDown(6);
       await xDelay(832);
     }
   }
-
 
   xGoing[0] = false;
 }
@@ -5512,9 +5459,9 @@ async function smelt() {
   }
   await xDelay(250);
   await xDoKeyPress(6, 100);
-  await xDelay(500);
+  await xDelay(550);
   await xDoDropByID(1, 694);
-  await xDelay(480);
+  await xDelay(550);
   await xDropAvailable(1, ORE_IDS);
   await xDelay(400);
   await xDoPickUp();
@@ -5535,9 +5482,9 @@ async function smelt() {
   }
   await xDelay(250);
   await xDoKeyPress(6, 100);
-  await xDelay(500);
+  await xDelay(550);
   await xDoDropByID(1, 694);
-  await xDelay(480);
+  await xDelay(550);
   await xDropAvailable(1, ORE_IDS);
   await xDelay(400);
   await xDoPickUp();
@@ -10939,11 +10886,15 @@ async function xGetShiny() {
     if (!obj || obj.can_pickup !== 0 || obj.name !== 'Shiny Rock') continue;
     const _k = obj.x + ',' + obj.y;
     if (_ssdBlacklist[_k] && now < _ssdBlacklist[_k]) continue;
+    // Checa também blacklist do WC Mining
+    if (window._wcmBlacklist && _wcmBlacklist[_k] && now < _wcmBlacklist[_k]) continue;
     const dist = xGetDistance(obj.x, obj.y, myself.x, myself.y);
     if (dist > 20) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
-    if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
+    // Não checa player se já está minerando esta pedra (evita sair durante mineração)
+    const _isCurTarget170 = window._ssdCurrentTarget && window._ssdCurrentTarget.x === obj.x && window._ssdCurrentTarget.y === obj.y;
+    if (!_isCurTarget170 && xGetPlayerByPosList(exList, wyList) !== undefined) continue;
     // Checa lado livre: sem sólido E sem tile de água (771→325)
     const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]) && xGetTileByPos(x, wyList[s]) !== 325);
     if (!hasFreeSide) continue;
@@ -10987,7 +10938,9 @@ async function xGetSSDStone() {
     if (dist > 20) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
-    if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
+    // Não checa player se já está minerando esta pedra (evita sair durante mineração)
+    const _isCurTarget172 = window._ssdCurrentTarget && window._ssdCurrentTarget.x === obj.x && window._ssdCurrentTarget.y === obj.y;
+    if (!_isCurTarget172 && xGetPlayerByPosList(exList, wyList) !== undefined) continue;
     // Checa lado livre: sem sólido E sem tile de água (771→325)
     const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]) && xGetTileByPos(x, wyList[s]) !== 325);
     if (!hasFreeSide) continue;
@@ -11015,16 +10968,37 @@ async function xGetChest() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   xTemp[171] = undefined;
+  if (!window._ssdReachCache) window._ssdReachCache = {};
+  if (!window._ssdBlacklist)  window._ssdBlacklist  = {};
+  if (!window._chestBlacklist) window._chestBlacklist = {};
+  const now = Date.now();
+  // Limpa entradas expiradas do chest blacklist
+  Object.keys(_chestBlacklist).forEach(k => { if (_chestBlacklist[k] < now) delete _chestBlacklist[k]; });
   const chestNames = ['Odd Chest', 'Treasure Chest'];
   for (let i in objects.items) {
     const obj = objects.items[i];
     if (!obj || obj.can_pickup !== 0 || !chestNames.includes(obj.name)) continue;
+    const _k = obj.x + ',' + obj.y;
+    // Ignora chest blacklistado (inacessível)
+    if (_chestBlacklist[_k] && now < _chestBlacklist[_k]) continue;
     const exList = [obj.x + 1, obj.x - 1, obj.x,     obj.x    ];
     const wyList = [obj.y,     obj.y,     obj.y + 1, obj.y - 1];
     if (xGetPlayerByPosList(exList, wyList) !== undefined) continue;
-    // Checagem leve: pelo menos um lado adjacente livre
-    const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]));
+    // Checa lado livre: sem sólido
+    const hasFreeSide = exList.some((x, s) => !xGetSolidByID(x, wyList[s]) && xGetTileByPos(x, wyList[s]) !== 325);
     if (!hasFreeSide) continue;
+    // Checa cache de alcançabilidade
+    const cached = _ssdReachCache[_k];
+    if (cached && now < cached.until) continue;
+    let canReach = false;
+    for (let s = 0; s < exList.length; s++) {
+      await xGetCanMove(exList[s], wyList[s]);
+      if (xCanMov) { canReach = true; break; }
+    }
+    if (!canReach) {
+      _ssdReachCache[_k] = { until: now + 120000 };
+      continue;
+    }
     if (!xTemp[171] ||
         xGetDistance(obj.x, obj.y, myself.x, myself.y) <
         xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y)) {
@@ -11133,23 +11107,29 @@ dsk.setCmd('/ssd', () => {
     }
 
 
-    // ── Reset completo ao ligar ──────────────────────────────
+    // ── Reset parcial ao ligar (waypoints preservados para retomar) ──
     window._ssdReachCache = {}; // limpa cache de alcançabilidade
     window._ssdBlacklist = {};   // limpa blacklist de pedras inacessíveis
     xGoing[110] = false;
     xMovingNow = false;
     xNeedsRep = false;
     RepTimer = 0;
-        xTemp[13] = myself; // ← reseta mob alvo
-        xTemp[170] = undefined; // ← reseta shiny
-        xTemp[171] = undefined; // ← reseta chest
-        xTemp[172] = undefined; // reseta stone
-    xTemp[70] = undefined; // força reinit waypoints
+    xTemp[13] = myself; // reseta mob alvo
+    xTemp[170] = undefined; // reseta shiny
+    xTemp[171] = undefined; // reseta chest
+    xTemp[172] = undefined; // reseta stone
     xTemp[90] = undefined; // cache mob X
     xTemp[91] = undefined; // cache mob Y
     xTemp[92] = undefined; // cache wp X
     xTemp[93] = undefined; // cache wp Y
     target.id = me;
+    // Só reinicia waypoints se ainda não foram populados (primeiro start)
+    if (!window.WCPosListX || WCPosListX.every(v => v === 0)) {
+      window.WCPosListX = new Array(250).fill(0);
+      window.WCPosListY = new Array(250).fill(0);
+      xTemp[70] = undefined; // força reinit waypoints
+      dsk.localMsg('SSD: waypoints resetados (primeiro start)', '#0ff');
+    }
 
 
     dsk.localMsg(`SSD Bot: Ativado | ID1=${xWCID1} ID2=${xWCID2} ID3=${xWCID3}`, '#5f5');
@@ -11428,18 +11408,73 @@ async function xSSD() {
   // ── PRIORIDADE 2: CHEST ──────────────────────────────────────
   await xGetChest();
   if (xTemp[171]) {
-    const dist = xGetDistance(xTemp[171].x, xTemp[171].y, myself.x, myself.y);
-    if (dist > 1) {
-      xMovingNow = false;
-      await xDoMove(xTemp[171].x, xTemp[171].y);
-    } else {
-      const dx  = xTemp[171].x - myself.x;
-      const dy  = xTemp[171].y - myself.y;
+    const _chest = xTemp[171];
+    const _chestK = _chest.x + ',' + _chest.y;
+
+    const _chestSides = [
+      { dx: 1, dy: 0 }, { dx: -1, dy: 0 },
+      { dx: 0, dy: 1 }, { dx: 0, dy: -1 }
+    ];
+
+    // Verifica se já está adjacente ao chest
+    const _chestAdj = _chestSides.find(c =>
+      myself.x === _chest.x + c.dx && myself.y === _chest.y + c.dy
+    );
+
+    if (_chestAdj) {
+      // Adjacente → vira e abre
+      xTemp[174] = undefined;
+      const dx = _chest.x - myself.x;
+      const dy = _chest.y - myself.y;
       const dir = dx === 1 ? 1 : dx === -1 ? 3 : dy === 1 ? 2 : 0;
       await xDoChangeDir(dir);
       await xDelay(100);
       xDoKeyPress(6, 100);
+    } else {
+      // Não adjacente → calcula lado livre mais próximo e navega até ele
+      const _chestFree = _chestSides
+        .map(c => ({
+          x: _chest.x + c.dx,
+          y: _chest.y + c.dy,
+          dist: Math.abs(myself.x - (_chest.x + c.dx)) + Math.abs(myself.y - (_chest.y + c.dy))
+        }))
+        .filter(t => !xGetSolidByID(t.x, t.y) && xGetTileByPos(t.x, t.y) !== 325)
+        .sort((a, b) => a.dist - b.dist);
+
+      if (_chestFree.length === 0) {
+        // Sem lado livre → blacklista direto
+        if (!window._chestBlacklist) window._chestBlacklist = {};
+        _chestBlacklist[_chestK] = Date.now() + 120000;
+        dsk.localMsg('SSD: chest sem lado livre, ignorando...', '#ff0');
+        xTemp[174] = undefined;
+        xTemp[171] = undefined;
+        xGoing[110] = false;
+        return;
+      }
+
+      const _dest = _chestFree[0];
+
+      // Rastreia timeout de navegação (igual às pedras)
+      if (!xTemp[174] || xTemp[174].k !== _chestK) {
+        xTemp[174] = { k: _chestK, t: Date.now(), lm: 0 };
+      } else if (Date.now() - xTemp[174].t > 8000) {
+        if (!window._chestBlacklist) window._chestBlacklist = {};
+        _chestBlacklist[_chestK] = Date.now() + 120000;
+        dsk.localMsg('SSD: chest inacessível (timeout), ignorando...', '#ff0');
+        xTemp[174] = undefined;
+        xTemp[171] = undefined;
+        xGoing[110] = false;
+        return;
+      }
+
+      // Só reemite xDoMove se não está já movendo e passou tempo suficiente
+      if (!xMovingNow && Date.now() - xTemp[174].lm > 3000) {
+        xTemp[174].lm = Date.now();
+        xMovingNow = false;
+        await xDoMove(_dest.x, _dest.y);
+      }
     }
+
     xGoing[110] = false;
     return;
   }
@@ -11465,6 +11500,7 @@ async function xSSD() {
     );
 
     if (_adjSide) {
+      window._ssdCurrentTarget = _ssdTarget; // mantém pedra atual durante mineração
       // está adjacente → vira e minera
       if (myself.dir !== ((_adjSide.dir + 2) % 4)) {
         if (keySpace.isDown) {
@@ -14247,9 +14283,8 @@ dsk.hammer = { enabled: false, repairing: false };
 
 
 async function Hammer() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
-
 
   if (currentLevel > 0 && skillLevel >= currentLevel && skillName == 'hammer') {
     await xDoKeyUp(6);
@@ -14258,101 +14293,132 @@ async function Hammer() {
     return;
   }
 
-
   if (xGoing[113] === true) return;
   xGoing[113] = true;
 
-
   if (inv[0].sprite === 719) {
-    // ── COM REPAIR KIT ──────────────────────────────
-
 
     if (inv[0].equip === 2) {
 
-
       if (dsk.hammer.repairingTarget === 'dummy') {
-                await xDoKeyUp(6);
-                await xDelay(520);
-        await xDoMove(myself.x, myself.y + 3);
+        await xDoKeyUp(6);
+        await xDelay(520);
+        await xDoMove(myself.x, myself.y + 1);  // anda 1 baixo
         await xDelay(700);
-        await xDoDropSlot(1, 1);
+        await xDoDropSlot(1, 1);                // dropa kit quebrado
         await xDelay(500);
-        await xDoMove(myself.x, myself.y - 1);
+        await xDoMove(myself.x, myself.y - 1);  // volta 1 cima
         await xDelay(700);
-        await xDoPickUp();
+        await xDoPickUp();                      // pega kit novo
         await xDelay(300);
-        await xDoUseSlot(0);
+        await xDoUseSlot(0);                    // equipa kit novo
         await xDelay(500);
-        await xDoMove(myself.x, myself.y - 2);
-        await xDelay(500);
+        await xDoMove(myself.x, myself.y - 2);  // anda 2 cima para ficar entre os dummies
+        await xDelay(700);
 
+        // volta reparar os dummies
+        await xDoChangeDir(0);
+        await xDelay(418);
+        await xDoKeyPress(6, 181); await xDelay(510);
+        while (xGetWallHp(myself.x, myself.y - 1) < 90 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
+          await xDoKeyPress(6, 180);
+          await xDelay(530);
+        }
+
+        await xDoChangeDir(1);
+        await xDelay(422);
+        await xDoKeyPress(6, 182); await xDelay(510);
+        while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
+          await xDoKeyPress(6, 183);
+          await xDelay(531);
+        }
+
+        await xDoChangeDir(3);
+        await xDelay(412);
+        await xDoKeyPress(6, 181); await xDelay(523);
+        while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
+          await xDoKeyPress(6, 182);
+          await xDelay(521);
+        }
+
+        // dropa kit e pega martelo
+        await xDelay(614);
+        await xDoMove(myself.x, myself.y + 2);
+        await xDelay(610);
+        await xDoDropSlot(1, 1);
+        await xDelay(634);
+
+        await xDoMove(myself.x, myself.y - 1);
+        await xDelay(614);
+        await xDoPickUp();
+        await xDelay(511);
+        await xDoUseSlot(0);
+        await xDelay(512);
+        await xDoChangeDir(0);
+        await xDelay(520);
 
       } else {
-                await xDoKeyUp(6);
-                await xDelay(520);
-        await xDoMove(myself.x, myself.y + 2);
+        await xDoKeyUp(6);
+        await xDelay(520);
+        await xDoMove(myself.x, myself.y + 1);  // anda 1 baixo
         await xDelay(800);
-        await xDoDropSlot(1, 1);
+        await xDoDropSlot(1, 1);                // dropa kit quebrado
         await xDelay(500);
-        await xDoMove(myself.x, myself.y - 1);
+        await xDoMove(myself.x, myself.y - 1);  // volta 1 cima
         await xDelay(800);
-        await xDoPickUp();
+        await xDoPickUp();                      // pega kit novo
         await xDelay(300);
-        await xDoUseSlot(0);
+        await xDoUseSlot(0);                    // equipa
         await xDelay(500);
         await xDoChangeDir(0);
         await xDelay(300);
       }
 
-
       dsk.hammer.repairingTarget = null;
       xGoing[113] = false;
       return;
     }
-        await xDoKeyPress(6, 214);
-        await xDelay(523);
 
+    await xDoKeyPress(6, 214);
+    await xDelay(523);
 
     if (xIfChatHas("is in perfect condition")) {
       xDoClearChat("is in perfect condition");
       dsk.hammer.repairing = false;
-          await xDoKeyUp(6);
-          await xDelay(512);
+      await xDoKeyUp(6);
+      await xDelay(512);
       await xDoMove(myself.x, myself.y - 2);
       await xDelay(620);
 
-
       await xDoChangeDir(0);
-          await xDelay(418);
+      await xDelay(418);
       await xDoKeyPress(6, 181); await xDelay(510);
       while (xGetWallHp(myself.x, myself.y - 1) < 90 && xGetWallHp(myself.x, myself.y - 1) !== -1) {
         await xDoKeyPress(6, 180);
         await xDelay(530);
       }
 
-
       await xDoChangeDir(1);
-          await xDelay(422);
+      await xDelay(422);
       await xDoKeyPress(6, 182); await xDelay(510);
       while (xGetWallHp(myself.x + 1, myself.y) < 90 && xGetWallHp(myself.x + 1, myself.y) !== -1) {
         await xDoKeyPress(6, 183);
         await xDelay(531);
       }
 
-
       await xDoChangeDir(3);
-          await xDelay(412);
+      await xDelay(412);
       await xDoKeyPress(6, 181); await xDelay(523);
       while (xGetWallHp(myself.x - 1, myself.y) < 90 && xGetWallHp(myself.x - 1, myself.y) !== -1) {
         await xDoKeyPress(6, 182);
         await xDelay(521);
       }
-          await xDelay(614);
+
+      await xDelay(614);
       await xDoMove(myself.x, myself.y + 2);
       await xDelay(610);
       await xDoDropSlot(1, 1);
       await xDelay(634);
-
 
       await xDoMove(myself.x, myself.y - 1);
       await xDelay(614);
@@ -14361,91 +14427,74 @@ async function Hammer() {
       await xDoUseSlot(0);
       await xDelay(512);
       await xDoChangeDir(0);
-          await xDelay(520);
-
+      await xDelay(520);
 
     } else if (dsk.hammer.repairing) {
       xGoing[113] = false;
       return;
     }
 
-
   } else {
-    // ── COM MARTELO ──────────────────────────────────
-
 
     if (inv[0].equip === 0) {
       await xDoUseSlot(0);
       await xDelay(500);
     }
 
-
     const wN = xGetWallByPos(myself.x,     myself.y - 2);
     const wW = xGetWallByPos(myself.x - 1, myself.y - 1);
     const wE = xGetWallByPos(myself.x + 1, myself.y - 1);
 
-
     if (wN?.hpbar?.val <= 250 || wW?.hpbar?.val <= 250 || wE?.hpbar?.val <= 250) {
       dsk.hammer.repairing = true;
-      dsk.hammer.repairingTarget = 'dummy'; // ← novo
-
+      dsk.hammer.repairingTarget = 'dummy';
 
       await xDoDropSlot(1, 1);
       await xDelay(645);
-
 
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(515);
       await xDoPickUp();
       await xDelay(545);
 
-
       await xDoChangeDir(0);
-          await xDelay(519);
+      await xDelay(519);
       await xDoUseSlot(0);
       await xDelay(531);
-
 
       xGoing[113] = false;
       return;
     }
 
-
     if (inv[0].equip === 2) {
       dsk.hammer.repairing = true;
-      dsk.hammer.repairingTarget = 'arma'; // ← novo
+      dsk.hammer.repairingTarget = 'arma';
 
-
-          await xDelay(456);
-          await xDoKeyUp(6);
-          await xDelay(325);
+      await xDelay(456);
+      await xDoKeyUp(6);
+      await xDelay(325);
       await xDoDropSlot(1, 1);
       await xDelay(624);
-
 
       await xDoMove(myself.x, myself.y + 1);
       await xDelay(510);
       await xDoPickUp();
       await xDelay(515);
 
-
       await xDoChangeDir(0);
-          await xDelay(515);
+      await xDelay(515);
       await xDoUseSlot(0);
       await xDelay(516);
-
 
       xGoing[113] = false;
       return;
     }
-
 
     if (!keySpace.isDown && inv[0].sprite !== undefined && inv[0].equip === 1) {
       await xDoKeyDown(6);
       await xDelay(800);
     }
   }
-
 
   xGoing[113] = false;
 }
@@ -14884,37 +14933,46 @@ async function repairItemClay() {
   await xDelay(369);
 
 
-  const firstEquippable = item_data.filter(el => el && el.eqp !== 0 && el.spr === 719)[0];
-        if (firstEquippable) {
-    // Continua pressionando até o item estar perfeito
+  // Continua pressionando até o item estar perfeito ou acabarem todos os kits
+  const hasKit     = () => item_data.some(el => el && el.spr === 719);
+  const kitEquipped = () => item_data.some(el => el && el.spr === 719 && el.eqp !== 0);
+  if (hasKit()) {
     while (!xIfChatHas("is in perfect condition")) {
-        await xDoKeyPress(6, 189);
+      // Sai se o bot for desativado
+      if (!dsk.clay.enabled) {
+        dsk.clay.repairing = false;
+        return;
+      }
+      // Se não tem mais nenhum kit → sai
+      if (!hasKit()) {
+        dsk.localMsg('Clay: sem repair kit, pegando pá...', '#fa5');
+        break;
+      }
+      // Se o kit equipado quebrou mas ainda tem outro → equipa o próximo
+      if (!kitEquipped()) {
+        dsk.localMsg('Clay: kit quebrou, equipando próximo...', '#ff0');
+        await xDoUseSlot(xGetSlotByID(719));
         await xDelay(400);
-        // Segurança: sai do loop se o bot for desativado
-        if (!dsk.clay.enabled) {
-            dsk.clay.repairing = false;
-            return;
-        }
+        continue;
+      }
+      await xDoKeyPress(6, 189);
+      await xDelay(400);
     }
-        }
-
-
-  if (xIfChatHas("is in perfect condition")) {
-    xDoClearChat("is in perfect condition");
-    await xDelay(349);
-    await xDoMove(myself.x - 1, myself.y);
-    await xDelay(649);
-    await xDoPickUp();
-    await xDelay(354);
-    await xDoUseSlot(0);
-    await xDelay(389);
-    await xDoChangeDir(0);
-    await xDelay(346);
-    dsk.clay.repairing = false;
-  } else {
-    // Ainda reparando — libera após timeout de segurança
-    setTimeout(() => { dsk.clay.repairing = false; }, 6000);
   }
+
+
+  // Pega a pá de volta: tanto se reparou com sucesso quanto se o kit quebrou
+  xDoClearChat("is in perfect condition");
+  await xDelay(349);
+  await xDoMove(myself.x - 1, myself.y);
+  await xDelay(649);
+  await xDoPickUp();
+  await xDelay(354);
+  await xDoUseSlot(0);
+  await xDelay(389);
+  await xDoChangeDir(0);
+  await xDelay(346);
+  dsk.clay.repairing = false;
 }
 
 
@@ -15815,12 +15873,68 @@ function xGetDirTo(ax, ay) {
 
 
 // ── Função principal ──────────────────────────────────────────
+// ── AUTOKILL EXCLUSIVO DO RECURSOS ───────────────────────────
+async function xRecursosKill() {
+  if (!dsk.recursos.autokill) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[141] === true) return;
+  xGoing[141] = true;
+
+  const adjacentes = [
+    { x: myself.x,     y: myself.y - 1, dir: 0 },
+    { x: myself.x,     y: myself.y + 1, dir: 2 },
+    { x: myself.x + 1, y: myself.y,     dir: 1 },
+    { x: myself.x - 1, y: myself.y,     dir: 3 },
+  ];
+
+  for (const { x, y, dir } of adjacentes) {
+    const mob = xGetMobByPos(x, y);
+    if (!mob || mob === myself || xPlyrTest(mob)) continue;
+
+    // salva direção do alvo atual antes de matar
+    const alvoAtualDir = myself.dir;
+    const alvoAtualX   = myself.x + (alvoAtualDir === 1 ? 1 : alvoAtualDir === 3 ? -1 : 0);
+    const alvoAtualY   = myself.y + (alvoAtualDir === 2 ? 1 : alvoAtualDir === 0 ? -1 : 0);
+
+    // mata o mob
+    if (target.id !== mob.id) {
+      target.id = mob.id;
+      send({ type: 't', t: mob.id });
+    }
+
+    send({ type: 'm', x: myself.x, y: myself.y, d: dir });
+    await xDelay(300);
+    await xDoKeyPress(6, 300);
+    await xDelay(300);
+
+    // volta o alvo
+    target.id = me;
+
+    // verifica se o alvo ainda existe
+    const alvoAindaExiste = objects.items.find(el =>
+      el && el.x === alvoAtualX && el.y === alvoAtualY &&
+      [...recursosConfig.selected].includes(el.name)
+    );
+
+    if (alvoAindaExiste) {
+      // volta a virar para o alvo
+      send({ type: 'm', x: myself.x, y: myself.y, d: alvoAtualDir });
+      await xDelay(300);
+    }
+
+    xGoing[141] = false;
+    return;
+  }
+
+  xGoing[141] = false;
+}
+
+// ── RECURSOS BOT ─────────────────────────────────────────────
 async function xRecursos() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   if (xGoing[140] === true) return;
   xGoing[140] = true;
-
 
   // ── Verifica itens quebrados ──────────────────────────────────
   if (inv[0]?.equip === 2 || inv[1]?.equip === 2 || inv[2]?.equip === 2) {
@@ -15828,7 +15942,6 @@ async function xRecursos() {
     xGoing[140] = false;
     return;
   }
-
 
   // ── Coleta Pinecone se perto ──────────────────────────────────
   const pinecone = objects.items.find(el => el?.name === 'Pinecone');
@@ -15842,9 +15955,7 @@ async function xRecursos() {
     }
   }
 
-
   const activeTargets = [...recursosConfig.selected];
-
 
   if (activeTargets.length === 0) {
     xChangeStatus('[RB] Nenhum alvo selecionado!');
@@ -15852,10 +15963,8 @@ async function xRecursos() {
     return;
   }
 
-
   // ── Busca recursos selecionados ───────────────────────────────
   const recursos = objects.items.filter(el => el && activeTargets.includes(el.name));
-
 
   if (recursos.length === 0) {
     const lMin = 8, lMax = 15;
@@ -15873,17 +15982,14 @@ async function xRecursos() {
     return;
   }
 
-
   // ── Ordena por distância Manhattan ───────────────────────────
   recursos.sort((a, b) =>
     (Math.abs(a.x - myself.x) + Math.abs(a.y - myself.y)) -
     (Math.abs(b.x - myself.x) + Math.abs(b.y - myself.y))
   );
 
-
   const alvo = recursos[0];
   const dist = Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y);
-
 
   if (dist > RECURSOS_RADIUS) {
     xMovingNow = false;
@@ -15899,15 +16005,13 @@ async function xRecursos() {
     return;
   }
 
-
   // ── Calcula melhor tile adjacente para atacar ─────────────────
   const sides = [
-    { x: alvo.x + 1, y: alvo.y,     dir: 3 },
-    { x: alvo.x - 1, y: alvo.y,     dir: 1 },
-    { x: alvo.x,     y: alvo.y + 1, dir: 0 },
-    { x: alvo.x,     y: alvo.y - 1, dir: 2 },
+    { x: alvo.x + 1, y: alvo.y },
+    { x: alvo.x - 1, y: alvo.y },
+    { x: alvo.x,     y: alvo.y + 1 },
+    { x: alvo.x,     y: alvo.y - 1 },
   ];
-
 
   let bestSide = null;
   let bestDist = Infinity;
@@ -15917,9 +16021,7 @@ async function xRecursos() {
     if (d < bestDist) { bestDist = d; bestSide = side; }
   }
 
-
   if (!bestSide) { xGoing[140] = false; return; }
-
 
   // ── Move e espera chegar ──────────────────────────────────────
   if (myself.x !== bestSide.x || myself.y !== bestSide.y) {
@@ -15934,7 +16036,6 @@ async function xRecursos() {
     }
   }
 
-
   // ── Checa se está adjacente (distância 1) ────────────────────
   const distFinal = Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y);
   if (distFinal !== 1) {
@@ -15942,27 +16043,30 @@ async function xRecursos() {
     return;
   }
 
+  // ── Recalcula direção baseado na posição REAL atual ───────────
+  const dxReal = alvo.x - myself.x;
+  const dyReal = alvo.y - myself.y;
+  let dirReal;
+  if (dxReal === 1)       dirReal = 1;
+  else if (dxReal === -1) dirReal = 3;
+  else if (dyReal === 1)  dirReal = 2;
+  else                    dirReal = 0;
 
-  // ── Vira com base na posição real atual ───────────────────────
-  const dx = alvo.x - myself.x;
-  const dy = alvo.y - myself.y;
-  const dirFinal = Math.abs(dx) >= Math.abs(dy)
-    ? (dx > 0 ? 1 : 3)
-    : (dy > 0 ? 2 : 0);
+  // ── Força a virada via send direto ────────────────────────────
+  send({ type: 'm', x: myself.x, y: myself.y, d: dirReal });
+  await xDelay(500);
 
-
-  if (myself.dir !== dirFinal) {
-    await xDoChangeDir(dirFinal);
-    await xDelay(350);
+  // ── Confirma que virou ────────────────────────────────────────
+  if (myself.dir !== dirReal) {
+    send({ type: 'm', x: myself.x, y: myself.y, d: dirReal });
+    await xDelay(500);
   }
-
 
   // ── Ataca segurando a tecla ───────────────────────────────────
   const tx = alvo.x, ty = alvo.y, tn = alvo.name;
   const aindaExiste = () => objects.items.find(el =>
     el && el.name === tn && el.x === tx && el.y === ty
   );
-
 
   if (aindaExiste()) {
     await xDoKeyDown(6);
@@ -15973,24 +16077,22 @@ async function xRecursos() {
     await xDelay(150);
   }
 
-
   xGoing[140] = false;
 }
 // ══════════════════════════════════════════════════════════════
-// ⚙️  RECURSOS CONFIG PANEL  (estilo craft config)
+// ⚙️  RECURSOS CONFIG PANEL
 // ══════════════════════════════════════════════════════════════
 
+dsk.recursos = { enabled: false, autokill: false };
 
 (function () {
   let rcPanel = null;
-
 
   const rc = {
     get visible() { return !!rcPanel; },
     set visible(v) { if (!v && rcPanel) removePanel(); else if (v && !rcPanel) createPanel(); },
   };
   dsk.recursosManager = rc;
-
 
   // Atualiza botão play em tempo real
   { let _t = 0; dsk.on('postLoop', () => {
@@ -16004,15 +16106,12 @@ async function xRecursos() {
     btn.style.color       = on ? '#e74c3c' : '#2ecc71';
   }); }
 
-
   function removePanel() {
     if (rcPanel) { rcPanel.remove(); rcPanel = null; }
   }
 
-
   function createPanel() {
     if (rcPanel) { removePanel(); return; }
-
 
     rcPanel = document.createElement('div');
     Object.assign(rcPanel.style, {
@@ -16023,7 +16122,6 @@ async function xRecursos() {
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
     });
-
 
     // Header
     const header = document.createElement('div');
@@ -16045,7 +16143,6 @@ async function xRecursos() {
     header.appendChild(titleEl);
     header.appendChild(closeBtn);
 
-
     // Drag
     let dragging = false, ox = 0, oy = 0;
     header.addEventListener('mousedown', _startDrag);
@@ -16066,26 +16163,21 @@ async function xRecursos() {
     function _onDragMove(e) { if (!dragging) return; const _xy = _getXY(e); rcPanel.style.left = (_xy.x - ox) + 'px'; rcPanel.style.top = (_xy.y - oy) + 'px'; }
     function _onDragEnd() { dragging = false; }
 
-
     // Body
     const body = document.createElement('div');
     Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
-
 
     const secLabel = document.createElement('div');
     secLabel.textContent = '── Alvos de Coleta ──';
     Object.assign(secLabel.style, { color: '#777', fontSize: '10px', textAlign: 'center', paddingBottom: '2px' });
     body.appendChild(secLabel);
 
-
     // Botões multi-select
     const targetBtns = {};
-
 
     RECURSOS_ALL_TARGETS.forEach(({ key, label }) => {
       const btn = document.createElement('button');
       btn.textContent = label;
-
 
       function updateBtn() {
         const sel = recursosConfig.selected.has(key);
@@ -16094,7 +16186,6 @@ async function xRecursos() {
         btn.style.color       = sel ? '#2ecc71' : '#ccc';
         btn.style.fontWeight  = sel ? 'bold'    : 'normal';
       }
-
 
       Object.assign(btn.style, {
         width: '100%', padding: '7px 8px', borderRadius: '6px',
@@ -16110,17 +16201,14 @@ async function xRecursos() {
         updateBtn();
       };
 
-
       targetBtns[key] = { el: btn, upd: updateBtn };
       updateBtn();
       body.appendChild(btn);
     });
 
-
     // Selecionar todos / nenhum
     const selRow = document.createElement('div');
     Object.assign(selRow.style, { display: 'flex', gap: '6px', marginTop: '2px' });
-
 
     function makeSmallBtn(txt, fn) {
       const b = document.createElement('button');
@@ -16136,7 +16224,6 @@ async function xRecursos() {
       return b;
     }
 
-
     selRow.appendChild(makeSmallBtn('✅ Todos', () => {
       RECURSOS_ALL_TARGETS.forEach(({ key }) => recursosConfig.selected.add(key));
       Object.values(targetBtns).forEach(b => b.upd());
@@ -16147,17 +16234,37 @@ async function xRecursos() {
     }));
     body.appendChild(selRow);
 
+    // ── Botão AutoKill ────────────────────────────────────────
+    const killBtn = document.createElement('button');
+    function updateKillBtn() {
+      const on = !!dsk.recursos.autokill;
+      killBtn.textContent       = on ? '⚔️ AutoKill: ON' : '⚔️ AutoKill: OFF';
+      killBtn.style.background  = on ? '#1a3a2a' : '#3a1a1a';
+      killBtn.style.borderColor = on ? '#2ecc71' : '#e74c3c';
+      killBtn.style.color       = on ? '#2ecc71' : '#e74c3c';
+    }
+    Object.assign(killBtn.style, {
+      width: '100%', padding: '7px 0', borderRadius: '6px',
+      border: '1px solid #e74c3c', background: '#3a1a1a',
+      color: '#e74c3c', cursor: 'pointer', fontSize: '11px',
+      fontWeight: 'bold', fontFamily: 'Verdana', transition: 'background .15s',
+    });
+    killBtn.onclick = () => {
+      dsk.recursos.autokill = !dsk.recursos.autokill;
+      updateKillBtn();
+      dsk.localMsg(`Recursos AutoKill: ${dsk.recursos.autokill ? 'ON' : 'OFF'}`, dsk.recursos.autokill ? '#5f5' : '#f55');
+    };
+    updateKillBtn();
+    body.appendChild(killBtn);
 
     // Divider
     const divider = document.createElement('div');
     Object.assign(divider.style, { borderTop: '1px solid #333', marginTop: '4px', paddingTop: '6px' });
     body.appendChild(divider);
 
-
     // Botão Play/Stop
     const playBtn = document.createElement('button');
     playBtn.dataset.rc = 'playbtn';
-
 
     function updatePlayBtn() {
       const on = !!dsk.recursos?.enabled;
@@ -16166,7 +16273,6 @@ async function xRecursos() {
       playBtn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
       playBtn.style.color       = on ? '#e74c3c' : '#2ecc71';
     }
-
 
     Object.assign(playBtn.style, {
       width: '100%', padding: '8px 0', borderRadius: '6px',
@@ -16178,24 +16284,18 @@ async function xRecursos() {
     updatePlayBtn();
     body.appendChild(playBtn);
 
-
     rcPanel.appendChild(header);
     rcPanel.appendChild(body);
     document.body.appendChild(rcPanel);
   }
 
-
   dsk.setCmd('/recursosconfig', () => { rc.visible = !rc.visible; });
   window.rc = rc;
 })();
 
-
 // ── Comando /recursos ─────────────────────────────────────────
-
-
 dsk.setCmd('/recursos', () => {
   dsk.recursos.enabled = !dsk.recursos.enabled;
-
 
   if (dsk.recursos.enabled) {
     if (recursosConfig.selected.size === 0) {
@@ -16206,12 +16306,14 @@ dsk.setCmd('/recursos', () => {
     dsk.localMsg(`Recursos Bot: Ativado 🌲 (${recursosConfig.selected.size} alvo(s))`, '#5f5');
     (async function loop() {
       while (dsk.recursos.enabled) {
+        await xRecursosKill(); // ← autokill antes de coletar
         await xRecursos();
         await xDelay(400);
       }
     })();
   } else {
     xGoing[140] = false;
+    xGoing[141] = false;
     dsk.localMsg('Recursos Bot: Desativado', '#f55');
   }
 });
@@ -21171,7 +21273,7 @@ let hudVertical = false;
 function verticalSkills() {
     for(let i = 0; i < jv.ability.length; i++) {
         jv.ability[i].x = 520;
-        jv.ability[i].y = 115 + ((jv.ability.length - 1 - i) * 60);
+        jv.ability[i].y = 115 + ((jv.ability.length - 1 - i) * 50);
     }
 }
 
