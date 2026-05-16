@@ -300,6 +300,63 @@ dsk.on('postPacket:quit', () => {
 // ── UTILITÁRIOS ─────────────────────────────────────────────
 
 
+
+// ── Utilitário de resize para painéis HTML ─────────────────────
+dsk.addResize = function(panel, minW = 160, minH = 200) {
+  const handle = document.createElement('div');
+  Object.assign(handle.style, {
+    position: 'absolute',
+    bottom: '0',
+    right: '0',
+    width: '16px',
+    height: '16px',
+    cursor: 'nwse-resize',
+    zIndex: '1',
+    background: 'linear-gradient(135deg, transparent 50%, #555 50%)',
+    borderBottomRightRadius: '10px',
+  });
+  panel.style.position = 'fixed';
+  panel.appendChild(handle);
+
+  let resizing = false;
+  let rStartX = 0, rStartY = 0, rStartW = 0, rStartH = 0;
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault(); e.stopPropagation();
+    resizing = true;
+    const xy = _getXY(e);
+    rStartX = xy.x; rStartY = xy.y;
+    const r = panel.getBoundingClientRect();
+    rStartW = r.width; rStartH = r.height;
+  });
+  handle.addEventListener('touchstart', e => {
+    e.preventDefault(); e.stopPropagation();
+    resizing = true;
+    const xy = _getXY(e);
+    rStartX = xy.x; rStartY = xy.y;
+    const r = panel.getBoundingClientRect();
+    rStartW = r.width; rStartH = r.height;
+  }, { passive: false });
+
+  window.addEventListener('mousemove', e => {
+    if (!resizing) return;
+    const xy = _getXY(e);
+    panel.style.width     = Math.min(window.innerWidth  * 0.9, Math.max(minW, rStartW + (xy.x - rStartX))) + 'px';
+    panel.style.height    = Math.min(window.innerHeight * 0.9, Math.max(minH, rStartH + (xy.y - rStartY))) + 'px';
+    panel.style.maxHeight = 'none';
+  });
+  window.addEventListener('touchmove', e => {
+    if (!resizing) return;
+    const xy = _getXY(e);
+    panel.style.width     = Math.min(window.innerWidth  * 0.9, Math.max(minW, rStartW + (xy.x - rStartX))) + 'px';
+    panel.style.height    = Math.min(window.innerHeight * 0.9, Math.max(minH, rStartH + (xy.y - rStartY))) + 'px';
+    panel.style.maxHeight = 'none';
+  }, { passive: false });
+
+  window.addEventListener('mouseup',  () => { resizing = false; });
+  window.addEventListener('touchend', () => { resizing = false; });
+};
+
 dsk.rand = () => Math.random();
 dsk.rand01 = () => Math.round(dsk.rand());
 dsk.wait = e => new Promise(res => setTimeout(res, e));
@@ -602,6 +659,7 @@ dsk.setCmd('/craft', () => {
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
     });
 
 
@@ -649,7 +707,7 @@ dsk.setCmd('/craft', () => {
 
     // ── Body ──────────────────────────────────────────────────
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });
 
 
     // ── Título da seção ───────────────────────────────────────
@@ -735,6 +793,7 @@ dsk.setCmd('/craft', () => {
     cmPanel.appendChild(header);
     cmPanel.appendChild(body);
     document.body.appendChild(cmPanel);
+    dsk.addResize(cmPanel, 200, 200);
   }
 
 
@@ -4160,19 +4219,29 @@ dsk.skillHud.label.on('pointerup', () => { dsk.skillHud.dragging = false; });
 dsk.skillHud.label.on('pointerupoutside', () => { dsk.skillHud.dragging = false; });
 
 
-dsk.on('postLoop', () => {
-  if (!dsk.skillHud.enabled) return;
+let _skillHudInterval = null;
+
+function _skillHudUpdate() {
   const name   = skillName  || '---';
   const level  = skillLevel ?? 0;
   const target = currentLevel > 0 ? ` / ${currentLevel}` : '';
   const pct    = skill_status?.val != null ? Math.floor(skill_status.val) : 0;
   dsk.skillHud.label.text = `⚔ ${name}: ${level}.${pct}${target}`;
-});
-
+}
 
 dsk.setCmd('/skills', () => {
   dsk.skillHud.enabled = !dsk.skillHud.enabled;
-  dsk.skillHud.label.visible = dsk.skillHud.enabled;
+
+  if (dsk.skillHud.enabled) {
+    _skillHudUpdate(); // texto primeiro
+    dsk.skillHud.label.visible = true; // depois mostra
+    _skillHudInterval = setInterval(_skillHudUpdate, 250);
+  } else {
+    clearInterval(_skillHudInterval);
+    _skillHudInterval = null;
+    dsk.skillHud.label.visible = false;
+  }
+
   dsk.localMsg(`Skill HUD: ${dsk.skillHud.enabled ? 'Ativado' : 'Desativado'}`, dsk.skillHud.enabled ? '#5f5' : '#f55');
 });
 
@@ -4230,6 +4299,7 @@ dsk.setCmd('/skills', () => {
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
     });
 
 
@@ -4276,7 +4346,7 @@ dsk.setCmd('/skills', () => {
 
     // ── Body ──────────────────────────────────────────────────
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: '1' });
 
 
     // Helper: linha com label + valor + botões
@@ -4573,16 +4643,8 @@ dsk.setCmd('/skills', () => {
 	});
 
 	skillBtn.onclick = () => {
-	  // mesma lógica do /skills
-	  dsk.skillHud.enabled = !dsk.skillHud.enabled;
-	  dsk.skillHud.label.visible = dsk.skillHud.enabled;
-
+	  dsk.commands['/skills']();
 	  updateSkillBtn();
-
-	  dsk.localMsg(
-		`Skill HUD: ${dsk.skillHud.enabled ? 'Ativado' : 'Desativado'}`,
-		dsk.skillHud.enabled ? '#5f5' : '#f55'
-	  );
 	};
 
 	updateSkillBtn();
@@ -4594,6 +4656,7 @@ dsk.setCmd('/skills', () => {
     acmPanel.appendChild(header);
     acmPanel.appendChild(body);
     document.body.appendChild(acmPanel);
+    dsk.addResize(acmPanel, 200, 200);
     renderValues();
   }
 
@@ -13968,7 +14031,8 @@ async function rotRun() {
     Object.assign(rmPanel.style, {
       position: 'fixed', top: '60px', left: '50%',
       transform: 'translateX(-50%)',
-      width: '290px', maxHeight: '85vh', overflowY: 'auto',
+      width: '290px', maxHeight: '85vh',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
@@ -14019,7 +14083,7 @@ async function rotRun() {
 
     // ── Body ──────────────────────────────────────────────────
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });
 
 
     // ── Cabeçalho das colunas ─────────────────────────────────
@@ -14237,6 +14301,7 @@ async function rotRun() {
     rmPanel.appendChild(header);
     rmPanel.appendChild(body);
     document.body.appendChild(rmPanel);
+    dsk.addResize(rmPanel, 200, 200);
 
 
     // Carrega posições salvas
@@ -18300,6 +18365,11 @@ jv.botaoHub.on_click = () => {
 dsk.setCmd('/menu', () => {
   hubBtnVisible = !hubBtnVisible;
   jv.botaoHub.visible = hubBtnVisible;
+  if (hubBtnVisible) {
+    _applyMenuStyle();
+  } else {
+    _restoreMenuStyle();
+  }
   dsk.localMsg(`Hub Button: ${hubBtnVisible ? 'Visível' : 'Escondido'}`, hubBtnVisible ? '#5f5' : '#f55');
 });
 
@@ -21740,6 +21810,7 @@ dsk.setCmd('/smith', () => {
       position: 'fixed', top: '80px', left: '50%',
       transform: 'translateX(-50%)',
       width: '260px',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
@@ -21785,7 +21856,7 @@ dsk.setCmd('/smith', () => {
 
     // Body
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });
 
     // Status box
     const statusBox = document.createElement('div');
@@ -21871,6 +21942,7 @@ dsk.setCmd('/smith', () => {
     smPanel.appendChild(header);
     smPanel.appendChild(body);
     document.body.appendChild(smPanel);
+    dsk.addResize(smPanel, 200, 200);
   }
 
   dsk.setCmd('/smithconfig', () => {
@@ -22151,45 +22223,168 @@ dsk.setCmd('/smith', () => {
 
 })();
 
-// OPTIONS
-ui_container.options.set_text("⚙ Menu");
-ui_container.options.title.style.strokeThickness = 1;
-ui_container.options.title.style.fill = 0x01ffe6;
+// OPTIONS / STATS — salva originais para restaurar no toggle do /menu
+const _origOptions = {
+  text:            ui_container.options.title.text,
+  strokeThickness: ui_container.options.title.style.strokeThickness,
+  fill:            ui_container.options.title.style.fill,
+};
+const _origStats = {
+  text:            ui_container.stats.title.text,
+  strokeThickness: ui_container.stats.title.style.strokeThickness,
+  fill:            ui_container.stats.title.style.fill,
+  skillFill:       jv.stat_dialog.skill.title.style.fill,
+  upgradesFill:    jv.stat_dialog.upgrades.title.style.fill,
+  reincFill:       jv.stat_dialog.reincarnate.title.style.fill,
+  pvpFill:         jv.stat_dialog.pvp.title.style.fill,
+  questFill:       jv.stat_dialog.quest.title.style.fill,
+  appearFill:      jv.stat_dialog.appearance.title.style.fill,
+};
+let _bgOptions = null;
+let _bgStats   = null;
 
+// ── Skill Icons ─────────────────────────────────────────────
+const skillSpriteMap = {
+    'Archery':      items[14][35],
+    'Assassin':     items[14][43],
+    'Axe':          items[13][39],
+    'Chopping':     tiles[11][7],
+    'Clubbing':     items[5][42],
+    'Construction': items[15][1],
+    'Cooking':      items[15][58],
+    'Crafting':     items[15][8],
+    'Dagger':       items[14][38],
+    'Destruction':  items[8][20],
+    'Digging':      items[13][38],
+    'Exploration':  items[2][49],
+    'Farming':      items[2][6],
+    'Fishing':      items[1][32],
+    'Foraging':     items[14][50],
+    'Hammer':       items[4][36],
+    'Healing':      items[2][15],
+    'Heavy Armor':  items[12][40],
+    'Hunting':      tiles[5][17],
+    'Knitting':     items[2][43],
+    'Light Armor':  items[12][46],
+    'Logic':        items[9][1],
+    'Medium Armor': items[2][16],
+    'Mining':       tiles[10][38],
+    'Pickaxe':      items[10][39],
+    'Questing':     items[12][61],
+    'Repairing':    items[15][44],
+    'Research':     items[14][21],
+    'Shield Block': items[10][40],
+    'Smelting':     items[1][50],
+    'Smithing':     items[13][48],
+    'Spear':        items[14][39],
+    'Sword':        items[15][38],
+    'Whip':         items[10][49],
+    'Tilling':      items[13][42],
+    'Unarmed':      items[12][37],
+    'Unarmored':    items[2][41],
+};
 
-let bgOptions = new PIXI.Graphics();
-bgOptions.beginFill(0x87cefa, 0.30);
-bgOptions.drawRoundedRect(0, 0, 60, 32, 6);
-bgOptions.endFill();
+let _skillIconsInterval = null;
 
-ui_container.options.addChildAt(bgOptions, 0);
+function _applySkillIcons() {
+    if (_skillIconsInterval) return;
+    const skillIcons = () => {
+        if (!jv.skill_dialog) return;
+        for (let slot of jv.skill_dialog.slot) {
+            const name = slot.label.text.split(':')[0];
+            const texture = skillSpriteMap[name];
+            if (!texture) continue;
+            if (!slot._iconCreated) {
+                slot.icon = new PIXI.Sprite(texture);
+                slot.icon.x = -16;
+                slot.icon.width = 16;
+                slot.icon.height = 16;
+                slot.stars.addChild(slot.icon);
+                slot._iconCreated = true;
+            } else {
+                slot.icon.texture = texture;
+            }
+        }
+    };
+    skillIcons();
+    _skillIconsInterval = setInterval(skillIcons, 100);
+}
 
+function _removeSkillIcons() {
+    if (_skillIconsInterval) { clearInterval(_skillIconsInterval); _skillIconsInterval = null; }
+    if (!jv.skill_dialog) return;
+    for (let slot of jv.skill_dialog.slot) {
+        if (slot._iconCreated && slot.icon) {
+            slot.stars.removeChild(slot.icon);
+            slot.icon.destroy();
+            slot.icon = null;
+            slot._iconCreated = false;
+        }
+    }
+}
 
-// STATS
-ui_container.stats.set_text("⚔ Stats");
-ui_container.stats.title.style.strokeThickness = 1;
-ui_container.stats.title.style.fill = 0x01ffe6;
+function _applyMenuStyle() {
+  // SKILL DIALOG
+  jv.skill_dialog.do_update = _skillDialogCustomUpdate;
+  _applySkillIcons();
+  jv.skill_dialog.do_update();
+  // OPTIONS
+  ui_container.options.set_text("⚙ Menu");
+  ui_container.options.title.style.strokeThickness = 1;
+  ui_container.options.title.style.fill = 0x01ffe6;
+  if (!_bgOptions) {
+    _bgOptions = new PIXI.Graphics();
+    _bgOptions.beginFill(0x87cefa, 0.30);
+    _bgOptions.drawRoundedRect(0, 0, 60, 32, 6);
+    _bgOptions.endFill();
+    ui_container.options.addChildAt(_bgOptions, 0);
+  }
+  // STATS
+  ui_container.stats.set_text("⚔ Stats");
+  ui_container.stats.title.style.strokeThickness = 1;
+  ui_container.stats.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.skill.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.upgrades.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.reincarnate.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.pvp.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.quest.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.appearance.title.style.fill = 0x01ffe6;
+  if (!_bgStats) {
+    _bgStats = new PIXI.Graphics();
+    _bgStats.beginFill(0x87cefa, 0.30);
+    _bgStats.drawRoundedRect(0, 0, 60, 32, 6);
+    _bgStats.endFill();
+    ui_container.stats.addChildAt(_bgStats, 0);
+  }
+}
 
-jv.stat_dialog.skill.title.style.fill = 0x01ffe6;
-jv.stat_dialog.upgrades.title.style.fill = 0x01ffe6;
-jv.stat_dialog.reincarnate.title.style.fill = 0x01ffe6;
-jv.stat_dialog.pvp.title.style.fill = 0x01ffe6;
-jv.stat_dialog.quest.title.style.fill = 0x01ffe6;
-jv.stat_dialog.appearance.title.style.fill = 0x01ffe6;
+function _restoreMenuStyle() {
+  // SKILL DIALOG
+  jv.skill_dialog.do_update = _origSkillDialogUpdate;
+  _removeSkillIcons();
+  jv.skill_dialog.do_update();
+  // OPTIONS
+  ui_container.options.set_text(_origOptions.text);
+  ui_container.options.title.style.strokeThickness = _origOptions.strokeThickness;
+  ui_container.options.title.style.fill = _origOptions.fill;
+  if (_bgOptions) { ui_container.options.removeChild(_bgOptions); _bgOptions = null; }
+  // STATS
+  ui_container.stats.set_text(_origStats.text);
+  ui_container.stats.title.style.strokeThickness = _origStats.strokeThickness;
+  ui_container.stats.title.style.fill = _origStats.fill;
+  jv.stat_dialog.skill.title.style.fill       = _origStats.skillFill;
+  jv.stat_dialog.upgrades.title.style.fill    = _origStats.upgradesFill;
+  jv.stat_dialog.reincarnate.title.style.fill = _origStats.reincFill;
+  jv.stat_dialog.pvp.title.style.fill         = _origStats.pvpFill;
+  jv.stat_dialog.quest.title.style.fill       = _origStats.questFill;
+  jv.stat_dialog.appearance.title.style.fill  = _origStats.appearFill;
+  if (_bgStats) { ui_container.stats.removeChild(_bgStats); _bgStats = null; }
+}
 
+const _origSkillDialogUpdate = jv.skill_dialog.do_update;
 
-
-let bgStats = new PIXI.Graphics();
-bgStats.beginFill(0x87cefa, 0.30);
-bgStats.drawRoundedRect(0, 0, 60, 32, 6);
-bgStats.endFill();
-
-ui_container.stats.addChildAt(bgStats, 0);
-
-let old = jv.skill_dialog.do_update;
-
-jv.skill_dialog.do_update = function() {
-    old.apply(this, arguments);
+function _skillDialogCustomUpdate() {
+    _origSkillDialogUpdate.apply(this, arguments);
 
     for (let o = 0; o < jv.skill_dialog.slot.length; o++) {
         let slot = jv.skill_dialog.slot[o];
@@ -22204,13 +22399,11 @@ jv.skill_dialog.do_update = function() {
                 star.tint = 0x01ffe6;
                 star.alpha = 1;
             }
-
             // 🟡 completo (neon amarelo forte)
             else if (star.alpha === 1) {
                 star.tint = 0xffff00;
                 star.alpha = 1;
             }
-
             // ⚪ incompleto (mais visível agora)
             else {
                 star.tint = 0xff00ff;
@@ -22218,7 +22411,7 @@ jv.skill_dialog.do_update = function() {
             }
         }
     }
-};
+}
 
 // ══════════════════════════════════════════════════════════════
 // 💎  GEM SKILLS PANEL  ─  by Pablo Mod
