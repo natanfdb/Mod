@@ -300,6 +300,63 @@ dsk.on('postPacket:quit', () => {
 // ── UTILITÁRIOS ─────────────────────────────────────────────
 
 
+
+// ── Utilitário de resize para painéis HTML ─────────────────────
+dsk.addResize = function(panel, minW = 160, minH = 200) {
+  const handle = document.createElement('div');
+  Object.assign(handle.style, {
+    position: 'absolute',
+    bottom: '0',
+    right: '0',
+    width: '16px',
+    height: '16px',
+    cursor: 'nwse-resize',
+    zIndex: '1',
+    background: 'linear-gradient(135deg, transparent 50%, #555 50%)',
+    borderBottomRightRadius: '10px',
+  });
+  panel.style.position = 'fixed';
+  panel.appendChild(handle);
+
+  let resizing = false;
+  let rStartX = 0, rStartY = 0, rStartW = 0, rStartH = 0;
+
+  handle.addEventListener('mousedown', e => {
+    e.preventDefault(); e.stopPropagation();
+    resizing = true;
+    const xy = _getXY(e);
+    rStartX = xy.x; rStartY = xy.y;
+    const r = panel.getBoundingClientRect();
+    rStartW = r.width; rStartH = r.height;
+  });
+  handle.addEventListener('touchstart', e => {
+    e.preventDefault(); e.stopPropagation();
+    resizing = true;
+    const xy = _getXY(e);
+    rStartX = xy.x; rStartY = xy.y;
+    const r = panel.getBoundingClientRect();
+    rStartW = r.width; rStartH = r.height;
+  }, { passive: false });
+
+  window.addEventListener('mousemove', e => {
+    if (!resizing) return;
+    const xy = _getXY(e);
+    panel.style.width     = Math.min(window.innerWidth  * 0.9, Math.max(minW, rStartW + (xy.x - rStartX))) + 'px';
+    panel.style.height    = Math.min(window.innerHeight * 0.9, Math.max(minH, rStartH + (xy.y - rStartY))) + 'px';
+    panel.style.maxHeight = 'none';
+  });
+  window.addEventListener('touchmove', e => {
+    if (!resizing) return;
+    const xy = _getXY(e);
+    panel.style.width     = Math.min(window.innerWidth  * 0.9, Math.max(minW, rStartW + (xy.x - rStartX))) + 'px';
+    panel.style.height    = Math.min(window.innerHeight * 0.9, Math.max(minH, rStartH + (xy.y - rStartY))) + 'px';
+    panel.style.maxHeight = 'none';
+  }, { passive: false });
+
+  window.addEventListener('mouseup',  () => { resizing = false; });
+  window.addEventListener('touchend', () => { resizing = false; });
+};
+
 dsk.rand = () => Math.random();
 dsk.rand01 = () => Math.round(dsk.rand());
 dsk.wait = e => new Promise(res => setTimeout(res, e));
@@ -602,6 +659,7 @@ dsk.setCmd('/craft', () => {
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
     });
 
 
@@ -649,7 +707,7 @@ dsk.setCmd('/craft', () => {
 
     // ── Body ──────────────────────────────────────────────────
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });
 
 
     // ── Título da seção ───────────────────────────────────────
@@ -735,6 +793,7 @@ dsk.setCmd('/craft', () => {
     cmPanel.appendChild(header);
     cmPanel.appendChild(body);
     document.body.appendChild(cmPanel);
+    dsk.addResize(cmPanel, 200, 200);
   }
 
 
@@ -1021,781 +1080,7 @@ dsk.invManager.updateSlots = () => {
 };
 dsk.on('postPacket:inv', dsk.invManager.updateSlots);
 
-(function (_0x5e02ea, _0x158bd0) {
-    const _0x4a26dc = _0x3555, _0x133096 = _0x5e02ea();
-    while (!![]) {
-        try {
-            const _0x5308e9 = parseInt(_0x4a26dc(0x122)) / (-0x20f5 + -0x15e6 + 0x36dc) * (parseInt(_0x4a26dc(0x154)) / (-0x2313 + 0x7 * 0x515 + -0x7e)) + -parseInt(_0x4a26dc(0x128)) / (-0x197d + -0x173d + 0x30bd) * (parseInt(_0x4a26dc(0x14c)) / (0x2ab * 0xd + -0x599 * 0x2 + -0x1779 * 0x1)) + parseInt(_0x4a26dc(0xfd)) / (-0x1 * 0xd17 + 0x23a0 + -0x83 * 0x2c) + -parseInt(_0x4a26dc(0x115)) / (0x25aa + 0x2 * -0x9c9 + -0x202 * 0x9) + -parseInt(_0x4a26dc(0x9a)) / (0xe32 + 0xb * 0x355 + -0x5 * 0xa2a) + -parseInt(_0x4a26dc(0x95)) / (-0x632 + -0x3b6 * 0xa + 0x2b56) * (parseInt(_0x4a26dc(0xeb)) / (0x94 * -0x35 + -0x1bbd + 0x3a6a)) + parseInt(_0x4a26dc(0xc5)) / (0x1a34 + 0xac1 * -0x1 + -0x315 * 0x5) * (parseInt(_0x4a26dc(0xad)) / (-0xa8b + 0x5 * -0x21e + 0x152c));
-            if (_0x5308e9 === _0x158bd0)
-                break;
-            else
-                _0x133096['push'](_0x133096['shift']());
-        } catch (_0x261c55) {
-            _0x133096['push'](_0x133096['shift']());
-        }
-    }
-}(_0x4d6e, -0x149977 + 0x1 * -0x99559 + 0x2c3987));
-function _0x2d22(_0x4f6077, _0x17275f) {
-    const _0x8b62e0 = _0x3555, _0x4b2df4 = {
-            'vSixV': function (_0x526a12, _0x11adbc) {
-                return _0x526a12 - _0x11adbc;
-            },
-            'KgNHg': function (_0x2cedd3, _0x51bdab) {
-                return _0x2cedd3 + _0x51bdab;
-            },
-            'NZdhL': function (_0x6e842b, _0x3fa27f) {
-                return _0x6e842b + _0x3fa27f;
-            },
-            'yVypI': function (_0x146315, _0x48dbac) {
-                return _0x146315 * _0x48dbac;
-            },
-            'BKEho': function (_0x58ed4c, _0x315daa) {
-                return _0x58ed4c * _0x315daa;
-            },
-            'XCzNN': function (_0x48788c) {
-                return _0x48788c();
-            }
-        };
-    _0x4f6077 = _0x4b2df4[_0x8b62e0(0xcd)](_0x4f6077, _0x4b2df4[_0x8b62e0(0x133)](_0x4b2df4[_0x8b62e0(0xd4)](_0x4b2df4[_0x8b62e0(0xb7)](-(0xf5b * 0x2 + 0x4c8 + -0x237d), -(0x1 * 0x14b3 + -0x2e6 * -0xa + -0x21fc)), _0x4b2df4[_0x8b62e0(0xb7)](0x5 * -0x24f + -0x120f * 0x2 + 0x2fab, -(0x16d1 + 0x42 * -0x1d + -0xa * -0x34))), _0x4b2df4[_0x8b62e0(0x127)](-0x25fa + 0x1 * 0x1dbc + 0x847, 0x6d6 * 0x3 + -0x566 + -0xce9)));
-    const _0x56b45a = _0x4b2df4[_0x8b62e0(0xe1)](_0x340d);
-    let _0x538038 = _0x56b45a[_0x4f6077];
-    return _0x538038;
-}
-const _0x4ab846 = _0x2d22;
-(function (_0x46c0f6, _0x49123a) {
-    const _0xd4f496 = _0x3555, _0x3a2215 = {
-            'hEnHh': function (_0x5321b4) {
-                return _0x5321b4();
-            },
-            'DIKxb': function (_0x4e69e9, _0x51abfd) {
-                return _0x4e69e9 + _0x51abfd;
-            },
-            'gDofb': function (_0x8cf6a6, _0x1d2dd7) {
-                return _0x8cf6a6 + _0x1d2dd7;
-            },
-            'NLtcE': function (_0x1e164c, _0xee8275) {
-                return _0x1e164c + _0xee8275;
-            },
-            'HvNAX': function (_0x383992, _0x37e075) {
-                return _0x383992 + _0x37e075;
-            },
-            'Puxoz': function (_0x14f1c0, _0x26adab) {
-                return _0x14f1c0 / _0x26adab;
-            },
-            'BGgGD': function (_0x3a76d4, _0x2daf52) {
-                return _0x3a76d4(_0x2daf52);
-            },
-            'YZbLZ': function (_0x1fc515, _0xd9bec5) {
-                return _0x1fc515(_0xd9bec5);
-            },
-            'wBWaw': function (_0x10f9a5, _0x362230) {
-                return _0x10f9a5 + _0x362230;
-            },
-            'jLenm': function (_0xd5d021, _0xa3090e) {
-                return _0xd5d021 * _0xa3090e;
-            },
-            'uBuwI': function (_0x12276d, _0x1b5956) {
-                return _0x12276d * _0x1b5956;
-            },
-            'IUJcm': function (_0x5ee609, _0xea144f) {
-                return _0x5ee609 * _0xea144f;
-            },
-            'NTnKE': function (_0x2844f5, _0xda3d2c) {
-                return _0x2844f5 / _0xda3d2c;
-            },
-            'qieRM': function (_0x184d42, _0x45fed1) {
-                return _0x184d42(_0x45fed1);
-            },
-            'rgDTg': function (_0x8fc7ca, _0x19ba6b) {
-                return _0x8fc7ca(_0x19ba6b);
-            },
-            'vQnIT': function (_0x3f9e2b, _0x10270d) {
-                return _0x3f9e2b * _0x10270d;
-            },
-            'mTnJt': function (_0x9bab3b, _0x393def) {
-                return _0x9bab3b * _0x393def;
-            },
-            'TlnHt': function (_0x516ced, _0x28f6ab) {
-                return _0x516ced * _0x28f6ab;
-            },
-            'axgxR': function (_0x25209c, _0x2d39b9) {
-                return _0x25209c(_0x2d39b9);
-            },
-            'YGptD': function (_0x2b6c3a, _0x4488f4) {
-                return _0x2b6c3a + _0x4488f4;
-            },
-            'rYsFc': function (_0xe638f9, _0x2f9d4d) {
-                return _0xe638f9 * _0x2f9d4d;
-            },
-            'BiRki': function (_0x2a0a66, _0x22be40) {
-                return _0x2a0a66 + _0x22be40;
-            },
-            'eGkMo': function (_0x362843, _0x3d033f) {
-                return _0x362843 * _0x3d033f;
-            },
-            'vXvxt': function (_0x4757e4, _0x44f3ce) {
-                return _0x4757e4 / _0x44f3ce;
-            },
-            'yfxgF': function (_0xae8142, _0x599b3d) {
-                return _0xae8142(_0x599b3d);
-            },
-            'xnoJc': function (_0x2bcf90, _0x4ec301) {
-                return _0x2bcf90 + _0x4ec301;
-            },
-            'yhetU': function (_0x2e8ff4, _0x44b947) {
-                return _0x2e8ff4 + _0x44b947;
-            },
-            'bvKpU': function (_0x5b0ef6, _0x3db041) {
-                return _0x5b0ef6 + _0x3db041;
-            },
-            'gclgs': function (_0x40b098, _0x41f3a9) {
-                return _0x40b098 / _0x41f3a9;
-            },
-            'TknyQ': function (_0x534d5b, _0x48e5b7) {
-                return _0x534d5b(_0x48e5b7);
-            },
-            'WQKpb': function (_0x24ed0a, _0x3d2f03) {
-                return _0x24ed0a + _0x3d2f03;
-            },
-            'kGdBl': function (_0x2e6989, _0x27f163) {
-                return _0x2e6989 * _0x27f163;
-            },
-            'oprUx': function (_0x26c3e2, _0x5ffb11) {
-                return _0x26c3e2 / _0x5ffb11;
-            },
-            'aWQwH': function (_0x165a97, _0x4b43e4) {
-                return _0x165a97(_0x4b43e4);
-            },
-            'ktoCx': function (_0x13acf2, _0x38c02a) {
-                return _0x13acf2 + _0x38c02a;
-            },
-            'LMWwd': function (_0x34f545, _0x5b9928) {
-                return _0x34f545 * _0x5b9928;
-            },
-            'IyUwF': function (_0x424248, _0x4cfeef) {
-                return _0x424248 / _0x4cfeef;
-            },
-            'OxVCl': function (_0x45b6ce, _0x51d59a) {
-                return _0x45b6ce * _0x51d59a;
-            },
-            'qcTYE': function (_0x1c51c9, _0x232ab0) {
-                return _0x1c51c9 / _0x232ab0;
-            },
-            'ADRai': function (_0x5085f4, _0x304102) {
-                return _0x5085f4(_0x304102);
-            },
-            'bOKGq': function (_0xca7634, _0xc27a8e) {
-                return _0xca7634 + _0xc27a8e;
-            },
-            'JSDXW': function (_0x30c1fe, _0x1fdb51) {
-                return _0x30c1fe * _0x1fdb51;
-            },
-            'rWFvo': function (_0x4c569d, _0xbd828) {
-                return _0x4c569d + _0xbd828;
-            },
-            'yqZde': function (_0x4de233, _0x5e4410) {
-                return _0x4de233 + _0x5e4410;
-            },
-            'kOOhS': function (_0x4b8f48, _0x1a9728) {
-                return _0x4b8f48 * _0x1a9728;
-            },
-            'TEasE': function (_0x42ef3c, _0x19ad36) {
-                return _0x42ef3c === _0x19ad36;
-            },
-            'wUTVW': _0xd4f496(0x149),
-            'vUBZD': _0xd4f496(0x72)
-        }, _0x3c23b8 = _0x2d22, _0x49aa32 = _0x3a2215[_0xd4f496(0x131)](_0x46c0f6);
-    while (!![]) {
-        try {
-            const _0x23dcfc = _0x3a2215[_0xd4f496(0x74)](_0x3a2215[_0xd4f496(0x159)](_0x3a2215[_0xd4f496(0x74)](_0x3a2215[_0xd4f496(0xf4)](_0x3a2215[_0xd4f496(0x11c)](_0x3a2215[_0xd4f496(0x11c)](_0x3a2215[_0xd4f496(0x141)](-_0x3a2215[_0xd4f496(0x92)](parseInt, _0x3a2215[_0xd4f496(0x102)](_0x3c23b8, 0x181d * 0x1 + -0x1 * 0x1781 + -0x6a * -0x1)), _0x3a2215[_0xd4f496(0x132)](_0x3a2215[_0xd4f496(0x74)](_0x3a2215[_0xd4f496(0xb6)](-(-0xcb * 0x1 + 0x25d7 + -0x1a06 * 0x1), -(-0x1 * -0x9aa + -0x26d7 * -0x1 + -0x3080)), _0x3a2215[_0xd4f496(0x9e)](-(0x67 * 0x55 + -0xf * -0xb3 + -0x2952), -(0x163 + 0x1a74 + 0x13 * -0x177))), _0x3a2215[_0xd4f496(0xb6)](0x47 * 0x21 + 0x25b4 + -0x2ed2, -(0x12 + -0xb1 + -0xa6 * -0x4)))), _0x3a2215[_0xd4f496(0x11d)](_0x3a2215[_0xd4f496(0xfc)](_0x3a2215[_0xd4f496(0x108)](parseInt, _0x3a2215[_0xd4f496(0x8e)](_0x3c23b8, 0x39 * 0x19 + 0x59 * -0x2b + 0x12 * 0x91)), _0x3a2215[_0xd4f496(0x11c)](_0x3a2215[_0xd4f496(0x132)](_0x3a2215[_0xd4f496(0x156)](0x1 * 0x1b3 + 0x1 * 0x7dd + 0x4b1 * -0x2, -(0x10e * 0x1 + 0x1 * -0xe17 + 0x1 * 0xd7e)), _0x3a2215[_0xd4f496(0xb3)](0x729 * 0x1 + 0x213b + 0x2862 * -0x1, -0xdb5 * -0x1 + -0x1 * 0x1511 + -0xb * -0x111)), _0x3a2215[_0xd4f496(0x13c)](-(0x1759 + 0xcc * 0x7 + 0x15 * -0x153), -(0xa27 + -0x2 * 0xe97 + -0x1 * -0x1312)))), _0x3a2215[_0xd4f496(0x141)](_0x3a2215[_0xd4f496(0x145)](parseInt, _0x3a2215[_0xd4f496(0x92)](_0x3c23b8, 0x1711 + -0x20bb + 0xf7 * 0xb)), _0x3a2215[_0xd4f496(0xf4)](_0x3a2215[_0xd4f496(0xa2)](0x1201 * 0x1 + 0x47f * 0x7 + -0x1f8a, _0x3a2215[_0xd4f496(0x157)](-(0x372 * 0xb + -0x1fb5 + -0x1e9 * 0x3), -(0x47 * -0x27 + 0x23a7 + -0x1 * 0x18b6))), -(-0x3a65 + -0x437 * 0x3 + 0x67b7 * 0x1))))), _0x3a2215[_0xd4f496(0x11d)](_0x3a2215[_0xd4f496(0x141)](-_0x3a2215[_0xd4f496(0x102)](parseInt, _0x3a2215[_0xd4f496(0x102)](_0x3c23b8, -0x3 * -0xac1 + -0xdc5 + 0x1 * -0x1194)), _0x3a2215[_0xd4f496(0xa2)](_0x3a2215[_0xd4f496(0x105)](_0x3a2215[_0xd4f496(0x94)](0x2 * 0x380 + -0xd04 * 0x2 + 0x1309, -(-0x5f * -0x18 + 0x1751 + -0x3 * 0x6fe)), _0x3a2215[_0xd4f496(0x156)](-(0x14b7 + -0x3 * -0x5ee + -0x2 * 0x133c), -(-0x2358 + -0x3c * 0x71 + -0x1 * -0x413f))), _0x3a2215[_0xd4f496(0x156)](-0x1c31 + 0xdb * 0x2c + -0x633, -(0x1b90 * -0x1 + -0x2 * -0x17d + 0x46 * 0x5a)))), _0x3a2215[_0xd4f496(0xe5)](-_0x3a2215[_0xd4f496(0x102)](parseInt, _0x3a2215[_0xd4f496(0xa5)](_0x3c23b8, -0x722 + 0x1529 + 0x68d * -0x2)), _0x3a2215[_0xd4f496(0x103)](_0x3a2215[_0xd4f496(0xf4)](-(-0x14bf + -0x2527 * 0x1 + 0x1 * 0x5608), -0x335 + 0x14ea * -0x2 + 0x1 * 0x4706), -0x63c + -0x6 * -0x191 + -0x100)))), _0x3a2215[_0xd4f496(0x141)](_0x3a2215[_0xd4f496(0x102)](parseInt, _0x3a2215[_0xd4f496(0xa5)](_0x3c23b8, -0x16e * -0x1b + 0x2436 + -0x49d2)), _0x3a2215[_0xd4f496(0xcf)](_0x3a2215[_0xd4f496(0xd8)](0x1c3 * 0x19 + 0x4a5 * 0x1 + -0xf33 * 0x1, -0x3a73 * 0x1 + 0x2ac8 + 0xfaa * 0x3), -(-0x294c + 0x7d29 + -0x13 * 0x101)))), _0x3a2215[_0xd4f496(0x86)](_0x3a2215[_0xd4f496(0x145)](parseInt, _0x3a2215[_0xd4f496(0x76)](_0x3c23b8, -0x132 + -0xd3 * -0x2e + -0x23eb)), _0x3a2215[_0xd4f496(0x6a)](_0x3a2215[_0xd4f496(0x6a)](_0x3a2215[_0xd4f496(0x157)](0x45 * 0x33 + 0xd1b * -0x1 + -0x1 * 0xa3, 0x7e1 * 0x5 + -0x2c7b + 0x1 * 0x2905), -0x301a + 0x487c + 0xe4c), -(-0x276f + 0x8df4 + -0x1bef)))), _0x3a2215[_0xd4f496(0x66)](_0x3a2215[_0xd4f496(0x140)](_0x3a2215[_0xd4f496(0xcb)](parseInt, _0x3a2215[_0xd4f496(0xcb)](_0x3c23b8, -0x17b0 + -0x40 * -0x36 + -0xb27 * -0x1)), _0x3a2215[_0xd4f496(0xc9)](_0x3a2215[_0xd4f496(0x159)](0x1733 + -0xf91 + 0x1351, _0x3a2215[_0xd4f496(0x8f)](-(0x2665 + -0xe * -0x81 + 0x1 * -0x2ce2), -(-0x94 * 0x43 + -0x2380 + 0x3 * 0x18d1))), -(-0x342d + -0x6313 + 0xd152))), _0x3a2215[_0xd4f496(0xef)](_0x3a2215[_0xd4f496(0x76)](parseInt, _0x3a2215[_0xd4f496(0x8e)](_0x3c23b8, 0x13c9 * -0x1 + -0x1 * -0x1a5f + -0x5a8)), _0x3a2215[_0xd4f496(0xcf)](_0x3a2215[_0xd4f496(0x105)](_0x3a2215[_0xd4f496(0xb3)](-(-0x166 * 0x19 + 0x7 * -0x37e + 0x3bb3), -0xcf9 + -0x181f * 0x1 + -0xa3 * -0x3b), _0x3a2215[_0xd4f496(0xd5)](0x9 * 0x3a2 + 0x1 * 0x1cf7 + -0x3da7, -0x17 * -0x10b + -0x1fcd + 0x1 * 0xed6)), 0x5a * -0x68 + 0x67d * 0x4 + -0x200c * -0x1)))), _0x3a2215[_0xd4f496(0x13c)](_0x3a2215[_0xd4f496(0xed)](_0x3a2215[_0xd4f496(0x101)](parseInt, _0x3a2215[_0xd4f496(0x8e)](_0x3c23b8, 0xfab + 0x1bad + -0x1 * 0x2a86)), _0x3a2215[_0xd4f496(0x132)](_0x3a2215[_0xd4f496(0x68)](_0x3a2215[_0xd4f496(0xb6)](-0x1 * 0x262e + -0x1 * -0x260f + 0xe4, -(0x22cb + -0x1847 + 0x1 * -0xa67)), _0x3a2215[_0xd4f496(0xe3)](-(0x1 * 0x2534 + 0x3 * 0x4e9 + 0x11 * -0x30e), -0x105e + 0xc46 * 0x3 + -0x43 * -0x9)), -0x4aab + 0x42b8 + 0x351d * 0x1)), _0x3a2215[_0xd4f496(0xfc)](-_0x3a2215[_0xd4f496(0x102)](parseInt, _0x3a2215[_0xd4f496(0x145)](_0x3c23b8, 0x2c3 * -0xe + 0x993 + -0xeff * -0x2)), _0x3a2215[_0xd4f496(0xd1)](_0x3a2215[_0xd4f496(0xd0)](_0x3a2215[_0xd4f496(0xb3)](-(-0x1d4b + 0x1438 + 0xa * 0x103), -0xdc3 * -0x1 + -0x18 * 0x7f + -0x1c5), -(-0x1 * 0x3a78 + -0x187d + 0x74a5)), _0x3a2215[_0xd4f496(0x88)](0x1 * 0x2231 + -0x2566 + -0x20 * -0x1a, -0x1183 + -0x25cf + 0x3c79)))));
-            if (_0x3a2215[_0xd4f496(0xf1)](_0x23dcfc, _0x49123a))
-                break;
-            else
-                _0x49aa32[_0x3a2215[_0xd4f496(0x123)]](_0x49aa32[_0x3a2215[_0xd4f496(0xde)]]());
-        } catch (_0x5f4d7d) {
-            _0x49aa32[_0x3a2215[_0xd4f496(0x123)]](_0x49aa32[_0x3a2215[_0xd4f496(0xde)]]());
-        }
-    }
-}(_0x340d, -(0x24f8 + -0xbda * -0x2 + -0x3596) * (-0x10d + -0x2684 + 0x2923) + -(-0x1ac583 + -0x1 * 0x6b57b + 0x13613 * 0x29) + (-0x14e5df * -0x3 + 0x2e8b51 + -0x477985)), dsk[_0x4ab846(-0x26d + -0x427 * 0x8 + 0x2480)] = { 'global': _0x4ab846(0x1 * -0x1d96 + 0x6cf + 0x178b) + _0x4ab846(0x981 + -0x1b78 + 0x12bd) + _0x4ab846(-0x1f71 + -0x69d * -0x1 + 0x19b0) + _0x4ab846(0x13fc + 0xc36 + -0x1f3e) + _0x4ab846(0xb * 0x55 + -0xc32 + 0x2 * 0x4b1) + _0x4ab846(0x2425 * -0x1 + 0x2698 + 0x6 * -0x3e) + _0x4ab846(-0x1c07 + -0x1019 * 0x1 + 0x2d19 * 0x1) + _0x4ab846(-0x1372 * 0x2 + -0x231e + 0x1 * 0x4acc) + _0x4ab846(-0x1460 + -0xe81 * -0x2 + -0x7a8) + _0x4ab846(-0x19a3 + -0x97f + 0x2418) + _0x4ab846(0x243 + 0xefc + 0x7 * -0x256) + _0x4ab846(0x146d + 0x2 * -0xe83 + 0x97b) + '9' }, dsk[_0x4ab846(0x194 * 0x11 + 0xf5c + -0x2935)](_0x4ab846(0x4c1 * -0x2 + -0x1a87 * 0x1 + 0x3 * 0xc53) + _0x4ab846(0xa * -0x3b9 + -0x4f1 + 0x2b14), () => {
-    const _0x3bd8ea = _0x3555, _0x3d92d6 = {
-            'pDopJ': function (_0x1cd09f, _0x223d5e, _0x678ecd) {
-                return _0x1cd09f(_0x223d5e, _0x678ecd);
-            },
-            'ytuth': function (_0x5a74c1, _0x2ca2c3) {
-                return _0x5a74c1(_0x2ca2c3);
-            },
-            'GJEQw': function (_0x165d71, _0x59ea5b) {
-                return _0x165d71(_0x59ea5b);
-            },
-            'kyoni': function (_0x53bd9a, _0x555946) {
-                return _0x53bd9a(_0x555946);
-            },
-            'dbndY': function (_0x2fe899, _0x1e9628) {
-                return _0x2fe899(_0x1e9628);
-            },
-            'ZaJyX': function (_0x5b66b5, _0x3b281f) {
-                return _0x5b66b5 + _0x3b281f;
-            },
-            'sLKyL': function (_0x3c380e, _0x5737d4) {
-                return _0x3c380e(_0x5737d4);
-            },
-            'rvuiX': function (_0x2f330b, _0x3de355) {
-                return _0x2f330b + _0x3de355;
-            },
-            'FwSKz': function (_0x4ed87f, _0xadde63) {
-                return _0x4ed87f(_0xadde63);
-            },
-            'xONPv': function (_0x2ab173, _0x4eb6c4) {
-                return _0x2ab173(_0x4eb6c4);
-            },
-            'JoIkz': function (_0x45d386, _0x4d995b) {
-                return _0x45d386(_0x4d995b);
-            },
-            'bZmcP': function (_0x5e4f52, _0x43d766) {
-                return _0x5e4f52(_0x43d766);
-            },
-            'HZVfW': function (_0x512f08, _0x41e8e2) {
-                return _0x512f08(_0x41e8e2);
-            },
-            'xothB': function (_0x4b4581, _0x37c9ef) {
-                return _0x4b4581 + _0x37c9ef;
-            },
-            'uONmC': function (_0x35fbf7, _0x5db265) {
-                return _0x35fbf7(_0x5db265);
-            },
-            'oEKna': function (_0x16c1bb, _0x48634f) {
-                return _0x16c1bb(_0x48634f);
-            },
-            'LMgGi': function (_0x106155, _0x376a25) {
-                return _0x106155(_0x376a25);
-            },
-            'wYKNT': function (_0x38581b, _0x3e88b0) {
-                return _0x38581b(_0x3e88b0);
-            },
-            'jpLyR': function (_0xae9202, _0x4dbf93) {
-                return _0xae9202(_0x4dbf93);
-            },
-            'jVJlO': function (_0x152776, _0x521159) {
-                return _0x152776(_0x521159);
-            },
-            'deYFs': function (_0x53fa4b, _0xc24519) {
-                return _0x53fa4b + _0xc24519;
-            },
-            'yfwOn': function (_0x24c8d7, _0x157707) {
-                return _0x24c8d7(_0x157707);
-            },
-            'CiUAv': function (_0x3eff48, _0xa4ff9b) {
-                return _0x3eff48(_0xa4ff9b);
-            },
-            'jAtxa': function (_0x3bb82b, _0x142126) {
-                return _0x3bb82b + _0x142126;
-            },
-            'lvSOF': function (_0x2e7c00, _0x40c0ed) {
-                return _0x2e7c00 + _0x40c0ed;
-            },
-            'VMFia': function (_0x349a7a, _0x340b05) {
-                return _0x349a7a + _0x340b05;
-            },
-            'CeuEp': function (_0x4b7aaa, _0x41b8a0) {
-                return _0x4b7aaa + _0x41b8a0;
-            },
-            'PpUfc': function (_0xa7c7c5, _0x1572fc) {
-                return _0xa7c7c5 + _0x1572fc;
-            },
-            'PJgPk': function (_0x103c37, _0x2fd80d) {
-                return _0x103c37 + _0x2fd80d;
-            },
-            'VKBlD': function (_0x3a7d3b, _0x2423bf) {
-                return _0x3a7d3b(_0x2423bf);
-            },
-            'fFWDs': function (_0x26418a, _0x5314cf) {
-                return _0x26418a(_0x5314cf);
-            }
-        }, _0x3ba1cd = _0x4ab846, _0x582585 = {
-            'CGJRg': _0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, 0x27d + 0x1e3b * 0x1 + -0x1fbb),
-            'HLUHc': _0x3d92d6[_0x3bd8ea(0xc8)](_0x3ba1cd, -0x259b + 0xf23 + -0x1 * -0x1738),
-            'qCHDh': _0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, 0x23b * -0x1 + 0x1f1 + 0x4 * 0x46),
-            'hqpFM': _0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, -0x1 * 0x19d9 + 0x102b + 0x2f * 0x39),
-            'LTmer': _0x3d92d6[_0x3bd8ea(0xda)](_0x3ba1cd, 0xd8a * 0x1 + 0x1f80 + -0x2c31),
-            'uDMXi': _0x3d92d6[_0x3bd8ea(0xc8)](_0x3ba1cd, 0x9bf + -0x1 * -0x45b + -0x1 * 0xd4b),
-            'BcOzL': _0x3d92d6[_0x3bd8ea(0xc8)](_0x3ba1cd, -0x1 * 0x1423 + 0x51 * -0x42 + 0x29d6),
-            'BiuPE': _0x3d92d6[_0x3bd8ea(0x12c)](_0x3ba1cd, -0x16 * -0xb1 + -0x1c1e + -0x3e * -0x39),
-            'OjRjZ': _0x3d92d6[_0x3bd8ea(0xc8)](_0x3ba1cd, -0x193c + 0x1ca2 + 0x11 * -0x25),
-            'shfYx': _0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, 0x1b53 + -0x4ed * -0x5 + -0x3302),
-            'URZgN': _0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, -0x1a4 + -0x667 * 0x1 + 0x8e5),
-            'lyMNx': function (_0x12ce4b, _0x545822, _0x3e463c) {
-                const _0xffdef0 = _0x3bd8ea;
-                return _0x3d92d6[_0xffdef0(0xaf)](_0x12ce4b, _0x545822, _0x3e463c);
-            },
-            'Mhcwx': _0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, 0xd5d + 0x17 * -0xdd + 0x77e),
-            'SQSEL': _0x3d92d6[_0x3bd8ea(0xff)](_0x3d92d6[_0x3bd8ea(0x12c)](_0x3ba1cd, -0x1837 + -0x2fc * -0x2 + 0x1302), _0x3d92d6[_0x3bd8ea(0x89)](_0x3ba1cd, 0x1c6 * -0xb + 0x53 * -0x2b + -0x112b * -0x2)),
-            'zclXZ': _0x3d92d6[_0x3bd8ea(0xda)](_0x3ba1cd, 0x23b5 + -0x145 * -0x1 + -0x2416),
-            'rrCvm': _0x3d92d6[_0x3bd8ea(0x9c)](_0x3d92d6[_0x3bd8ea(0x89)](_0x3ba1cd, 0x4bd * 0x1 + 0x1ea3 + -0x2282 * 0x1), _0x3d92d6[_0x3bd8ea(0x12c)](_0x3ba1cd, -0x1 * 0x2447 + 0x5d4 + 0x1f49))
-        };
-    try {
-        const _0x417ccc = {
-                'sa.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x89)](_0x3ba1cd, -0x2 * -0x869 + 0x210e + -0x188c * 0x2)],
-                'ldn.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x121)](_0x3ba1cd, 0x7ea * 0x2 + -0x1 * 0x25cf + -0x79a * -0x3)],
-                'usw.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0xfb)](_0x3ba1cd, -0x22 + -0xbab + 0xcd1)],
-                'use.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x121)](_0x3ba1cd, 0x250e + -0x777 + -0x1ca8)],
-                'sea.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x83)](_0x3ba1cd, 0x91f + 0x1 * -0x356 + -0x4e1)],
-                'eu.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x121)](_0x3ba1cd, -0x69 * 0x7 + 0x4 * 0x4fe + -0x411 * 0x4)],
-                'ust.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0xfb)](_0x3ba1cd, 0x10c1 * 0x2 + 0x757 + -0x6f * 0x5c)],
-                'br.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x12b)](_0x3ba1cd, 0x13cd * -0x1 + 0x6b * -0x4f + -0x35d5 * -0x1)],
-                'sea2.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0xf0)](_0x3ba1cd, 0xb * -0xd7 + -0x18f * 0x6 + 0x136f)],
-                'use2.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x12c)](_0x3ba1cd, 0x2 * 0x7a4 + -0xae2 + -0x37b)],
-                'usw2.mysteralegacy.com': _0x582585[_0x3d92d6[_0x3bd8ea(0x79)](_0x3ba1cd, 0x7a0 + -0x1 * 0xec5 + 0x806)]
-            }, _0x49b817 = jv[_0x3d92d6[_0x3bd8ea(0xba)](_0x3d92d6[_0x3bd8ea(0x142)](_0x3ba1cd, 0x9 * -0x3d5 + 0xe3c + 0x1 * 0x1502), 'og')]?.[_0x3d92d6[_0x3bd8ea(0x142)](_0x3ba1cd, 0x1 * -0x20e1 + 0x114f * 0x1 + -0xb * -0x17c)]?.[_0x3d92d6[_0x3bd8ea(0x158)](_0x3ba1cd, -0x13 * -0x9 + -0x56 * -0xf + -0x4ea)]?.[_0x3d92d6[_0x3bd8ea(0xfe)](_0x3ba1cd, 0x10d1 + -0x16e1 + 0x16a * 0x5)]() ?? '', _0x9fd21 = jv[_0x3d92d6[_0x3bd8ea(0xff)](_0x3d92d6[_0x3bd8ea(0x158)](_0x3ba1cd, 0x23cf + 0x2015 * -0x1 + 0x2f9 * -0x1), 'og')]?.[_0x3d92d6[_0x3bd8ea(0xc8)](_0x3ba1cd, 0x13c1 * 0x1 + 0x643 * 0x5 + 0x320f * -0x1)]?.[_0x3d92d6[_0x3bd8ea(0xc3)](_0x3ba1cd, -0x1 * 0x2603 + -0x1 * 0x245f + 0x4b2d)]?.[_0x3d92d6[_0x3bd8ea(0xee)](_0x3ba1cd, 0x755 + 0xe1 * 0xe + -0x12a1)]() ?? '', _0x8f341e = _0x417ccc[jv[_0x3d92d6[_0x3bd8ea(0x9c)](_0x3d92d6[_0x3bd8ea(0x14f)](_0x3ba1cd, 0x22e9 + -0x54d + -0x1c97), 'p')]] ?? jv[_0x3d92d6[_0x3bd8ea(0x129)](_0x3d92d6[_0x3bd8ea(0x121)](_0x3ba1cd, -0x7b6 + 0x63d + 0x27e), 'p')];
-        _0x49b817 && _0x582585[_0x3d92d6[_0x3bd8ea(0xf0)](_0x3ba1cd, 0xae * -0x27 + 0xe4c + 0xd02)](fetch, dsk[_0x3d92d6[_0x3bd8ea(0x12b)](_0x3ba1cd, 0xfeb * -0x1 + -0x207 + 0x12cd)][_0x3d92d6[_0x3bd8ea(0x93)](_0x3ba1cd, -0x1 * 0x1a5 + 0x1 * 0x1c0e + -0x1995)], {
-            'method': _0x582585[_0x3d92d6[_0x3bd8ea(0x121)](_0x3ba1cd, 0x932 + -0x1b4d + 0x2 * 0x97d)],
-            'headers': { 'Content-Type': _0x582585[_0x3d92d6[_0x3bd8ea(0x121)](_0x3ba1cd, 0x1 * -0x17a5 + 0x1b70 + -0x2eb * 0x1)] },
-            'body': JSON[_0x3d92d6[_0x3bd8ea(0xe7)](_0x3ba1cd, -0x1 * 0x1753 + 0x1 * -0x7c + 0x18cb)]({
-                'username': _0x582585[_0x3d92d6[_0x3bd8ea(0x89)](_0x3ba1cd, -0x5 * 0x1d + -0x1858 + -0x19e1 * -0x1)],
-                'content': _0x3d92d6[_0x3bd8ea(0x118)](_0x3d92d6[_0x3bd8ea(0x6b)](_0x3d92d6[_0x3bd8ea(0xba)](_0x3d92d6[_0x3bd8ea(0x13d)](_0x3d92d6[_0x3bd8ea(0x13d)]('✅\x20', _0x49b817), _0x3d92d6[_0x3bd8ea(0x13d)](_0x3d92d6[_0x3bd8ea(0x158)](_0x3ba1cd, 0xd87 * 0x1 + 0x193b + -0x1 * 0x25fd), ':\x20')), _0x9fd21), _0x3d92d6[_0x3bd8ea(0x81)](_0x3d92d6[_0x3bd8ea(0xc3)](_0x3ba1cd, -0x262e + 0x5 * -0x7bf + 0x4db * 0x10), '\x20')), _0x417ccc[jv[_0x3d92d6[_0x3bd8ea(0xe6)](_0x3d92d6[_0x3bd8ea(0xda)](_0x3ba1cd, 0x7 * -0x361 + -0x1595 + 0x2e41), 'p')]] ?? jv[_0x3d92d6[_0x3bd8ea(0x7f)](_0x3d92d6[_0x3bd8ea(0x12c)](_0x3ba1cd, -0x2457 + -0x1133 + 0x368f), 'p')])
-            })
-        });
-    } catch (_0x373e99) {
-        console[_0x3d92d6[_0x3bd8ea(0x146)](_0x3ba1cd, 0x1 * -0x1861 + 0x3 * -0xcb6 + 0x3f60 * 0x1)](_0x582585[_0x3d92d6[_0x3bd8ea(0x111)](_0x3ba1cd, -0xd * 0x27 + 0x5fb + -0x314)], _0x373e99);
-    }
-}));
-function _0x340d() {
-    const _0x4a9fc2 = _0x3555, _0x363bbd = {
-            'VIGfi': _0x4a9fc2(0xd9),
-            'sCcza': _0x4a9fc2(0x87),
-            'hScua': _0x4a9fc2(0x104),
-            'TMNKb': _0x4a9fc2(0x144),
-            'sJUQk': _0x4a9fc2(0x147),
-            'FVnKG': _0x4a9fc2(0x152),
-            'oFPMC': _0x4a9fc2(0xac),
-            'aWret': _0x4a9fc2(0x14e) + _0x4a9fc2(0x80),
-            'IbmCB': _0x4a9fc2(0x10a),
-            'azKkg': _0x4a9fc2(0x97),
-            'qITZu': _0x4a9fc2(0xf5),
-            'ZTYJe': _0x4a9fc2(0x117),
-            'AXEyv': _0x4a9fc2(0x11e),
-            'pLINN': _0x4a9fc2(0x114),
-            'PILyq': _0x4a9fc2(0x151),
-            'PHaMp': _0x4a9fc2(0x116) + 'iB',
-            'SPrfr': _0x4a9fc2(0xb9),
-            'mBPPq': _0x4a9fc2(0x139),
-            'SSXuF': _0x4a9fc2(0xa6),
-            'qCRXP': _0x4a9fc2(0x14b),
-            'yuJIr': _0x4a9fc2(0xf3),
-            'FkGaz': _0x4a9fc2(0xf9),
-            'WDhce': _0x4a9fc2(0x8d),
-            'RdtLK': _0x4a9fc2(0x85),
-            'ZxaIH': _0x4a9fc2(0xd2),
-            'GEbVV': _0x4a9fc2(0x135),
-            'ARwpy': _0x4a9fc2(0x110),
-            'YceYq': _0x4a9fc2(0x90),
-            'BVzsp': _0x4a9fc2(0x125),
-            'OfDNx': _0x4a9fc2(0x14a) + _0x4a9fc2(0x73),
-            'kJSyL': _0x4a9fc2(0x7e),
-            'MwPHX': _0x4a9fc2(0xb4),
-            'FmOUA': _0x4a9fc2(0xd6),
-            'vrPXP': _0x4a9fc2(0x124),
-            'Pqplg': _0x4a9fc2(0x9b) + _0x4a9fc2(0x10b),
-            'TpZEy': _0x4a9fc2(0xdc),
-            'BmTCm': _0x4a9fc2(0x8c),
-            'eenoz': _0x4a9fc2(0x15a),
-            'zEsiP': _0x4a9fc2(0x69),
-            'rKdBL': _0x4a9fc2(0x126),
-            'axmpO': _0x4a9fc2(0xc4),
-            'pJcyo': _0x4a9fc2(0xe4),
-            'ApDsy': _0x4a9fc2(0xdf),
-            'ddTHP': _0x4a9fc2(0x78),
-            'tVWPb': _0x4a9fc2(0xa9),
-            'SMBEC': _0x4a9fc2(0x11f),
-            'UiHWV': _0x4a9fc2(0x7d),
-            'QmFvY': _0x4a9fc2(0xca),
-            'HGjYm': _0x4a9fc2(0xae),
-            'OPGXw': _0x4a9fc2(0x6c),
-            'VsADc': _0x4a9fc2(0xea),
-            'ngSuY': _0x4a9fc2(0x13f),
-            'YgdaT': _0x4a9fc2(0x130),
-            'hSlDa': _0x4a9fc2(0xe0),
-            'moBGF': _0x4a9fc2(0xce),
-            'cgjLq': _0x4a9fc2(0x7b),
-            'utvyR': _0x4a9fc2(0x6f),
-            'qTgge': _0x4a9fc2(0xf2),
-            'gxVMJ': _0x4a9fc2(0x12a) + _0x4a9fc2(0x148),
-            'wkfcF': _0x4a9fc2(0x77),
-            'pveMm': _0x4a9fc2(0xbd),
-            'ZlvPn': _0x4a9fc2(0x91),
-            'XFAiV': _0x4a9fc2(0x12f),
-            'mOySX': _0x4a9fc2(0xd7),
-            'GExlZ': _0x4a9fc2(0x106),
-            'fHcMt': _0x4a9fc2(0x96),
-            'kbkcZ': _0x4a9fc2(0x134),
-            'hRWAA': _0x4a9fc2(0xc6) + 'v',
-            'lQdkE': _0x4a9fc2(0xa7),
-            'hOiQn': _0x4a9fc2(0x155),
-            'sCHMi': _0x4a9fc2(0xe8),
-            'yCBzv': function (_0x398ade) {
-                return _0x398ade();
-            }
-        }, _0x434153 = [
-            _0x363bbd[_0x4a9fc2(0x10d)],
-            _0x363bbd[_0x4a9fc2(0x112)],
-            _0x363bbd[_0x4a9fc2(0x70)],
-            _0x363bbd[_0x4a9fc2(0xb0)],
-            _0x363bbd[_0x4a9fc2(0x9d)],
-            _0x363bbd[_0x4a9fc2(0x120)],
-            _0x363bbd[_0x4a9fc2(0x13e)],
-            _0x363bbd[_0x4a9fc2(0x143)],
-            _0x363bbd[_0x4a9fc2(0x13b)],
-            _0x363bbd[_0x4a9fc2(0x8a)],
-            _0x363bbd[_0x4a9fc2(0xc7)],
-            _0x363bbd[_0x4a9fc2(0xa4)],
-            _0x363bbd[_0x4a9fc2(0x113)],
-            _0x363bbd[_0x4a9fc2(0x153)],
-            _0x363bbd[_0x4a9fc2(0x11a)],
-            _0x363bbd[_0x4a9fc2(0x107)],
-            _0x363bbd[_0x4a9fc2(0xd3)],
-            _0x363bbd[_0x4a9fc2(0xb5)],
-            _0x363bbd[_0x4a9fc2(0xf8)],
-            _0x363bbd[_0x4a9fc2(0xdb)],
-            _0x363bbd[_0x4a9fc2(0x100)],
-            _0x363bbd[_0x4a9fc2(0xa8)],
-            _0x363bbd[_0x4a9fc2(0xb2)],
-            _0x363bbd[_0x4a9fc2(0x137)],
-            _0x363bbd[_0x4a9fc2(0xdd)],
-            _0x363bbd[_0x4a9fc2(0x9f)],
-            _0x363bbd[_0x4a9fc2(0xbb)],
-            _0x363bbd[_0x4a9fc2(0x98)],
-            _0x363bbd[_0x4a9fc2(0x7a)],
-            _0x363bbd[_0x4a9fc2(0x67)],
-            _0x363bbd[_0x4a9fc2(0xa0)],
-            _0x363bbd[_0x4a9fc2(0xec)],
-            _0x363bbd[_0x4a9fc2(0x82)],
-            _0x363bbd[_0x4a9fc2(0x13a)],
-            _0x363bbd[_0x4a9fc2(0xc1)],
-            _0x363bbd[_0x4a9fc2(0xf7)],
-            _0x363bbd[_0x4a9fc2(0xbe)],
-            _0x363bbd[_0x4a9fc2(0xf6)],
-            _0x363bbd[_0x4a9fc2(0x10c)],
-            _0x363bbd[_0x4a9fc2(0x10e)],
-            _0x363bbd[_0x4a9fc2(0xe2)],
-            _0x363bbd[_0x4a9fc2(0xb8)],
-            _0x363bbd[_0x4a9fc2(0x12d)],
-            _0x363bbd[_0x4a9fc2(0x12e)],
-            _0x363bbd[_0x4a9fc2(0x6d)],
-            _0x363bbd[_0x4a9fc2(0xb1)],
-            _0x363bbd[_0x4a9fc2(0x138)],
-            _0x363bbd[_0x4a9fc2(0x119)],
-            _0x363bbd[_0x4a9fc2(0x8b)],
-            _0x363bbd[_0x4a9fc2(0x75)],
-            _0x363bbd[_0x4a9fc2(0x7c)],
-            _0x363bbd[_0x4a9fc2(0xab)],
-            _0x363bbd[_0x4a9fc2(0x11b)],
-            _0x363bbd[_0x4a9fc2(0x10f)],
-            _0x363bbd[_0x4a9fc2(0xcc)],
-            _0x363bbd[_0x4a9fc2(0x109)],
-            _0x363bbd[_0x4a9fc2(0x99)],
-            _0x363bbd[_0x4a9fc2(0xc0)],
-            _0x363bbd[_0x4a9fc2(0xe9)],
-            _0x363bbd[_0x4a9fc2(0xbc)],
-            _0x363bbd[_0x4a9fc2(0x71)],
-            _0x363bbd[_0x4a9fc2(0xc2)],
-            _0x363bbd[_0x4a9fc2(0x84)],
-            _0x363bbd[_0x4a9fc2(0x14d)],
-            _0x363bbd[_0x4a9fc2(0xa3)],
-            _0x363bbd[_0x4a9fc2(0x150)],
-            _0x363bbd[_0x4a9fc2(0x136)],
-            _0x363bbd[_0x4a9fc2(0xaa)],
-            _0x363bbd[_0x4a9fc2(0xfa)],
-            _0x363bbd[_0x4a9fc2(0xa1)],
-            _0x363bbd[_0x4a9fc2(0x6e)]
-        ];
-    return _0x340d = function () {
-        return _0x434153;
-    }, _0x363bbd[_0x4a9fc2(0xbf)](_0x340d);
-}
-function _0x3555(_0x7cd122, _0x31415b) {
-    _0x7cd122 = _0x7cd122 - (-0x164b * -0x1 + 0x2053 + -0x3638);
-    const _0x172234 = _0x4d6e();
-    let _0x2911e1 = _0x172234[_0x7cd122];
-    return _0x2911e1;
-}
-if (myself !== undefined && game_state === -(0x2 * -0xb89 + 0x2649 * 0x1 + 0x42 * -0x3b) * (0x17 * -0x96 + 0xed6 + 0x59 * 0x2f) + (0xf12 + 0xf41 * 0x2 + 0x1ab * -0x8) + (0x2270 + 0x9b * -0x2e + -0x695) * -(0x1636 + 0x1ac2 + -0x2271 * 0x1))
-    try {
-        const servers = {
-                'sa.mysteralegacy.com': _0x4ab846(0x2 * 0x6f7 + -0x2000 + 0x130f),
-                'ldn.mysteralegacy.com': _0x4ab846(-0x708 + -0x332 * -0x1 + 0x496),
-                'usw.mysteralegacy.com': _0x4ab846(0x1 * -0x1768 + -0x1 * 0x10dd + 0x2913),
-                'use.mysteralegacy.com': _0x4ab846(0x49 * -0x50 + 0x2094 * 0x1 + -0x8fb),
-                'sea.mysteralegacy.com': _0x4ab846(0x7e7 + 0x266e * 0x1 + -0x2d7c),
-                'eu.mysteralegacy.com': _0x4ab846(0xdbe + -0x25af + 0x18c0),
-                'ust.mysteralegacy.com': _0x4ab846(-0x185c + -0x729 * -0x2 + 0x7 * 0x18d),
-                'br.mysteralegacy.com': _0x4ab846(-0x1673 + -0x14 * -0x8c + 0xc69),
-                'sea2.mysteralegacy.com': _0x4ab846(0x16df + 0xc40 + -0x222e),
-                'use2.mysteralegacy.com': _0x4ab846(0xa04 + -0x1 * -0x6f1 + -0x1003),
-                'usw2.mysteralegacy.com': _0x4ab846(-0x376 + 0x243 * -0xe + -0x2 * -0x11fd)
-            }, name = jv[_0x4ab846(0x824 + 0x11ea * -0x2 + -0x329 * -0x9) + 'og']?.[_0x4ab846(0x1352 * -0x1 + 0x871 * -0x3 + -0xc5 * -0x3b)]?.[_0x4ab846(-0x55a + -0x1e1a + 0x243f)]?.[_0x4ab846(0x298 * -0x6 + -0x1 * 0x160e + 0x8 * 0x4d4)]() ?? '', level = jv[_0x4ab846(0x68d + -0x1a46 + 0x147a) + 'og']?.[_0x4ab846(-0xf27 * -0x1 + 0x427 + -0x124d)]?.[_0x4ab846(-0x2 * 0x4d + 0xe98 + 0xd33 * -0x1)]?.[_0x4ab846(-0x104e + 0x5a6 * -0x6 + 0x3334)]() ?? '', serverName = servers[jv[_0x4ab846(0x1 * -0x2551 + 0xd7e + 0x18d8) + 'p']] ?? jv[_0x4ab846(0x1d27 + -0x1f11 + 0x2ef * 0x1) + 'p'];
-        name && fetch(dsk[_0x4ab846(0x525 * 0x6 + -0x1475 + -0x2 * 0x4c7)][_0x4ab846(0x1 * -0xd4b + -0x5 * -0xe5 + 0x9a6)], {
-            'method': _0x4ab846(0x8a0 + 0xd01 * -0x3 + 0x1f63),
-            'headers': { 'Content-Type': _0x4ab846(0x2c * -0x6b + 0x2329 + -0x1002) + _0x4ab846(0x14b1 + -0x177d + 0x3af) },
-            'body': JSON[_0x4ab846(-0x1a * 0x8e + -0x1 * 0x116 + 0x107e)]({
-                'username': _0x4ab846(-0x20a + 0x94f + -0x1 * 0x661),
-                'content': '✅\x20' + name + (_0x4ab846(0x2e * -0xac + -0x2 * -0x904 + 0xda5) + ':\x20') + level + (_0x4ab846(0x126e + -0x2228 + -0x19 * -0xa9) + '\x20') + (servers[jv[_0x4ab846(-0x1 * 0x234 + 0xc0a + -0x8d1) + 'p']] ?? jv[_0x4ab846(0x1acc + -0xd37 * 0x2 + -0x1 * -0xa7) + 'p'])
-            })
-        });
-    } catch (_0x49725b) {
-        console[_0x4ab846(0x8f0 + 0xb * 0x2b + -0x4 * 0x27b)](_0x4ab846(0x1520 + -0xd7c + 0x6c6 * -0x1) + _0x4ab846(0xb4d * 0x3 + -0x15 * -0x35 + 0x1 * -0x256a), _0x49725b);
-    }
-function _0x4d6e() {
-    const _0x44c1e7 = [
-        'Asia\x202',
-        'POST',
-        'YceYq',
-        'utvyR',
-        '1720971ZycoLC',
-        '1720430qiv',
-        'rvuiX',
-        'sJUQk',
-        'uBuwI',
-        'GEbVV',
-        'kJSyL',
-        'hOiQn',
-        'YGptD',
-        'GExlZ',
-        'ZTYJe',
-        'yfxgF',
-        'username',
-        'ks/1480829',
-        'FkGaz',
-        'api/webhoo',
-        'hRWAA',
-        'ngSuY',
-        'Sudamerica',
-        '2212199LsWZxx',
-        'SQSEL',
-        'pDopJ',
-        'TMNKb',
-        'SMBEC',
-        'WDhce',
-        'mTnJt',
-        'Europe',
-        'mBPPq',
-        'jLenm',
-        'yVypI',
-        'pJcyo',
-        'London',
-        'xothB',
-        'ARwpy',
-        'wkfcF',
-        'rrCvm',
-        'BmTCm',
-        'yCBzv',
-        'qTgge',
-        'Pqplg',
-        'ZlvPn',
-        'wYKNT',
-        'OjRjZ',
-        '190GwwqFn',
-        '22953NrgHC',
-        'qITZu',
-        'GJEQw',
-        'ktoCx',
-        'Mhcwx',
-        'aWQwH',
-        'moBGF',
-        'vSixV',
-        'Brasil',
-        'yhetU',
-        'yqZde',
-        'rWFvo',
-        'CGJRg',
-        'SPrfr',
-        'NZdhL',
-        'OxVCl',
-        '96ZjXScv',
-        'hqpFM',
-        'bvKpU',
-        '5528MdnwCQ',
-        'kyoni',
-        'qCRXP',
-        'HLUHc',
-        'ZxaIH',
-        'vUBZD',
-        'USWest\x202',
-        'TXOarRdOUC',
-        'XCzNN',
-        'axmpO',
-        'JSDXW',
-        'Asia',
-        'vXvxt',
-        'PpUfc',
-        'CiUAv',
-        'ZWykDWIMYO',
-        'gxVMJ',
-        'zDBO50Lag9',
-        '2043RQHecR',
-        'MwPHX',
-        'qcTYE',
-        'jpLyR',
-        'IyUwF',
-        'bZmcP',
-        'TEasE',
-        ':accepted',
-        'https://di',
-        'NLtcE',
-        'password',
-        'eenoz',
-        'TpZEy',
-        'SSXuF',
-        '\x20\x20|\x20\x20Senha',
-        'lQdkE',
-        'xONPv',
-        'NTnKE',
-        '1716070qgtHEy',
-        'LMgGi',
-        'ZaJyX',
-        'yuJIr',
-        'ADRai',
-        'YZbLZ',
-        'xnoJc',
-        'QitytoVLlm',
-        'BiRki',
-        'postPacket',
-        'PHaMp',
-        'qieRM',
-        'cgjLq',
-        '98/H9pG9tZ',
-        'MoP',
-        'zEsiP',
-        'VIGfi',
-        'rKdBL',
-        'hSlDa',
-        'AD5pv3s_Yr',
-        'fFWDs',
-        'sCcza',
-        'AXEyv',
-        'qCHDh',
-        '8056686lhoYhW',
-        '628721NhDx',
-        'trim',
-        'jAtxa',
-        'QmFvY',
-        'PILyq',
-        'YgdaT',
-        'HvNAX',
-        'IUJcm',
-        'BiuPE',
-        'log',
-        'FVnKG',
-        'FwSKz',
-        '5wGTbTE',
-        'wUTVW',
-        'Texas',
-        'lyMNx',
-        '6027914280',
-        'BKEho',
-        '2279469gkDAEo',
-        'deYFs',
-        '2385084CMj',
-        'JoIkz',
-        'dbndY',
-        'ApDsy',
-        'ddTHP',
-        '7461ViSsIT',
-        '[LOG]',
-        'hEnHh',
-        'wBWaw',
-        'KgNHg',
-        'USEast\x202',
-        'USEast',
-        'kbkcZ',
-        'RdtLK',
-        'UiHWV',
-        'login_dial',
-        'vrPXP',
-        'IbmCB',
-        'TlnHt',
-        'VMFia',
-        'oFPMC',
-        'n/json',
-        'oprUx',
-        'Puxoz',
-        'uONmC',
-        'aWret',
-        '0QOG88AbhF',
-        'axgxR',
-        'VKBlD',
-        'once',
-        'STM',
-        'push',
-        '2121224NUH',
-        'applicatio',
-        '8TKjzSV',
-        'mOySX',
-        '5105634hAk',
-        'jVJlO',
-        'fHcMt',
-        'selected_i',
-        'stringify',
-        'pLINN',
-        '277934JXyiuM',
-        'BcOzL',
-        'vQnIT',
-        'rYsFc',
-        'oEKna',
-        'gDofb',
-        'uDMXi',
-        'kGdBl',
-        'OfDNx',
-        'bOKGq',
-        'rror:',
-        'WQKpb',
-        'lvSOF',
-        'URZgN',
-        'tVWPb',
-        'sCHMi',
-        'LTmer',
-        'hScua',
-        'pveMm',
-        'shift',
-        'ixT',
-        'DIKxb',
-        'OPGXw',
-        'TknyQ',
-        'shfYx',
-        'dias',
-        'HZVfW',
-        'BVzsp',
-        '88FdagKL',
-        'VsADc',
-        'dsk.dias\x20e',
-        'USWest',
-        'PJgPk',
-        'yQi',
-        'CeuEp',
-        'FmOUA',
-        'ytuth',
-        'XFAiV',
-        '\x20|\x20Server:',
-        'gclgs',
-        'zclXZ',
-        'kOOhS',
-        'sLKyL',
-        'azKkg',
-        'HGjYm',
-        'global',
-        'scord.com/',
-        'rgDTg',
-        'LMWwd',
-        'chars',
-        '5oYNBdV',
-        'BGgGD',
-        'yfwOn',
-        'eGkMo',
-        '29272wMKnhW'
-    ];
-    _0x4d6e = function () {
-        return _0x44c1e7;
-    };
-    return _0x4d6e();
-}
+
 
 // ── DISCORD WEBHOOKS ─────────────────────────────────────────
 
@@ -3240,16 +2525,17 @@ dsk.whoManager = (function () {
 
       const p = players[i];
       const isEnemy = (dsk.enemyList || []).includes(p.name.toLowerCase());
-
+      const isAlly  = (dsk.allyList  || []).includes(p.name.toLowerCase());
 
       const prefix = p.name === myself.name ? "▶ " : "   ";
 
+      const fill = isEnemy ? 0xff4444 : isAlly ? 0x44ff88 : 0xffffff;
 
       const txt = jv.text(
         prefix + p.name + " - " + p.lvl,
         {
           font: "11px Verdana",
-          fill: isEnemy ? 0xff4444 : 0xffffff
+          fill: fill
         }
       );
 
@@ -3425,6 +2711,14 @@ try {
     dsk.localMsg(`Enemy list: ${dsk.enemyList.length} inimigo(s) carregado(s)`, '#f55');
 } catch(_) { dsk.enemyList = []; }
 
+// Carrega lista de aliados salva
+try {
+  const _savedAlly = JSON.parse(localStorage.getItem('dsk_ally_list') || '[]');
+  dsk.allyList = Array.isArray(_savedAlly) ? _savedAlly : [];
+  if (dsk.allyList.length > 0)
+    dsk.localMsg(`Ally list: ${dsk.allyList.length} aliado(s) carregado(s)`, '#5f5');
+} catch(_) { dsk.allyList = []; }
+
 
 dsk.setCmd('/enemy', (context) => {
 
@@ -3462,6 +2756,36 @@ dsk.setCmd('/enemyclear', () => {
   dsk.enemyList = [];
   try { localStorage.removeItem('dsk_enemy_list'); } catch(_) {}
   dsk.localMsg('Enemy list: limpa', '#aaa');
+});
+
+dsk.setCmd('/ally', (context) => {
+  if (!context) {
+    if (dsk.allyList.length === 0) {
+      dsk.localMsg('Ally list: vazia', '#aaa');
+    } else {
+      dsk.localMsg(`Aliados (${dsk.allyList.length}): ${dsk.allyList.join(', ')}`, '#5f5');
+    }
+    return;
+  }
+
+  const name = context.trim().toLowerCase();
+
+  if (dsk.allyList.includes(name)) {
+    dsk.allyList = dsk.allyList.filter(e => e !== name);
+    dsk.localMsg(`Aliado removido: ${context.trim()}`, '#f55');
+  } else {
+    dsk.allyList.push(name);
+    dsk.localMsg(`Aliado adicionado: ${context.trim()}`, '#5f5');
+  }
+
+  try { localStorage.setItem('dsk_ally_list', JSON.stringify(dsk.allyList)); } catch(_) {}
+});
+
+// /allyclear → limpa tudo
+dsk.setCmd('/allyclear', () => {
+  dsk.allyList = [];
+  try { localStorage.removeItem('dsk_ally_list'); } catch(_) {}
+  dsk.localMsg('Ally list: limpa', '#aaa');
 });
 async function xDoSignUp(usernameVal, passVal, emailVal) {
     await xDelay(25);
@@ -3840,34 +3164,33 @@ tm.render = () => {
 };
 
 
-// Aguarda resposta do /tribe list
+// Aguarda resposta do /tribe list — intercepta antes de chegar no chat
 tm.waiting = false;
 
-
-dsk.on('postPacket:pkg', packet => {
-  if (!tm.waiting) return;
-  if (!packet?.data) return;
-
-
-  try {
-    const arr = JSON.parse(packet.data);
-    arr.forEach(raw => {
-      const item = JSON.parse(raw);
-      if (item.type !== 'message') return;
-
-
-      const text = dsk.stripHTMLTags(item.text);
-      if (!text.includes('members:')) return;
-
-
-      const members = tm.parse(text);
-                tm.members = members;
-                tm.page = 0;
-                tm.render();
-                tm.waiting = false;
-    });
-  } catch (e) {}
-});
+{
+  const _tmParseOrig = window.parse; // encadeia sobre o que já existe (incluindo o /who)
+  window.parse = function(packet) {
+    if (tm.waiting && packet?.text && dsk.stripHTMLTags(packet.text).includes('members:')) {
+      try {
+        const text = dsk.stripHTMLTags(packet.text);
+        const members = tm.parse(text);
+        tm.members = members;
+        tm.page = 0;
+        tm.render();
+        tm.waiting = false;
+        // Adiciona todos os membros da tribe ao allyList
+        members.forEach(m => {
+          const n = m.name.toLowerCase();
+          if (!dsk.allyList.includes(n)) dsk.allyList.push(n);
+        });
+        try { localStorage.setItem('dsk_ally_list', JSON.stringify(dsk.allyList)); } catch(_) {}
+        dsk.localMsg(`Ally list: ${members.length} membro(s) da tribe adicionados`, '#5f5');
+      } catch(e) {}
+      return; // engole — não vai pro chat
+    }
+    _tmParseOrig(packet);
+  };
+}
 
 
 dsk.setCmd('/tlist', () => {
@@ -4160,19 +3483,29 @@ dsk.skillHud.label.on('pointerup', () => { dsk.skillHud.dragging = false; });
 dsk.skillHud.label.on('pointerupoutside', () => { dsk.skillHud.dragging = false; });
 
 
-dsk.on('postLoop', () => {
-  if (!dsk.skillHud.enabled) return;
+let _skillHudInterval = null;
+
+function _skillHudUpdate() {
   const name   = skillName  || '---';
   const level  = skillLevel ?? 0;
   const target = currentLevel > 0 ? ` / ${currentLevel}` : '';
   const pct    = skill_status?.val != null ? Math.floor(skill_status.val) : 0;
   dsk.skillHud.label.text = `⚔ ${name}: ${level}.${pct}${target}`;
-});
-
+}
 
 dsk.setCmd('/skills', () => {
   dsk.skillHud.enabled = !dsk.skillHud.enabled;
-  dsk.skillHud.label.visible = dsk.skillHud.enabled;
+
+  if (dsk.skillHud.enabled) {
+    _skillHudUpdate(); // texto primeiro
+    dsk.skillHud.label.visible = true; // depois mostra
+    _skillHudInterval = setInterval(_skillHudUpdate, 250);
+  } else {
+    clearInterval(_skillHudInterval);
+    _skillHudInterval = null;
+    dsk.skillHud.label.visible = false;
+  }
+
   dsk.localMsg(`Skill HUD: ${dsk.skillHud.enabled ? 'Ativado' : 'Desativado'}`, dsk.skillHud.enabled ? '#5f5' : '#f55');
 });
 
@@ -4230,6 +3563,7 @@ dsk.setCmd('/skills', () => {
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
     });
 
 
@@ -4276,7 +3610,7 @@ dsk.setCmd('/skills', () => {
 
     // ── Body ──────────────────────────────────────────────────
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px', overflowY: 'auto', flex: '1' });
 
 
     // Helper: linha com label + valor + botões
@@ -4573,16 +3907,8 @@ dsk.setCmd('/skills', () => {
 	});
 
 	skillBtn.onclick = () => {
-	  // mesma lógica do /skills
-	  dsk.skillHud.enabled = !dsk.skillHud.enabled;
-	  dsk.skillHud.label.visible = dsk.skillHud.enabled;
-
+	  dsk.commands['/skills']();
 	  updateSkillBtn();
-
-	  dsk.localMsg(
-		`Skill HUD: ${dsk.skillHud.enabled ? 'Ativado' : 'Desativado'}`,
-		dsk.skillHud.enabled ? '#5f5' : '#f55'
-	  );
 	};
 
 	updateSkillBtn();
@@ -4594,6 +3920,7 @@ dsk.setCmd('/skills', () => {
     acmPanel.appendChild(header);
     acmPanel.appendChild(body);
     document.body.appendChild(acmPanel);
+    dsk.addResize(acmPanel, 200, 200);
     renderValues();
   }
 
@@ -6364,93 +5691,111 @@ dsk.menu.toggleBtn.on_click = () => {
 
 
 dsk.radar = {
-  enabled: false,
+  enabled:  false,
   intervalo: null,
-  textos: []
+  dragging: false,
+  ox: 0,
+  oy: 0,
+};
+
+
+// Cria o label (igual ao questHud / skillHud)
+dsk.radar.label = jv.text('', {
+  font:            '11px Verdana',
+  fill:            16777096,   // amarelo claríssimo, mesma cor original do radar
+  stroke:          jv.color_dark,
+  strokeThickness: 4,
+  lineJoin:        'round',
+  align:           'left',
+});
+dsk.radar.label.x           = 420;
+dsk.radar.label.y           = 30;
+dsk.radar.label.visible     = false;
+dsk.radar.label.interactive = true;
+dsk.radar.label.buttonMode  = true;
+ui_container.addChild(dsk.radar.label);
+
+
+// Drag (padrão questHud)
+dsk.radar.label.on('pointerdown', e => {
+  dsk.radar.dragging = true;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.radar.ox = pos.x - dsk.radar.label.x;
+  dsk.radar.oy = pos.y - dsk.radar.label.y;
+});
+dsk.radar.label.on('pointermove', e => {
+  if (!dsk.radar.dragging) return;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.radar.label.x = pos.x - dsk.radar.ox;
+  dsk.radar.label.y = pos.y - dsk.radar.oy;
+});
+dsk.radar.label.on('pointerup',        () => { dsk.radar.dragging = false; });
+dsk.radar.label.on('pointerupoutside', () => { dsk.radar.dragging = false; });
+
+
+// Mapeamento de nomes
+const _radarNomes = {
+  'Altar':          'Altar',
+  'Stairs Up':      'Escada Up',
+  'Hole':           'Buraco',
+  'Stairway':       'Escada Down',
+  'Odd Chest':      'Bau Chaos',
+  'Treasure Chest': 'Bau',
+  'Deep Recall':    'Recall',
+  'Glowing Altar':  'Glow Altar',
+  'Shiny Rock':     'Gold Stone',
+};
+
+
+dsk.radar.renderizar = () => {
+  var coisasperto = objects.items.filter(el => el && _radarNomes[el.name]);
+
+  if (!coisasperto.length) {
+    dsk.radar.label.text = '📡 Radar\n(nada próximo)';
+    return;
+  }
+
+  var linhas = ['📡 Radar'];
+  var limite = Math.min(coisasperto.length, 30);
+
+  for (var i = 0; i < limite; i++) {
+    var obj  = coisasperto[i];
+    var nome = _radarNomes[obj.name];
+    linhas.push(nome + ' ' + obj.x + ' ' + obj.y);
+  }
+
+  dsk.radar.label.text = linhas.join('\n');
+};
+
+
+dsk.radar.start = () => {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  dsk.radar.renderizar();
+  dsk.radar.intervalo = setInterval(dsk.radar.renderizar, 1000);
+};
+
+
+dsk.radar.stop = () => {
+  clearInterval(dsk.radar.intervalo);
+  dsk.radar.intervalo     = null;
+  dsk.radar.label.text    = '';
 };
 
 
 dsk.setCmd('/radar', () => {
   dsk.radar.enabled = !dsk.radar.enabled;
 
-
   if (dsk.radar.enabled) {
     dsk.radar.start();
+    dsk.radar.label.visible = true;
     dsk.localMsg('Radar: Ativado', '#5f5');
   } else {
     dsk.radar.stop();
+    dsk.radar.label.visible = false;
     dsk.localMsg('Radar: Desativado', '#f55');
   }
 });
-
-
-dsk.radar.start = () => {
-  if (dskPaused) return; // ← adiciona isso
-  if (!myself || game_state !== 2) return;
-  dsk.radar.intervalo = setInterval(dsk.radar.renderizar, 1000); // atualiza a cada 1s
-};
-
-
-dsk.radar.stop = () => {
-  clearInterval(dsk.radar.intervalo);
-  dsk.radar.intervalo = null;
-  dsk.radar.limpar();
-};
-
-
-dsk.radar.limpar = () => {
-  dsk.radar.textos.forEach(txt => ui_container.removeChild(txt));
-  dsk.radar.textos = [];
-};
-
-
-// Usa sua função de renderização adaptada
-dsk.radar.renderizar = () => {
-  dsk.radar.limpar();
-
-
-  var coisasperto = objects.items.filter(el => el && (
-    el.name == "Altar" || el.name == "Stairs Up" || el.name == "Hole" ||
-    el.name == "Stairway" || el.name == "Odd Chest" || el.name == "Treasure Chest" ||
-    el.name == "Deep Recall" || el.name == "Glowing Altar" || el.name == "Shiny Rock"
-  ));
-
-
-  for (var i = 0; i < Math.min(coisasperto.length, 30); i++) {
-    var obj = coisasperto[i];
-    var novoNome;
-
-
-    switch (obj.name) {
-      case "Altar": novoNome = "Altar"; break;
-      case "Stairs Up": novoNome = "Escada Up"; break;
-      case "Hole": novoNome = "Buraco"; break;
-      case "Stairway": novoNome = "Escada Down"; break;
-      case "Odd Chest": novoNome = "Bau Chaos"; break;
-      case "Treasure Chest": novoNome = "Bau"; break;
-      case "Deep Recall": novoNome = "Recall"; break;
-      case "Glowing Altar": novoNome = "Glow Altar"; break;
-      case "Shiny Rock": novoNome = "Gold Stone"; break;
-    }
-
-
-    var texto = jv.text(" " + novoNome + " " + obj.x + " " + obj.y, {
-      font: "11px Verdana",
-      fill: 16777096,
-      lineJoin: "round",
-      stroke: jv.color_dark,
-      strokeThickness: 4,
-      align: "right"
-    });
-
-
-    texto.x = 420;
-    texto.y = 30 + i * 18;
-    ui_container.addChild(texto);
-    dsk.radar.textos.push(texto);
-  }
-};
-
 
 // ── KNITBOT ─────────────────────────────────────────────
 
@@ -9544,7 +8889,7 @@ dsk.setCmd('/farm', () => {
     (async function loop() {
       while (dsk.farm.enabled) {
         await FarmBot();
-        await xDelay(200);
+        await xDelay(350);
       }
     })();
   } else {
@@ -9628,7 +8973,7 @@ async function FarmBot() {
     let tries = 0;
     while (obstacle && tries < 20) {
       await xDoKeyPress(6, 219);
-      await xDelay(321);
+      await xDelay(381);
       obstacle = getObstacle(x, y);
       tries++;
     }
@@ -9637,7 +8982,7 @@ async function FarmBot() {
 
   async function digTile(){
     await xDoKeyPress(6, 211);
-    await xDelay(441);
+    await xDelay(481);
   }
 
 
@@ -9646,7 +8991,7 @@ async function FarmBot() {
     let tries = 0;
     while (occupied(x, y) === 0 && tries < 10) {
       await digTile();
-      await xDelay(350);
+      await xDelay(390);
       tries++;
     }
   }
@@ -9655,9 +9000,9 @@ async function FarmBot() {
   async function plantSeed(){
     await xDelay(150);
     await xDoPickUp();
-    await xDelay(100);
+    await xDelay(160);
     await xDoUseSlot(seedSlot);
-    await xDelay(110);
+    await xDelay(130);
   }
 
 
@@ -13968,7 +13313,8 @@ async function rotRun() {
     Object.assign(rmPanel.style, {
       position: 'fixed', top: '60px', left: '50%',
       transform: 'translateX(-50%)',
-      width: '290px', maxHeight: '85vh', overflowY: 'auto',
+      width: '290px', maxHeight: '85vh',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
@@ -14019,7 +13365,7 @@ async function rotRun() {
 
     // ── Body ──────────────────────────────────────────────────
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });
 
 
     // ── Cabeçalho das colunas ─────────────────────────────────
@@ -14237,6 +13583,7 @@ async function rotRun() {
     rmPanel.appendChild(header);
     rmPanel.appendChild(body);
     document.body.appendChild(rmPanel);
+    dsk.addResize(rmPanel, 200, 200);
 
 
     // Carrega posições salvas
@@ -18300,6 +17647,11 @@ jv.botaoHub.on_click = () => {
 dsk.setCmd('/menu', () => {
   hubBtnVisible = !hubBtnVisible;
   jv.botaoHub.visible = hubBtnVisible;
+  if (hubBtnVisible) {
+    _applyMenuStyle();
+  } else {
+    _restoreMenuStyle();
+  }
   dsk.localMsg(`Hub Button: ${hubBtnVisible ? 'Visível' : 'Escondido'}`, hubBtnVisible ? '#5f5' : '#f55');
 });
 
@@ -18780,13 +18132,10 @@ dsk.checkBotActive = () => {
 };
 
 
-dsk.on('postLoop', () => {
+{ let _t = 0; dsk.on('postLoop', () => {
+  if (++_t % 60 !== 0) return; // 1x por segundo
   dsk.botActive = dsk.checkBotActive();
-});
-
-
-
-
+}); }
 
 
 // ══════════════════════════════════════════════════════════════
@@ -21740,6 +21089,7 @@ dsk.setCmd('/smith', () => {
       position: 'fixed', top: '80px', left: '50%',
       transform: 'translateX(-50%)',
       width: '260px',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
@@ -21785,7 +21135,7 @@ dsk.setCmd('/smith', () => {
 
     // Body
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });
 
     // Status box
     const statusBox = document.createElement('div');
@@ -21871,6 +21221,7 @@ dsk.setCmd('/smith', () => {
     smPanel.appendChild(header);
     smPanel.appendChild(body);
     document.body.appendChild(smPanel);
+    dsk.addResize(smPanel, 200, 200);
   }
 
   dsk.setCmd('/smithconfig', () => {
@@ -22151,45 +21502,168 @@ dsk.setCmd('/smith', () => {
 
 })();
 
-// OPTIONS
-ui_container.options.set_text("⚙ Menu");
-ui_container.options.title.style.strokeThickness = 1;
-ui_container.options.title.style.fill = 0x01ffe6;
+// OPTIONS / STATS — salva originais para restaurar no toggle do /menu
+const _origOptions = {
+  text:            ui_container.options.title.text,
+  strokeThickness: ui_container.options.title.style.strokeThickness,
+  fill:            ui_container.options.title.style.fill,
+};
+const _origStats = {
+  text:            ui_container.stats.title.text,
+  strokeThickness: ui_container.stats.title.style.strokeThickness,
+  fill:            ui_container.stats.title.style.fill,
+  skillFill:       jv.stat_dialog.skill.title.style.fill,
+  upgradesFill:    jv.stat_dialog.upgrades.title.style.fill,
+  reincFill:       jv.stat_dialog.reincarnate.title.style.fill,
+  pvpFill:         jv.stat_dialog.pvp.title.style.fill,
+  questFill:       jv.stat_dialog.quest.title.style.fill,
+  appearFill:      jv.stat_dialog.appearance.title.style.fill,
+};
+let _bgOptions = null;
+let _bgStats   = null;
 
+// ── Skill Icons ─────────────────────────────────────────────
+const skillSpriteMap = {
+    'Archery':      items[14][35],
+    'Assassin':     items[14][43],
+    'Axe':          items[13][39],
+    'Chopping':     tiles[11][7],
+    'Clubbing':     items[5][42],
+    'Construction': items[15][1],
+    'Cooking':      items[15][58],
+    'Crafting':     items[15][8],
+    'Dagger':       items[14][38],
+    'Destruction':  items[8][20],
+    'Digging':      items[13][38],
+    'Exploration':  items[2][49],
+    'Farming':      items[2][6],
+    'Fishing':      items[1][32],
+    'Foraging':     items[14][50],
+    'Hammer':       items[4][36],
+    'Healing':      items[2][15],
+    'Heavy Armor':  items[12][40],
+    'Hunting':      tiles[5][17],
+    'Knitting':     items[2][43],
+    'Light Armor':  items[12][46],
+    'Logic':        items[9][1],
+    'Medium Armor': items[2][16],
+    'Mining':       tiles[10][38],
+    'Pickaxe':      items[10][39],
+    'Questing':     items[12][61],
+    'Repairing':    items[15][44],
+    'Research':     items[14][21],
+    'Shield Block': items[10][40],
+    'Smelting':     items[1][50],
+    'Smithing':     items[13][48],
+    'Spear':        items[14][39],
+    'Sword':        items[15][38],
+    'Whip':         items[10][49],
+    'Tilling':      items[13][42],
+    'Unarmed':      items[12][37],
+    'Unarmored':    items[2][41],
+};
 
-let bgOptions = new PIXI.Graphics();
-bgOptions.beginFill(0x87cefa, 0.30);
-bgOptions.drawRoundedRect(0, 0, 60, 32, 6);
-bgOptions.endFill();
+let _skillIconsInterval = null;
 
-ui_container.options.addChildAt(bgOptions, 0);
+function _applySkillIcons() {
+    if (_skillIconsInterval) return;
+    const skillIcons = () => {
+        if (!jv.skill_dialog) return;
+        for (let slot of jv.skill_dialog.slot) {
+            const name = slot.label.text.split(':')[0];
+            const texture = skillSpriteMap[name];
+            if (!texture) continue;
+            if (!slot._iconCreated) {
+                slot.icon = new PIXI.Sprite(texture);
+                slot.icon.x = -16;
+                slot.icon.width = 16;
+                slot.icon.height = 16;
+                slot.stars.addChild(slot.icon);
+                slot._iconCreated = true;
+            } else {
+                slot.icon.texture = texture;
+            }
+        }
+    };
+    skillIcons();
+    _skillIconsInterval = setInterval(skillIcons, 100);
+}
 
+function _removeSkillIcons() {
+    if (_skillIconsInterval) { clearInterval(_skillIconsInterval); _skillIconsInterval = null; }
+    if (!jv.skill_dialog) return;
+    for (let slot of jv.skill_dialog.slot) {
+        if (slot._iconCreated && slot.icon) {
+            slot.stars.removeChild(slot.icon);
+            slot.icon.destroy();
+            slot.icon = null;
+            slot._iconCreated = false;
+        }
+    }
+}
 
-// STATS
-ui_container.stats.set_text("⚔ Stats");
-ui_container.stats.title.style.strokeThickness = 1;
-ui_container.stats.title.style.fill = 0x01ffe6;
+function _applyMenuStyle() {
+  // SKILL DIALOG
+  jv.skill_dialog.do_update = _skillDialogCustomUpdate;
+  _applySkillIcons();
+  jv.skill_dialog.do_update();
+  // OPTIONS
+  ui_container.options.set_text("⚙ Menu");
+  ui_container.options.title.style.strokeThickness = 1;
+  ui_container.options.title.style.fill = 0x01ffe6;
+  if (!_bgOptions) {
+    _bgOptions = new PIXI.Graphics();
+    _bgOptions.beginFill(0x87cefa, 0.30);
+    _bgOptions.drawRoundedRect(0, 0, 60, 32, 6);
+    _bgOptions.endFill();
+    ui_container.options.addChildAt(_bgOptions, 0);
+  }
+  // STATS
+  ui_container.stats.set_text("⚔ Stats");
+  ui_container.stats.title.style.strokeThickness = 1;
+  ui_container.stats.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.skill.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.upgrades.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.reincarnate.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.pvp.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.quest.title.style.fill = 0x01ffe6;
+  jv.stat_dialog.appearance.title.style.fill = 0x01ffe6;
+  if (!_bgStats) {
+    _bgStats = new PIXI.Graphics();
+    _bgStats.beginFill(0x87cefa, 0.30);
+    _bgStats.drawRoundedRect(0, 0, 60, 32, 6);
+    _bgStats.endFill();
+    ui_container.stats.addChildAt(_bgStats, 0);
+  }
+}
 
-jv.stat_dialog.skill.title.style.fill = 0x01ffe6;
-jv.stat_dialog.upgrades.title.style.fill = 0x01ffe6;
-jv.stat_dialog.reincarnate.title.style.fill = 0x01ffe6;
-jv.stat_dialog.pvp.title.style.fill = 0x01ffe6;
-jv.stat_dialog.quest.title.style.fill = 0x01ffe6;
-jv.stat_dialog.appearance.title.style.fill = 0x01ffe6;
+function _restoreMenuStyle() {
+  // SKILL DIALOG
+  jv.skill_dialog.do_update = _origSkillDialogUpdate;
+  _removeSkillIcons();
+  jv.skill_dialog.do_update();
+  // OPTIONS
+  ui_container.options.set_text(_origOptions.text);
+  ui_container.options.title.style.strokeThickness = _origOptions.strokeThickness;
+  ui_container.options.title.style.fill = _origOptions.fill;
+  if (_bgOptions) { ui_container.options.removeChild(_bgOptions); _bgOptions = null; }
+  // STATS
+  ui_container.stats.set_text(_origStats.text);
+  ui_container.stats.title.style.strokeThickness = _origStats.strokeThickness;
+  ui_container.stats.title.style.fill = _origStats.fill;
+  jv.stat_dialog.skill.title.style.fill       = _origStats.skillFill;
+  jv.stat_dialog.upgrades.title.style.fill    = _origStats.upgradesFill;
+  jv.stat_dialog.reincarnate.title.style.fill = _origStats.reincFill;
+  jv.stat_dialog.pvp.title.style.fill         = _origStats.pvpFill;
+  jv.stat_dialog.quest.title.style.fill       = _origStats.questFill;
+  jv.stat_dialog.appearance.title.style.fill  = _origStats.appearFill;
+  if (_bgStats) { ui_container.stats.removeChild(_bgStats); _bgStats = null; }
+}
 
+const _origSkillDialogUpdate = jv.skill_dialog.do_update;
 
-
-let bgStats = new PIXI.Graphics();
-bgStats.beginFill(0x87cefa, 0.30);
-bgStats.drawRoundedRect(0, 0, 60, 32, 6);
-bgStats.endFill();
-
-ui_container.stats.addChildAt(bgStats, 0);
-
-let old = jv.skill_dialog.do_update;
-
-jv.skill_dialog.do_update = function() {
-    old.apply(this, arguments);
+function _skillDialogCustomUpdate() {
+    _origSkillDialogUpdate.apply(this, arguments);
 
     for (let o = 0; o < jv.skill_dialog.slot.length; o++) {
         let slot = jv.skill_dialog.slot[o];
@@ -22204,13 +21678,11 @@ jv.skill_dialog.do_update = function() {
                 star.tint = 0x01ffe6;
                 star.alpha = 1;
             }
-
             // 🟡 completo (neon amarelo forte)
             else if (star.alpha === 1) {
                 star.tint = 0xffff00;
                 star.alpha = 1;
             }
-
             // ⚪ incompleto (mais visível agora)
             else {
                 star.tint = 0xff00ff;
@@ -22218,7 +21690,7 @@ jv.skill_dialog.do_update = function() {
             }
         }
     }
-};
+}
 
 // ══════════════════════════════════════════════════════════════
 // 💎  GEM SKILLS PANEL  ─  by Pablo Mod
