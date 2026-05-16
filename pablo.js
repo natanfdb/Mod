@@ -4695,7 +4695,8 @@ async function Armas() {
     return;
   }
 
-  if (skillLevel >= currentLevel && currentLevel > 0 && skillName !== 'repairing' && skillName !== 'questing' && !emTroca) {
+  const _armasTarget = (skillConfig[skillName] > 0 ? skillConfig[skillName] : currentLevel);
+  if (_armasTarget > 0 && skillLevel >= _armasTarget && skillName !== 'repairing' && skillName !== 'questing' && !emTroca) {
     emTroca = true;
     await xDoKeyUp(6);
     await xDelay(600);
@@ -9570,7 +9571,8 @@ async function FarmBot() {
 
 
   // Parar se atingir level
-  if (currentLevel > 0 && skillLevel >= currentLevel && ['farming','foraging'].includes(skillName)) {
+  const _farmTarget = skillConfig[skillName] > 0 ? skillConfig[skillName] : currentLevel;
+  if (_farmTarget > 0 && skillLevel >= _farmTarget && ['farming','foraging'].includes(skillName)) {
     dsk.farm.enabled = false;
     dsk.localMsg('Farm Bot: Desativado (level atingido)', '#f55');
     return;
@@ -14913,12 +14915,10 @@ async function HealBot() {
 
 // ── CLAY BOT ─────────────────────────────────────────────────
 
-
 dsk.clay = { enabled: false, repairing: false };
 
-
 async function repairItemClay() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   dsk.clay.repairing = true;
   await xDoKeyUp(6);
@@ -14932,57 +14932,58 @@ async function repairItemClay() {
   await xDoUseSlot(xGetSlotByID(719));
   await xDelay(369);
 
-
-  // Continua pressionando até o item estar perfeito ou acabarem todos os kits
-  const hasKit     = () => item_data.some(el => el && el.spr === 719);
-  const kitEquipped = () => item_data.some(el => el && el.spr === 719 && el.eqp !== 0);
-  if (hasKit()) {
+  const firstEquippable = item_data.filter(el => el && el.spr === 719)[0];
+  if (firstEquippable) {
     while (!xIfChatHas("is in perfect condition")) {
-      // Sai se o bot for desativado
+      const kitsDisponiveis = item_data.filter(el => el && el.spr === 719);
+      
+      if (kitsDisponiveis.length === 0) {
+        dsk.clay.repairing = false;
+        return;
+      }
+
+      await xDoKeyPress(6, 189);
+      await xDelay(400);
+
+      const kitsApos = item_data.filter(el => el && el.spr === 719);
+      if (kitsApos.length < kitsDisponiveis.length) {
+        if (kitsApos.length === 0) {
+          dsk.clay.repairing = false;
+          return;
+        }
+        await xDoUseSlot(xGetSlotByID(719));
+        await xDelay(369);
+      }
+
       if (!dsk.clay.enabled) {
         dsk.clay.repairing = false;
         return;
       }
-      // Se não tem mais nenhum kit → sai
-      if (!hasKit()) {
-        dsk.localMsg('Clay: sem repair kit, pegando pá...', '#fa5');
-        break;
-      }
-      // Se o kit equipado quebrou mas ainda tem outro → equipa o próximo
-      if (!kitEquipped()) {
-        dsk.localMsg('Clay: kit quebrou, equipando próximo...', '#ff0');
-        await xDoUseSlot(xGetSlotByID(719));
-        await xDelay(400);
-        continue;
-      }
-      await xDoKeyPress(6, 189);
-      await xDelay(400);
     }
   }
 
-
-  // Pega a pá de volta: tanto se reparou com sucesso quanto se o kit quebrou
-  xDoClearChat("is in perfect condition");
-  await xDelay(349);
-  await xDoMove(myself.x - 1, myself.y);
-  await xDelay(649);
-  await xDoPickUp();
-  await xDelay(354);
-  await xDoUseSlot(0);
-  await xDelay(389);
-  await xDoChangeDir(0);
-  await xDelay(346);
-  dsk.clay.repairing = false;
+  if (xIfChatHas("is in perfect condition")) {
+    xDoClearChat("is in perfect condition");
+    await xDelay(349);
+    await xDoMove(myself.x - 1, myself.y);
+    await xDelay(649);
+    await xDoPickUp();
+    await xDelay(354);
+    await xDoUseSlot(0);
+    await xDelay(389);
+    await xDoChangeDir(0);
+    await xDelay(346);
+    dsk.clay.repairing = false;
+  } else {
+    setTimeout(() => { dsk.clay.repairing = false; }, 6000);
+  }
 }
 
-
 async function ClayBot() {
-  if (dskPaused) return; // ← adiciona isso
+  if (dskPaused) return;
   if (!myself || game_state !== 2) return;
   if (dsk.clay.repairing) return;
 
-
-  // Parar se atingir o level alvo
   if (currentLevel > 0 && skillLevel >= currentLevel && skillName === 'digging') {
     await xDoKeyUp(6);
     xGoing[114] = false;
@@ -14991,10 +14992,8 @@ async function ClayBot() {
     return;
   }
 
-
   if (xGoing[114] === true) return;
   xGoing[114] = true;
-
 
   if (xIfChatHas("Disconnected (Packet Spamming)")) {
     await xDelay(300);
@@ -15005,7 +15004,6 @@ async function ClayBot() {
     return;
   }
 
-
   if (xIfChatHas("Welcome back ")) {
     await xDelay(1000);
     await xDoClearChat("Welcome back ");
@@ -15013,29 +15011,37 @@ async function ClayBot() {
     await xDoKeyUp(6);
   }
 
-
-  // Reparo tem prioridade
   if (inv[0].equip === 2) {
     await repairItemClay();
     xGoing[114] = false;
     return;
   }
 
-
   const allowedNames = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
 
+  // ── HELPER: solta a tecla antes de mover ──────────────────
+  async function safeMove(x, y) {
+    await xDoKeyUp(6);
+    await xDelay(200);
+    await xDoMove(x, y);
+  }
+  // ──────────────────────────────────────────────────────────
 
   if (occupied(myself.x, myself.y - 2) === 0) {
     await xDoMove(myself.x, myself.y - 1);
+
   } else if (occupied(myself.x, myself.y - 1) === 0 && occupied(myself.x, myself.y + 1) === 0) {
+    // Posição boa para escavar
     if (myself.dir !== 0) {
       await xDelay(356);
       await xDoChangeDir(0);
     }
     await xDelay(345);
     await xDoKeyDown(6);
+
   } else if (occupied(myself.x, myself.y - 1) === 1 && occupied(myself.x, myself.y + 1) === 0) {
-    await xDoMove(myself.x, myself.y + 1);
+    // ← AQUI estava o bug: movia sem soltar a tecla
+    await safeMove(myself.x, myself.y + 1);
     if (myself.dir !== 0) {
       await xDelay(357);
       await xDoChangeDir(0);
@@ -15044,33 +15050,27 @@ async function ClayBot() {
     return;
   }
 
+  const wallBelow = objects.items.find(el =>
+    el && allowedNames.includes(el.name) &&
+    el.x === myself.x && el.y === (myself.y + 1)
+  );
 
-        const wallBelow = objects.items.find(el =>
-                el && allowedNames.includes(el.name) &&
-                el.x === myself.x && el.y === (myself.y + 1)
-                // ← sem checar dir aqui
-        );
-
-
-        if (wallBelow) {
-                if (myself.dir !== 0) {
-                  await xDelay(357);
-                  await xDoChangeDir(0);
-                  await xDelay(546);
-                }
-                await xDoKeyDown(6);
-                xGoing[114] = false;
-                return;
-        }
-
+  if (wallBelow) {
+    if (myself.dir !== 0) {
+      await xDelay(357);
+      await xDoChangeDir(0);
+      await xDelay(546);
+    }
+    await xDoKeyDown(6);
+    xGoing[114] = false;
+    return;
+  }
 
   xGoing[114] = false;
 }
 
-
 dsk.setCmd('/clay', () => {
   dsk.clay.enabled = !dsk.clay.enabled;
-
 
   if (dsk.clay.enabled) {
     dsk.clay.repairing = false;
@@ -17482,12 +17482,12 @@ async function FarmWood() {
   }
 
 
-  // Animal Gate à direita virado para direita → desce
-  const animalGateR = objects.items.find(el => el?.name === 'Animal Gate' && el.x === myself.x + 1 && el.y === myself.y);
-  if (animalGateR && myself.dir === 1) {
-    await xDelay(200);
-    await xDoChangeDir(2); // 'vb'
-        await xDelay(200);
+  //Gate à direita virado para direita → desce
+  const allowedNames2 = ['Animal Gate', 'Stone Wall', 'Tribe Gate', 'Signpost', 'Wood Wall', 'Personal Gate'];
+  if (allowedNames2.includes(xGetWallByPos(myself.x + 1, myself.y)?.name) && myself.dir == 1) {
+	await xDelay(400);
+	await xDoChangeDir(2);
+	await xDelay(400);
   }
 
 
@@ -18290,6 +18290,7 @@ jv.botaoHub = jv.Button.create(0, 0, 60, '⚔ Hub', ui_container, 22);
 jv.botaoHub.x = 1;
 jv.botaoHub.y = 390;
 jv.botaoHub.title.style.fill = 0x01ffe6;
+jv.botaoHub.title.style.strokeThickness = 1;
 jv.botaoHub.visible = false;
 
 jv.botaoHub.on_click = () => {
@@ -22222,7 +22223,6 @@ jv.skill_dialog.do_update = function() {
 // ══════════════════════════════════════════════════════════════
 // 💎  GEM SKILLS PANEL  ─  by Pablo Mod
 // Mostra as 37 skills com nome, gemas necessárias e sprites
-// Cole este bloco no fim do modpablo.js
 // Comando: /gemskills
 // ══════════════════════════════════════════════════════════════
 
@@ -22618,6 +22618,293 @@ jv.skill_dialog.do_update = function() {
 
 })();
 
+dsk.compactHotbar = { enabled: false };
+
+dsk.setCmd('/hotbar', () => {
+  if (!dsk.compactHotbar.enabled) {
+
+    // ── Salva o estado original ──────────────────────────────
+    dsk.compactHotbar._origUpdateInventory = update_inventory;
+    dsk.compactHotbar._origHotSlot         = [...jv.hot_slot];
+    dsk.compactHotbar._origHotSceneX       = jv.hot_scene.x;
+    dsk.compactHotbar._origButtons         = [...jv.hot_button];
+
+    // ── Aplica layout compacto ───────────────────────────────
+    var BTN_W       = 42;  // largura de cada botão
+    var BTN_H       = 30;  // altura de cada botão
+    var COL_SPACING = 46;   // espaço entre colunas
+    var ROW_SPACING = 34;  // espaço entre linhas
+    var COLS        = 3;  // colunas
+    var ROWS        = 5;  // linhas
+    var TOTAL       = COLS * ROWS;
+
+    jv.hot_slot = [0,1,2,3,4,5,6,7,8,9,10,11,12,13,14];
+
+    // Remove botões antigos
+    // ── Aplica layout compacto ───────────────────────────────
+	// ... salva originals antes ...
+
+	// Remove botões antigos da cena SEM destruir o qty_text
+	for (var e = 0; e < jv.hot_button.length; e++) {
+	  if (jv.hot_button[e]) {
+		// ✅ Removido o removeChild do qty_text aqui
+		jv.hot_scene.removeChild(jv.hot_button[e]);
+	  }
+	}
+	jv.hot_button = [];
+
+    var totalW = (COLS - 1) * COL_SPACING + BTN_W;
+    jv.hot_scene.x = 740 - totalW;
+
+    for (var e = 0; e < TOTAL; e++) {
+      var col = Math.floor(e / ROWS);
+      var row = e % ROWS;
+
+      jv.hot_button[e] = jv.Button.create(
+        col * COL_SPACING, row * ROW_SPACING,
+        BTN_W, items[0][0], jv.hot_scene, BTN_H
+      );
+      jv.hot_button[e].button_alpha = .5;
+      jv.hot_button[e].main_color   = jv.color_dark;
+      jv.hot_button[e].slot         = jv.hot_slot[e];
+
+      jv.hot_button[e].qty_text = jv.text("", {
+        font: "8px Verdana", fill: 15658734,
+        lineJoin: "round", stroke: jv.color_medium, strokeThickness: 2
+      });
+      jv.hot_button[e].qty_text.x = 1;
+      jv.hot_button[e].qty_text.y = BTN_H - 10;
+      jv.hot_button[e].addChild(jv.hot_button[e].qty_text);
+      jv.hot_button[e].clear_item();
+      jv.hot_button[e].draw_item();
+
+      (function(idx) {
+        jv.hot_button[idx].on_click = function() {
+          send({ type: "u", slot: this.slot });
+        };
+      })(e);
+    }
+
+    // Salva update_inventory novo para poder remover depois
+    update_inventory = function() {
+      var e, t, i;
+      for (e in inv) inv[e].clear_item();
+      for (e in item_data) {
+        if (item_page * item_length <= e && e < (item_page + 1) * item_length && void 0 !== item_data[e].slot) {
+          t = item_data[e].slot - item_page * item_length;
+          inv[t].draw_item(item_data[e].n, item_data[e].qty, item_data[e].spr, item_data[e].eqp, "#" + item_data[e].col);
+          if (void 0 !== info_pane.slot && e == info_pane.slot) info_pane.set_info(inv[t]);
+        }
+        if (void 0 !== info_pane.slot && void 0 === item_data[e].slot && e == info_pane.slot) info_pane.set_info();
+      }
+      update_recipes();
+      update_build();
+      for (e = 0; e < TOTAL; e++) {
+        if (item_data[jv.hot_slot[e]] && void 0 !== item_data[jv.hot_slot[e]].slot) {
+          if (item_data[jv.hot_slot[e]].spr < 0) {
+            jv.hot_button[e].graphic.texture = tiles[-item_data[jv.hot_slot[e]].spr % 16][Math.floor(-item_data[jv.hot_slot[e]].spr / 16)];
+          } else {
+            jv.hot_button[e].graphic.texture = items[item_data[jv.hot_slot[e]].spr % 16][Math.floor(item_data[jv.hot_slot[e]].spr / 16)];
+          }
+          jv.hot_button[e].visible = 1;
+          if (1 < item_data[jv.hot_slot[e]].qty) {
+            jv.hot_button[e].qty_text.text = item_data[jv.hot_slot[e]].qty;
+          } else {
+            i = jv.hot_button[e].main_color;
+            jv.hot_button[e].main_color = jv.color_dark;
+            if (1 === item_data[jv.hot_slot[e]].eqp) {
+              jv.hot_button[e].qty_text.text = "E";
+            } else if (2 === item_data[jv.hot_slot[e]].eqp) {
+              jv.hot_button[e].qty_text.text = "E";
+              jv.hot_button[e].main_color = 8912896;
+            } else {
+              jv.hot_button[e].qty_text.text = "";
+            }
+            if (i !== jv.hot_button[e].main_color) {
+              jv.hot_button[e].clear_item();
+              jv.hot_button[e].draw_item();
+            }
+          }
+        } else {
+          jv.hot_button[e].graphic.texture = items[0][0];
+          jv.hot_button[e].visible = 0;
+        }
+      }
+    };
+
+    jv.hot_scene.visible = 1;
+    update_inventory();
+
+    dsk.compactHotbar.enabled = true;
+    dsk.localMsg('Hotbar: Compacto ativado', '#5f5');
+
+  } else {
+
+    // ── Restaura o estado original ───────────────────────────
+
+    // Remove botões compactos da cena
+	for (var e = 0; e < jv.hot_button.length; e++) {
+	  if (jv.hot_button[e]) {
+		// ✅ Removido o removeChild do qty_text aqui também
+		jv.hot_scene.removeChild(jv.hot_button[e]);
+	  }
+	}
+
+    // Restaura botões originais na cena
+    jv.hot_button = dsk.compactHotbar._origButtons;
+    for (var e = 0; e < jv.hot_button.length; e++) {
+      if (jv.hot_button[e]) jv.hot_scene.addChild(jv.hot_button[e]);
+    }
+
+    jv.hot_slot       = dsk.compactHotbar._origHotSlot;
+    jv.hot_scene.x    = dsk.compactHotbar._origHotSceneX;
+    update_inventory  = dsk.compactHotbar._origUpdateInventory;
+
+    update_inventory();
+
+    dsk.compactHotbar.enabled = false;
+    dsk.localMsg('Hotbar: Original restaurado', '#f55');
+  }
+});
+
+dsk.compactHotbar2 = { enabled: false };
+
+dsk.setCmd('/hotbar2', () => {
+  if (!dsk.compactHotbar2.enabled) {
+
+    // ── Salva o estado original ──────────────────────────────
+    dsk.compactHotbar2._origUpdateInventory = update_inventory;
+    dsk.compactHotbar2._origHotSlot         = [...jv.hot_slot];
+    dsk.compactHotbar2._origHotSceneX       = jv.hot_scene.x;
+    dsk.compactHotbar2._origButtons         = [...jv.hot_button];
+
+    // ── Aplica layout 2x5 (10 slots) ────────────────────────
+    var BTN_W       = 65;
+    var BTN_H       = 30;
+    var COL_SPACING = 69;
+    var ROW_SPACING = 34;
+    var COLS        = 2;
+    var ROWS        = 5;
+    var TOTAL       = COLS * ROWS;
+
+    jv.hot_slot = [0,1,2,3,4,5,6,7,8,9];
+
+    // Remove botões antigos da cena SEM destruir qty_text
+    for (var e = 0; e < jv.hot_button.length; e++) {
+      if (jv.hot_button[e]) {
+        jv.hot_scene.removeChild(jv.hot_button[e]);
+      }
+    }
+    jv.hot_button = [];
+
+    var totalW = (COLS - 1) * COL_SPACING + BTN_W;
+    jv.hot_scene.x = 740 - totalW;
+
+    for (var e = 0; e < TOTAL; e++) {
+      var col = Math.floor(e / ROWS);
+      var row = e % ROWS;
+
+      jv.hot_button[e] = jv.Button.create(
+        col * COL_SPACING, row * ROW_SPACING,
+        BTN_W, items[0][0], jv.hot_scene, BTN_H
+      );
+      jv.hot_button[e].button_alpha = .5;
+      jv.hot_button[e].main_color   = jv.color_dark;
+      jv.hot_button[e].slot         = jv.hot_slot[e];
+
+      jv.hot_button[e].qty_text = jv.text("", {
+        font: "8px Verdana", fill: 15658734,
+        lineJoin: "round", stroke: jv.color_medium, strokeThickness: 2
+      });
+      jv.hot_button[e].qty_text.x = 1;
+      jv.hot_button[e].qty_text.y = BTN_H - 10;
+      jv.hot_button[e].addChild(jv.hot_button[e].qty_text);
+      jv.hot_button[e].clear_item();
+      jv.hot_button[e].draw_item();
+
+      (function(idx) {
+        jv.hot_button[idx].on_click = function() {
+          send({ type: "u", slot: this.slot });
+        };
+      })(e);
+    }
+
+    update_inventory = function() {
+      var e, t, i;
+      for (e in inv) inv[e].clear_item();
+      for (e in item_data) {
+        if (item_page * item_length <= e && e < (item_page + 1) * item_length && void 0 !== item_data[e].slot) {
+          t = item_data[e].slot - item_page * item_length;
+          inv[t].draw_item(item_data[e].n, item_data[e].qty, item_data[e].spr, item_data[e].eqp, "#" + item_data[e].col);
+          if (void 0 !== info_pane.slot && e == info_pane.slot) info_pane.set_info(inv[t]);
+        }
+        if (void 0 !== info_pane.slot && void 0 === item_data[e].slot && e == info_pane.slot) info_pane.set_info();
+      }
+      update_recipes();
+      update_build();
+      for (e = 0; e < TOTAL; e++) {
+        if (item_data[jv.hot_slot[e]] && void 0 !== item_data[jv.hot_slot[e]].slot) {
+          if (item_data[jv.hot_slot[e]].spr < 0) {
+            jv.hot_button[e].graphic.texture = tiles[-item_data[jv.hot_slot[e]].spr % 16][Math.floor(-item_data[jv.hot_slot[e]].spr / 16)];
+          } else {
+            jv.hot_button[e].graphic.texture = items[item_data[jv.hot_slot[e]].spr % 16][Math.floor(item_data[jv.hot_slot[e]].spr / 16)];
+          }
+          jv.hot_button[e].visible = 1;
+          if (1 < item_data[jv.hot_slot[e]].qty) {
+            jv.hot_button[e].qty_text.text = item_data[jv.hot_slot[e]].qty;
+          } else {
+            i = jv.hot_button[e].main_color;
+            jv.hot_button[e].main_color = jv.color_dark;
+            if (1 === item_data[jv.hot_slot[e]].eqp) {
+              jv.hot_button[e].qty_text.text = "E";
+            } else if (2 === item_data[jv.hot_slot[e]].eqp) {
+              jv.hot_button[e].qty_text.text = "E";
+              jv.hot_button[e].main_color = 8912896;
+            } else {
+              jv.hot_button[e].qty_text.text = "";
+            }
+            if (i !== jv.hot_button[e].main_color) {
+              jv.hot_button[e].clear_item();
+              jv.hot_button[e].draw_item();
+            }
+          }
+        } else {
+          jv.hot_button[e].graphic.texture = items[0][0];
+          jv.hot_button[e].visible = 0;
+        }
+      }
+    };
+
+    jv.hot_scene.visible = 1;
+    update_inventory();
+
+    dsk.compactHotbar2.enabled = true;
+    dsk.localMsg('Hotbar2: 2x5 ativado', '#5f5');
+
+  } else {
+
+    // ── Restaura o estado original ───────────────────────────
+    for (var e = 0; e < jv.hot_button.length; e++) {
+      if (jv.hot_button[e]) {
+        jv.hot_scene.removeChild(jv.hot_button[e]);
+      }
+    }
+
+    jv.hot_button = dsk.compactHotbar2._origButtons;
+    for (var e = 0; e < jv.hot_button.length; e++) {
+      if (jv.hot_button[e]) jv.hot_scene.addChild(jv.hot_button[e]);
+    }
+
+    jv.hot_slot      = dsk.compactHotbar2._origHotSlot;
+    jv.hot_scene.x   = dsk.compactHotbar2._origHotSceneX;
+    update_inventory = dsk.compactHotbar2._origUpdateInventory;
+
+    update_inventory();
+
+    dsk.compactHotbar2.enabled = false;
+    dsk.localMsg('Hotbar2: Original restaurado', '#f55');
+  }
+});
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
 
