@@ -3299,16 +3299,17 @@ dsk.whoManager = (function () {
 
       const p = players[i];
       const isEnemy = (dsk.enemyList || []).includes(p.name.toLowerCase());
-
+      const isAlly  = (dsk.allyList  || []).includes(p.name.toLowerCase());
 
       const prefix = p.name === myself.name ? "▶ " : "   ";
 
+      const fill = isEnemy ? 0xff4444 : isAlly ? 0x44ff88 : 0xffffff;
 
       const txt = jv.text(
         prefix + p.name + " - " + p.lvl,
         {
           font: "11px Verdana",
-          fill: isEnemy ? 0xff4444 : 0xffffff
+          fill: fill
         }
       );
 
@@ -3484,6 +3485,14 @@ try {
     dsk.localMsg(`Enemy list: ${dsk.enemyList.length} inimigo(s) carregado(s)`, '#f55');
 } catch(_) { dsk.enemyList = []; }
 
+// Carrega lista de aliados salva
+try {
+  const _savedAlly = JSON.parse(localStorage.getItem('dsk_ally_list') || '[]');
+  dsk.allyList = Array.isArray(_savedAlly) ? _savedAlly : [];
+  if (dsk.allyList.length > 0)
+    dsk.localMsg(`Ally list: ${dsk.allyList.length} aliado(s) carregado(s)`, '#5f5');
+} catch(_) { dsk.allyList = []; }
+
 
 dsk.setCmd('/enemy', (context) => {
 
@@ -3521,6 +3530,36 @@ dsk.setCmd('/enemyclear', () => {
   dsk.enemyList = [];
   try { localStorage.removeItem('dsk_enemy_list'); } catch(_) {}
   dsk.localMsg('Enemy list: limpa', '#aaa');
+});
+
+dsk.setCmd('/ally', (context) => {
+  if (!context) {
+    if (dsk.allyList.length === 0) {
+      dsk.localMsg('Ally list: vazia', '#aaa');
+    } else {
+      dsk.localMsg(`Aliados (${dsk.allyList.length}): ${dsk.allyList.join(', ')}`, '#5f5');
+    }
+    return;
+  }
+
+  const name = context.trim().toLowerCase();
+
+  if (dsk.allyList.includes(name)) {
+    dsk.allyList = dsk.allyList.filter(e => e !== name);
+    dsk.localMsg(`Aliado removido: ${context.trim()}`, '#f55');
+  } else {
+    dsk.allyList.push(name);
+    dsk.localMsg(`Aliado adicionado: ${context.trim()}`, '#5f5');
+  }
+
+  try { localStorage.setItem('dsk_ally_list', JSON.stringify(dsk.allyList)); } catch(_) {}
+});
+
+// /allyclear → limpa tudo
+dsk.setCmd('/allyclear', () => {
+  dsk.allyList = [];
+  try { localStorage.removeItem('dsk_ally_list'); } catch(_) {}
+  dsk.localMsg('Ally list: limpa', '#aaa');
 });
 async function xDoSignUp(usernameVal, passVal, emailVal) {
     await xDelay(25);
@@ -3899,34 +3938,33 @@ tm.render = () => {
 };
 
 
-// Aguarda resposta do /tribe list
+// Aguarda resposta do /tribe list — intercepta antes de chegar no chat
 tm.waiting = false;
 
-
-dsk.on('postPacket:pkg', packet => {
-  if (!tm.waiting) return;
-  if (!packet?.data) return;
-
-
-  try {
-    const arr = JSON.parse(packet.data);
-    arr.forEach(raw => {
-      const item = JSON.parse(raw);
-      if (item.type !== 'message') return;
-
-
-      const text = dsk.stripHTMLTags(item.text);
-      if (!text.includes('members:')) return;
-
-
-      const members = tm.parse(text);
-                tm.members = members;
-                tm.page = 0;
-                tm.render();
-                tm.waiting = false;
-    });
-  } catch (e) {}
-});
+{
+  const _tmParseOrig = window.parse; // encadeia sobre o que já existe (incluindo o /who)
+  window.parse = function(packet) {
+    if (tm.waiting && packet?.text && dsk.stripHTMLTags(packet.text).includes('members:')) {
+      try {
+        const text = dsk.stripHTMLTags(packet.text);
+        const members = tm.parse(text);
+        tm.members = members;
+        tm.page = 0;
+        tm.render();
+        tm.waiting = false;
+        // Adiciona todos os membros da tribe ao allyList
+        members.forEach(m => {
+          const n = m.name.toLowerCase();
+          if (!dsk.allyList.includes(n)) dsk.allyList.push(n);
+        });
+        try { localStorage.setItem('dsk_ally_list', JSON.stringify(dsk.allyList)); } catch(_) {}
+        dsk.localMsg(`Ally list: ${members.length} membro(s) da tribe adicionados`, '#5f5');
+      } catch(e) {}
+      return; // engole — não vai pro chat
+    }
+    _tmParseOrig(packet);
+  };
+}
 
 
 dsk.setCmd('/tlist', () => {
@@ -6081,6 +6119,7 @@ dsk.menu.toggleBtn.on_click = () => {
 	  { label: 'Cavar',              state: () => !!dsk.cavar?.enabled,          toggle: () => dsk.commands['/cavar']() },
 	  { label: 'Base Repair',        state: () => !!dsk.baseRepair?.enabled,     toggle: () => dsk.commands['/baserepair']() },
 	  { label: 'Sort Fooders',       state: () => !!dsk.sort?.enabled,           toggle: () => dsk.commands['/sort']() },
+	  { label: 'Sort Config',        state: () => !!scPanel,                     toggle: () => dsk.commands['/sortconfig']() },
     ]},
     { label: '⚙️  Config / UI', items: [
       { label: 'Color Picker',       state: () => !!(typeof cp !== 'undefined' && cp?.visible),  toggle: () => dsk.commands['/colorpicker']() },
@@ -6427,93 +6466,111 @@ dsk.menu.toggleBtn.on_click = () => {
 
 
 dsk.radar = {
-  enabled: false,
+  enabled:  false,
   intervalo: null,
-  textos: []
+  dragging: false,
+  ox: 0,
+  oy: 0,
+};
+
+
+// Cria o label (igual ao questHud / skillHud)
+dsk.radar.label = jv.text('', {
+  font:            '11px Verdana',
+  fill:            16777096,   // amarelo claríssimo, mesma cor original do radar
+  stroke:          jv.color_dark,
+  strokeThickness: 4,
+  lineJoin:        'round',
+  align:           'left',
+});
+dsk.radar.label.x           = 420;
+dsk.radar.label.y           = 30;
+dsk.radar.label.visible     = false;
+dsk.radar.label.interactive = true;
+dsk.radar.label.buttonMode  = true;
+ui_container.addChild(dsk.radar.label);
+
+
+// Drag (padrão questHud)
+dsk.radar.label.on('pointerdown', e => {
+  dsk.radar.dragging = true;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.radar.ox = pos.x - dsk.radar.label.x;
+  dsk.radar.oy = pos.y - dsk.radar.label.y;
+});
+dsk.radar.label.on('pointermove', e => {
+  if (!dsk.radar.dragging) return;
+  const pos = e.data.getLocalPosition(ui_container);
+  dsk.radar.label.x = pos.x - dsk.radar.ox;
+  dsk.radar.label.y = pos.y - dsk.radar.oy;
+});
+dsk.radar.label.on('pointerup',        () => { dsk.radar.dragging = false; });
+dsk.radar.label.on('pointerupoutside', () => { dsk.radar.dragging = false; });
+
+
+// Mapeamento de nomes
+const _radarNomes = {
+  'Altar':          'Altar',
+  'Stairs Up':      'Escada Up',
+  'Hole':           'Buraco',
+  'Stairway':       'Escada Down',
+  'Odd Chest':      'Bau Chaos',
+  'Treasure Chest': 'Bau',
+  'Deep Recall':    'Recall',
+  'Glowing Altar':  'Glow Altar',
+  'Shiny Rock':     'Gold Stone',
+};
+
+
+dsk.radar.renderizar = () => {
+  var coisasperto = objects.items.filter(el => el && _radarNomes[el.name]);
+
+  if (!coisasperto.length) {
+    dsk.radar.label.text = '📡 Radar\n(nada próximo)';
+    return;
+  }
+
+  var linhas = ['📡 Radar'];
+  var limite = Math.min(coisasperto.length, 30);
+
+  for (var i = 0; i < limite; i++) {
+    var obj  = coisasperto[i];
+    var nome = _radarNomes[obj.name];
+    linhas.push(nome + ' ' + obj.x + ' ' + obj.y);
+  }
+
+  dsk.radar.label.text = linhas.join('\n');
+};
+
+
+dsk.radar.start = () => {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  dsk.radar.renderizar();
+  dsk.radar.intervalo = setInterval(dsk.radar.renderizar, 1000);
+};
+
+
+dsk.radar.stop = () => {
+  clearInterval(dsk.radar.intervalo);
+  dsk.radar.intervalo     = null;
+  dsk.radar.label.text    = '';
 };
 
 
 dsk.setCmd('/radar', () => {
   dsk.radar.enabled = !dsk.radar.enabled;
 
-
   if (dsk.radar.enabled) {
     dsk.radar.start();
+    dsk.radar.label.visible = true;
     dsk.localMsg('Radar: Ativado', '#5f5');
   } else {
     dsk.radar.stop();
+    dsk.radar.label.visible = false;
     dsk.localMsg('Radar: Desativado', '#f55');
   }
 });
-
-
-dsk.radar.start = () => {
-  if (dskPaused) return; // ← adiciona isso
-  if (!myself || game_state !== 2) return;
-  dsk.radar.intervalo = setInterval(dsk.radar.renderizar, 1000); // atualiza a cada 1s
-};
-
-
-dsk.radar.stop = () => {
-  clearInterval(dsk.radar.intervalo);
-  dsk.radar.intervalo = null;
-  dsk.radar.limpar();
-};
-
-
-dsk.radar.limpar = () => {
-  dsk.radar.textos.forEach(txt => ui_container.removeChild(txt));
-  dsk.radar.textos = [];
-};
-
-
-// Usa sua função de renderização adaptada
-dsk.radar.renderizar = () => {
-  dsk.radar.limpar();
-
-
-  var coisasperto = objects.items.filter(el => el && (
-    el.name == "Altar" || el.name == "Stairs Up" || el.name == "Hole" ||
-    el.name == "Stairway" || el.name == "Odd Chest" || el.name == "Treasure Chest" ||
-    el.name == "Deep Recall" || el.name == "Glowing Altar" || el.name == "Shiny Rock"
-  ));
-
-
-  for (var i = 0; i < Math.min(coisasperto.length, 30); i++) {
-    var obj = coisasperto[i];
-    var novoNome;
-
-
-    switch (obj.name) {
-      case "Altar": novoNome = "Altar"; break;
-      case "Stairs Up": novoNome = "Escada Up"; break;
-      case "Hole": novoNome = "Buraco"; break;
-      case "Stairway": novoNome = "Escada Down"; break;
-      case "Odd Chest": novoNome = "Bau Chaos"; break;
-      case "Treasure Chest": novoNome = "Bau"; break;
-      case "Deep Recall": novoNome = "Recall"; break;
-      case "Glowing Altar": novoNome = "Glow Altar"; break;
-      case "Shiny Rock": novoNome = "Gold Stone"; break;
-    }
-
-
-    var texto = jv.text(" " + novoNome + " " + obj.x + " " + obj.y, {
-      font: "11px Verdana",
-      fill: 16777096,
-      lineJoin: "round",
-      stroke: jv.color_dark,
-      strokeThickness: 4,
-      align: "right"
-    });
-
-
-    texto.x = 420;
-    texto.y = 30 + i * 18;
-    ui_container.addChild(texto);
-    dsk.radar.textos.push(texto);
-  }
-};
-
 
 // ── KNITBOT ─────────────────────────────────────────────
 
@@ -9607,7 +9664,7 @@ dsk.setCmd('/farm', () => {
     (async function loop() {
       while (dsk.farm.enabled) {
         await FarmBot();
-        await xDelay(200);
+        await xDelay(350);
       }
     })();
   } else {
@@ -9691,7 +9748,7 @@ async function FarmBot() {
     let tries = 0;
     while (obstacle && tries < 20) {
       await xDoKeyPress(6, 219);
-      await xDelay(321);
+      await xDelay(381);
       obstacle = getObstacle(x, y);
       tries++;
     }
@@ -9700,7 +9757,7 @@ async function FarmBot() {
 
   async function digTile(){
     await xDoKeyPress(6, 211);
-    await xDelay(441);
+    await xDelay(481);
   }
 
 
@@ -9709,7 +9766,7 @@ async function FarmBot() {
     let tries = 0;
     while (occupied(x, y) === 0 && tries < 10) {
       await digTile();
-      await xDelay(350);
+      await xDelay(390);
       tries++;
     }
   }
@@ -9718,9 +9775,9 @@ async function FarmBot() {
   async function plantSeed(){
     await xDelay(150);
     await xDoPickUp();
-    await xDelay(100);
+    await xDelay(160);
     await xDoUseSlot(seedSlot);
-    await xDelay(110);
+    await xDelay(130);
   }
 
 
@@ -10986,6 +11043,26 @@ async function xGetShiny() {
 async function xGetSSDStone() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
+
+  // Se já está adjacente e minerando uma Rock (não Shiny), mantém sem reescanear
+  if (window._ssdCurrentTarget) {
+    const _ct = window._ssdCurrentTarget;
+    const _rockSpritesCheck = [-261, -618, -518];
+    const _isRock = _ct.name === 'Rock' || _rockSpritesCheck.includes(_ct.sprite);
+    const _stillExists = Object.values(objects.items).some(o =>
+      o && o.x === _ct.x && o.y === _ct.y && o.can_pickup === 0
+    );
+    const _adjacent = [
+      { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }
+    ].some(c => myself.x === _ct.x + c.dx && myself.y === _ct.y + c.dy);
+    if (_isRock && _stillExists && _adjacent) {
+      xTemp[172] = _ct;
+      return _ct;
+    } else if (!_stillExists) {
+      window._ssdCurrentTarget = undefined;
+    }
+  }
+
   xTemp[172] = undefined;
   if (!window._ssdReachCache) window._ssdReachCache = {};
   if (!window._ssdBlacklist)  window._ssdBlacklist  = {};
@@ -11522,7 +11599,7 @@ async function xSSD() {
       // Rastreia timeout de navegação (igual às pedras)
       if (!xTemp[174] || xTemp[174].k !== _chestK) {
         xTemp[174] = { k: _chestK, t: Date.now(), lm: 0 };
-      } else if (Date.now() - xTemp[174].t > 8000) {
+      } else if (Date.now() - xTemp[174].t > 25000) {
         if (!window._chestBlacklist) window._chestBlacklist = {};
         _chestBlacklist[_chestK] = Date.now() + 120000;
         dsk.localMsg('SSD: chest inacessível (timeout), ignorando...', '#ff0');
@@ -11602,11 +11679,11 @@ async function xSSD() {
           dir: (c.dir + 2) % 4,
           dist: Math.abs(myself.x - (_ssdTarget.x + c.dx)) + Math.abs(myself.y - (_ssdTarget.y + c.dy))
         }))
-        .filter(t => !xGetSolidByID(t.x, t.y))
+        .filter(t => !xGetSolidByID(t.x, t.y) && xGetPlayerByPosList([t.x], [t.y]) === undefined)
         .sort((a, b) => a.dist - b.dist);
 
       if (_freeSides.length === 0) {
-        dsk.localMsg('SSD: pedra sem lado livre, ignorando...', '#ff0');
+        dsk.localMsg('SSD: pedra sem lado livre ou bloqueada, blacklistando...', '#ff0');
         const _blKey = _ssdTarget.x + ',' + _ssdTarget.y;
         if (!window._ssdBlacklist) window._ssdBlacklist = {};
         _ssdBlacklist[_blKey] = Date.now() + 120000;
@@ -11621,7 +11698,7 @@ async function xSSD() {
 
       if (xTemp[97]?.x === _dest.x && xTemp[97]?.y === _dest.y) {
         if (!xTemp[98]) xTemp[98] = Date.now();
-        if (Date.now() - xTemp[98] > 8000) {
+        if (Date.now() - xTemp[98] > 25000) {
           dsk.localMsg('SSD: pedra inacessível (timeout), ignorando...', '#ff0');
           const _blKey = _ssdTarget.x + ',' + _ssdTarget.y;
           if (!window._ssdBlacklist) window._ssdBlacklist = {};
@@ -13545,12 +13622,14 @@ window.rotationConfig = window.rotationConfig ?? {
   swordLevel:  40,
   hammerLevel: 40,
   armasLevel:  40,
-  destruLevel: 40,
+  destruLevel:   40,
+  smithingLevel: 40,
   skipCook:    false,
   skipSmelt:   false,
   skipSword:   false,
   skipHammer:  false,
   skipArmas:   false,
+  skipSmith:   false,
   skipDestru:  false,
   // ── Posições ──────────────────────────────────────────────
   pos: {
@@ -13560,6 +13639,7 @@ window.rotationConfig = window.rotationConfig ?? {
     hammer: { x: 119, y: 280 },
     armas:  { x: 114, y: 280 }, // posição de combate (segunda do step)
     armasPick: { x: 117, y: 280 }, // posição de pegar itens (primeira)
+    smith:  { x: 122, y: 277 },
     destru: { x: 124, y: 281 },
   },
 };
@@ -13601,6 +13681,7 @@ dsk.setCmd('/rotation', () => {
     dsk.cooking.enabled  = false;
     dsk.smelting.enabled = false;
     dsk.armas.enabled    = false;
+    dsk.smith.enabled    = false;
     dsk.destruction.enabled = false;
     xGoing[0]   = false;
     xGoing[1]   = false;
@@ -13884,7 +13965,74 @@ async function rotRun() {
   if (!dsk.rotation.enabled) return;
 
 
-  // ── STEP 6: DESTRUCTION ───────────────────────────────────
+
+  // ── STEP 6: SMITHING ──────────────────────────────────────
+  if (!rotationConfig.skipSmith) {
+    dsk.rotation.step  = 'smith';
+    dsk.rotation.phase = 'nav';
+
+
+    dsk.localMsg('Rotation → indo para Smithing...', '#0ff');
+    await rotMoveTo(rotationConfig.pos.smith.x, rotationConfig.pos.smith.y);
+    await xDelay(400);
+    await xDoChangeDir(1); // vira para a direita
+    await xDelay(400);
+    await xDoPickUp(); // pega item 1 (martelo ou ring)
+    await xDelay(400);
+    await xDoPickUp(); // pega item 2
+    await xDelay(400);
+    if (inv[0]?.sprite && inv[0].equip === 0) { await xDoUseSlot(0); await xDelay(500); } // equipa martelo
+
+
+    dsk.rotation.phase = 'bot';
+    currentLevel = rotationConfig.smithingLevel;
+    skillName    = 'smithing';
+    skillLevel   = 0;
+    dsk.localMsg(`Rotation → Smithing até nível ${currentLevel}`, '#5f5');
+
+
+    // Inicializa o smith igual ao /smith faz internamente
+    dsk.smith.playerPos  = { x: myself.x, y: myself.y };
+    dsk.smith.dirToAnvil = myself.dir;
+    dsk.smith.anvil      = xSmithGetAnvilPos();
+    dsk.smith.progress   = 0;
+    dsk.smith.repairing  = false;
+    dsk.smith.phase      = 'idle';
+    dsk.smith.itemName   = inv[1]?.sprite ? (inv[1].n ?? xGetItemNameBySlot(1) ?? 'item') : 'item';
+    xGoing[145]          = false;
+    dsk.smith.enabled    = true;
+    dsk.botActive        = true;
+
+
+    (async function smithLoop() {
+      while (dsk.smith.enabled && dsk.rotation.enabled) {
+        await xSmith();
+        await xDelay(300);
+      }
+      dsk.botActive = false;
+    })();
+
+
+    while (dsk.smith.enabled && dsk.rotation.enabled) await xDelay(2000);
+    if (!dsk.rotation.enabled) return;
+
+
+    dsk.rotation.phase = 'cleanup';
+    dsk.smith.enabled = false;
+    skillLevel = 0;
+    xDoKeyUp(6);
+    await xDelay(500);
+    dsk.localMsg('Rotation → Smithing pronto! Dropando slots...', '#ff0');
+    for (const slot of [1, 2, 3, 4, 5, 6]) {
+      if (inv[slot - 1]?.sprite) { xDoDropSlot(0, slot); await xDelay(300); }
+    }
+    await xDelay(500);
+  }
+
+
+  if (!dsk.rotation.enabled) return;
+
+  // ── STEP 7: DESTRUCTION ───────────────────────────────────
   if (!rotationConfig.skipDestru) {
     dsk.rotation.step  = 'destru';
     dsk.rotation.phase = 'nav';
@@ -13980,8 +14128,9 @@ async function rotRun() {
     { key: 'smelt',  label: 'Smelt',  cfgKey: 'smeltLevel',  skipKey: 'skipSmelt'  },
     { key: 'sword',  label: 'Sword',  cfgKey: 'swordLevel',  skipKey: 'skipSword'  },
     { key: 'hammer', label: 'Hammer', cfgKey: 'hammerLevel', skipKey: 'skipHammer' },
-    { key: 'armas',  label: 'Armas',  cfgKey: 'armasLevel',  skipKey: 'skipArmas'  },
-    { key: 'destru', label: 'Destru', cfgKey: 'destruLevel', skipKey: 'skipDestru' },
+    { key: 'armas',    label: 'Armas',    cfgKey: 'armasLevel',    skipKey: 'skipArmas'  },
+    { key: 'smith',    label: 'Smithing', cfgKey: 'smithingLevel', skipKey: 'skipSmith'  },
+    { key: 'destru',   label: 'Destru',   cfgKey: 'destruLevel',   skipKey: 'skipDestru' },
   ];
 
 
@@ -13992,6 +14141,7 @@ async function rotRun() {
     { key: 'hammer',    label: 'Hammer'     },
     { key: 'armasPick', label: 'Armas Pick' },
     { key: 'armas',     label: 'Armas Luta' },
+    { key: 'smith',     label: 'Smithing'   },
     { key: 'destru',    label: 'Destru'     },
   ];
 
@@ -14003,7 +14153,7 @@ async function rotRun() {
     const r = dsk.rotation;
     const alvoMap = {
       cook:'cookLevel', smelt:'smeltLevel', sword:'swordLevel',
-      hammer:'hammerLevel', armas:'armasLevel', destru:'destruLevel',
+      hammer:'hammerLevel', armas:'armasLevel', smith:'smithingLevel', destru:'destruLevel',
     };
     set('step',  `Step: ${r.step}`);
     set('phase', `Fase: ${r.phase}`);
@@ -17706,189 +17856,452 @@ function sortGeneratePermutationsLetters(str) {
 // ── Lógica principal ───────────────────────────────────────────
 
 
-window.sortDoTrash = true;
+// ══════════════════════════════════════════════════════════════
+// 📦  SORT FOODERS + CONFIG PANEL
+// Comando: /sort | /sortconfig
+// ══════════════════════════════════════════════════════════════
 
+{
+  // ── Pré-sets de itens ────────────────────────────────────────
+  const SORT_PRESETS = {
+    'Noble Jacket': { trigger: 'You wear the Noble Jacket', keyword: 'def',       offset: 4 },
+    'Grass Band':   { trigger: 'You equip the Grass Band',  keyword: 'med)',      offset: 5 },
+	'Paddler':      { trigger: "You equip the Peddler's Gem", keyword: 'ing)',    offset: 5 },
+    'Spindle':      { trigger: 'You hold a Spindle', keyword: '*.', offset: 3 }, // runas começam logo depois do espaço
+  };
 
-async function SortFooders() {
-  if (dskPaused) return;
-  if (!myself || game_state !== 2) return;
+  // ── Config central (editável pelo painel) ────────────────────
+  const sortCfg = {
+    preset:   'Noble Jacket',
+    trigger:  'You wear the Noble Jacket',
+    keyword:  'def',
+    offset:   4,
+    pickXMin: 114, pickXMax: 124,
+    pickYMin: 290, pickYMax: 291,
+    trashX:   110, trashY: 299,
+    // Mapa de runas: combo → {x, y} destino
+    runeMap: {
+      'A':     { x: 105, y: 293 }, 'S': { x: 106, y: 293 }, 'H': { x: 107, y: 293 },
+      'G':     { x: 108, y: 293 }, 'R': { x: 109, y: 293 },
+      'AH':    { x: 111, y: 293 }, 'AR': { x: 111, y: 297 }, 'SH': { x: 111, y: 295 },
+      'SG':    { x: 112, y: 296 }, 'SR': { x: 111, y: 296 }, 'HG': { x: 112, y: 297 },
+      'HR':    { x: 112, y: 293 }, 'GR': { x: 112, y: 295 },
+      'SHG':   { x: 113, y: 297 }, 'SHR': { x: 113, y: 296 }, 'SGR': { x: 113, y: 295 },
+      'HGR':   { x: 113, y: 294 }, 'ASHG': { x: 113, y: 293 }, 'ASHR': { x: 114, y: 293 },
+      'AHGR':  { x: 114, y: 294 }, 'ASGR': { x: 114, y: 296 }, 'SHGR': { x: 114, y: 295 },
+      'ASHGR': { x: 114, y: 297 },
+    },
+  };
+    
 
+  // Carrega config salva
+  try {
+    const saved = JSON.parse(localStorage.getItem('dsk_sort_cfg') || '{}');
+    Object.assign(sortCfg, saved);
+  } catch(e) {}
 
-  // Pegar item mais próximo nas posições 
-  if (inv[0].sprite === undefined) {
-    let closest = undefined;
-    let closestDist = Infinity;
+  function saveCfg() {
+    try { localStorage.setItem('dsk_sort_cfg', JSON.stringify(sortCfg)); } catch(e) {}
+  }
 
+  // ── Helpers de runa (mesmos do original) ─────────────────────
+  const allCombos = [
+    'A','S','H','G','R',
+    'AS','AH','AG','AR','SH','SG','SR','HG','HR','GR',
+    'ASH','ASG','ASR','AHG','AHR','AGR','SHG','SHR','SGR','HGR',
+    'ASHG','ASHR','AHGR','ASGR','SHGR','ASHGR',
+  ];
 
-    for (let x = 113; x <= 126; x++) {
-      for (let y = 290; y <= 291; y++) {
-        const item = xGetItemByPos(x, y);
-        if (item !== undefined) {
-          const dist = Math.sqrt(Math.pow(myself.x - x, 2) + Math.pow(myself.y - y, 2));
-          if (dist < closestDist) {
-            closest = item;
-            closestDist = dist;
+  function resolveTarget(runeStr) {
+    const runeLetters = sortTransformLetter(runeStr);
+    const runeNumber  = sortTransformNumber(runeStr);
+    const n           = retnum(runeStr);
+    const rn          = runeNumber;
+    const hasOne      = runeStr.indexOf('1') !== -1;
+
+    for (const combo of allCombos) {
+      if (!sortGeneratePermutationsLetters(combo).includes(runeLetters)) continue;
+
+      // Runas simples: posição base + nível
+      if (['A','S','H','G','R'].includes(combo)) {
+        const base = sortCfg.runeMap[combo];
+        return { x: base.x, y: base.y + n - 1 };
+      }
+
+      // Combinações com condição rn<=0 / sem "1"
+      const needsClean = !hasOne && rn <= 0;
+      const dest = sortCfg.runeMap[combo];
+      if (!dest) return null;
+      return { x: dest.x, y: needsClean ? dest.y : sortCfg.trashY };
+    }
+    return null;
+  }
+
+  // ── SortFooders reescrito ────────────────────────────────────
+  async function SortFooders() {
+    if (dskPaused) return;
+    if (!myself || game_state !== 2) return;
+
+    // Pegar item na área configurada
+    if (inv[0].sprite === undefined) {
+      let closest = undefined, closestDist = Infinity;
+      for (let x = sortCfg.pickXMin; x <= sortCfg.pickXMax; x++) {
+        for (let y = sortCfg.pickYMin; y <= sortCfg.pickYMax; y++) {
+          const item = xGetItemByPos(x, y);
+          if (item !== undefined) {
+            const dist = Math.sqrt((myself.x-x)**2 + (myself.y-y)**2);
+            if (dist < closestDist) { closest = item; closestDist = dist; }
           }
         }
       }
-    }
+      if (!closest) return;
 
-
-    if (!closest) return;
-
-
-    // Tenta chegar e pegar — até 6 tentativas
-    xDoMove(closest.x, closest.y);
-    for (let attempt = 0; attempt < 6; attempt++) {
-      await xDelay(900);
-      if (myself.still() && !checkPosition(50)) {
-        xDoPickUp();
-        await xDelay(700);
-        xDoUseSlot(0);
-        await xDelay(700);
-        break;
-      }
-      await xDelay(700);
-    }
-  }
-
-
-  // ── Processa chat com resultado do robe ───────────────────────
-  if (xIfChatHas("You wear the Noble Jacket")) {
-    const fullLine = whatChatHas("You wear the Noble Jacket");
-    xDoClearChat("You wear the Noble Jacket");
-
-
-    const defIdx = fullLine.indexOf("def");
-    const runeStr = fullLine.substring(defIdx + 4);
-
-
-    if (runeStr !== "") {
-      sortDoTrash = false;
-
-
-      const allCombos = [
-        "A","S","H","G","R",
-        "AS","AH","AG","AR","SH","SG","SR","HG","HR","GR",
-        "ASH","ASG","ASR","AHG","AHR","AGR","SHG","SHR","SGR","HGR",
-        "ASHG","ASHR","AHGR","ASGR","SHGR","ASHGR"
-      ];
-
-
-      const runeLetters = sortTransformLetter(runeStr);
-      const runeNumber  = sortTransformNumber(runeStr);
-
-
-      let targetX = 117, targetY = 300; // default: Trash
-
-
-      for (const combo of allCombos) {
-        if (sortGeneratePermutationsLetters(combo).includes(runeLetters)) {
-          const n  = retnum(runeStr);
-          const rn = runeNumber;
-
-
-          switch (combo) {
-            // ── Runas simples (A/S/H/G/R) por nível 1-5 ──────────
-            case "A": targetX=112; targetY=292+n; break;
-            case "S": targetX=113; targetY=292+n; break;
-            case "H": targetX=114; targetY=292+n; break;
-            case "G": targetX=115; targetY=292+n; break;
-            case "R": targetX=116; targetY=292+n; break;
-
-
-            // ── Combinações duplas (sem "1" e rn<=0) ──────────────
-            case "AH": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?293:300; break;
-            case "AR": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?294:300; break;
-            case "SH": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?295:300; break;
-            case "SG": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?296:300; break;
-            case "SR": targetX=118; targetY=runeStr.indexOf("1")===-1&&rn<=0?297:300; break;
-            case "HG": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?293:300; break;
-            case "HR": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?294:300; break;
-            case "GR": targetX=119; targetY=runeStr.indexOf("1")===-1&&rn<=0?295:300; break;
-
-
-            // ── Combinações triplas/quádruplas (rn<=0) ────────────
-            case "SHG":   targetX=119; targetY=rn<=0?296:300; break;
-            case "SHR":   targetX=119; targetY=rn<=0?297:300; break;
-            case "SGR":   targetX=120; targetY=rn<=0?293:300; break;
-            case "HGR":   targetX=120; targetY=rn<=0?294:300; break;
-            case "ASHG":  targetX=120; targetY=rn<=0?295:300; break;
-            case "ASHR":  targetX=120; targetY=rn<=0?296:300; break;
-            case "AHGR":  targetX=120; targetY=rn<=0?297:300; break;
-            case "ASGR":  targetX=121; targetY=rn<=0?293:300; break;
-            case "SHGR":  targetX=121; targetY=rn<=0?294:300; break;
-            case "ASHGR": targetX=121; targetY=rn<=0?295:300; break;
-
-
-            default: targetX=117; targetY=300; break;
-          }
+      xDoMove(closest.x, closest.y);
+      for (let i = 0; i < 6; i++) {
+        await xDelay(900);
+        if (myself.still() && !checkPosition(50)) {
+          xDoPickUp(); await xDelay(700);
+          xDoUseSlot(0); await xDelay(700);
           break;
         }
-      }
-
-
-      xDoMove(targetX, targetY);
-
-
-      // Tenta dropar — até 7 tentativas
-      for (let attempt = 0; attempt < 7; attempt++) {
-        await xDelay(1300);
-        if (myself.still() && !checkPosition(50)) {
-          await xDelay(850);
-          xDoDropSlot(0, 1);
-          await xDelay(800);
-          if (dsk.sort.enabled) SortFooders();
-          return;
-        }
-        await xDelay(800);
-      }
-
-
-    } else {
-      // runeStr vazio → vai para o Trash
-      xDoMove(117, 300);
-      for (let attempt = 0; attempt < 8; attempt++) {
-        await xDelay(1300);
-        if (myself.still()) {
-          await xDelay(850);
-          xDoDropSlot(0, 1);
-          await xDelay(800);
-          if (dsk.sort.enabled) SortFooders();
-          return;
-        }
-        await xDelay(800);
+        await xDelay(700);
       }
     }
 
+    // Processa resultado do equip
+    if (xIfChatHas(sortCfg.trigger)) {
+      const fullLine = whatChatHas(sortCfg.trigger);
+      xDoClearChat(sortCfg.trigger);
 
-  } else {
-    // Não tem mensagem do robe ainda — aguarda
-    await xDelay(800);
-    if (dsk.sort.enabled) SortFooders();
+      let runeStr = '';
+	  const kidx = fullLine.indexOf(sortCfg.keyword);
+	  runeStr = kidx !== -1 ? fullLine.substring(kidx + sortCfg.offset) : '';
+
+      if (runeStr !== '') {
+        const dest = resolveTarget(runeStr);
+        const tx = dest ? dest.x : sortCfg.trashX;
+        const ty = dest ? dest.y : sortCfg.trashY;
+
+        for (let i = 0; i < 6; i++) {
+		  xDoMove(tx, ty);
+		  await xDelay(1500);
+		  if (myself.x === tx && myself.y === ty) break;
+		}
+		if (myself.x === tx && myself.y === ty) {
+		  await xDelay(850);
+		  xDoDropSlot(0, 1);
+		  await xDelay(800);
+		  if (dsk.sort.enabled) SortFooders();
+		}
+
+    } else {
+	  // Sem runas → lixo
+	  for (let i = 0; i < 6; i++) {
+		xDoMove(sortCfg.trashX, sortCfg.trashY);
+		await xDelay(1500);
+		if (myself.x === sortCfg.trashX && myself.y === sortCfg.trashY) break;
+	  }
+	  if (myself.x === sortCfg.trashX && myself.y === sortCfg.trashY) {
+		await xDelay(850);
+		xDoDropSlot(0, 1);
+		await xDelay(800);
+		if (dsk.sort.enabled) SortFooders();
+	  }
+	}
+
+    } else {
+      await xDelay(800);
+      if (dsk.sort.enabled) SortFooders();
+    }
   }
+
+  // ── Objeto sort ──────────────────────────────────────────────
+  dsk.sort = { enabled: false };
+
+  dsk.setCmd('/sort', () => {
+    dsk.sort.enabled = !dsk.sort.enabled;
+    if (dsk.sort.enabled) {
+      dsk.localMsg('Sort Fooders: Ativado', '#5f5');
+      SortFooders();
+    } else {
+      dsk.localMsg('Sort Fooders: Desativado', '#f55');
+    }
+  });
+
+  // ══════════════════════════════════════════════════════════════
+  // SORT CONFIG PANEL
+  // ══════════════════════════════════════════════════════════════
+
+  let scPanel = null;
+
+  function scRemove() { if (scPanel) { scPanel.remove(); scPanel = null; } }
+
+  function scCreate() {
+    if (scPanel) { scRemove(); return; }
+
+    scPanel = document.createElement('div');
+    Object.assign(scPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '310px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      display: 'flex', flexDirection: 'column',
+    });
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '📦 Sort Config';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px' });
+    closeBtn.onclick = scRemove;
+    header.appendChild(title); header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', e => {
+      if (e.target === closeBtn) return;
+      dragging = true;
+      ox = _getXY(e).x - scPanel.getBoundingClientRect().left;
+      oy = _getXY(e).y - scPanel.getBoundingClientRect().top;
+      scPanel.style.transform = 'none';
+    });
+    window.addEventListener('mousemove', e => { if (!dragging) return; scPanel.style.left = (_getXY(e).x - ox)+'px'; scPanel.style.top = (_getXY(e).y - oy)+'px'; });
+    window.addEventListener('mouseup', () => dragging = false);
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, {
+      padding: '10px 12px', display: 'flex', flexDirection: 'column',
+      gap: '8px', maxHeight: '520px', overflowY: 'auto',
+    });
+
+    function section(txt) {
+      const d = document.createElement('div');
+      d.textContent = txt;
+      Object.assign(d.style, { color: '#777', fontSize: '10px', textAlign: 'center', borderTop: '1px solid #333', paddingTop: '6px' });
+      return d;
+    }
+
+    function row(children) {
+      const r = document.createElement('div');
+      Object.assign(r.style, {
+        background: '#2a2a3e', borderRadius: '7px', padding: '6px 10px',
+        display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
+      });
+      children.forEach(c => r.appendChild(c));
+      return r;
+    }
+
+    function lbl(txt, color) {
+      const s = document.createElement('span');
+      s.textContent = txt;
+      Object.assign(s.style, { color: color || '#ccc', fontSize: '11px', flexShrink: '0' });
+      return s;
+    }
+
+    function numInput(val, min, max, onChange) {
+      const wrap = document.createElement('div');
+      Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '2px' });
+      function mkBtn(t, fn) {
+        const b = document.createElement('button');
+        b.textContent = t;
+        Object.assign(b.style, {
+          width: '22px', height: '20px', padding: '0', borderRadius: '4px',
+          border: '1px solid #555', background: '#1a1a2e', color: '#fff', cursor: 'pointer', fontSize: '11px',
+        });
+        b.onmouseenter = () => b.style.background = '#3a3a5e';
+        b.onmouseleave = () => b.style.background = '#1a1a2e';
+        b.onclick = fn;
+        return b;
+      }
+      const valEl = document.createElement('span');
+      valEl.textContent = String(val);
+      Object.assign(valEl.style, { color: '#FFD700', fontSize: '11px', minWidth: '28px', textAlign: 'center' });
+      wrap.appendChild(mkBtn('-', () => { val = Math.max(min, val-1); valEl.textContent = String(val); onChange(val); }));
+      wrap.appendChild(valEl);
+      wrap.appendChild(mkBtn('+', () => { val = Math.min(max, val+1); valEl.textContent = String(val); onChange(val); }));
+      return wrap;
+    }
+
+    function captureBtn(txt, onClick) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        padding: '3px 8px', borderRadius: '5px', border: '1px solid #0af',
+        background: '#1a2a3a', color: '#0af', cursor: 'pointer', fontSize: '10px',
+      });
+      b.onmouseenter = () => b.style.background = '#2a3a4a';
+      b.onmouseleave = () => b.style.background = '#1a2a3a';
+      b.onclick = onClick;
+      return b;
+    }
+
+    // ── Seção: Item ───────────────────────────────────────────
+    body.appendChild(section('── Item ──'));
+
+    // Preset selector
+    const presetRow = document.createElement('div');
+    Object.assign(presetRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '6px 10px',
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px',
+    });
+    presetRow.appendChild(lbl('Pré-set'));
+    const sel = document.createElement('select');
+    Object.assign(sel.style, {
+      background: '#1a1a2e', color: '#FFD700', border: '1px solid #555',
+      borderRadius: '4px', fontSize: '11px', padding: '2px 4px', cursor: 'pointer',
+    });
+    Object.keys(SORT_PRESETS).forEach(k => {
+      const opt = document.createElement('option');
+      opt.value = k; opt.textContent = k;
+      if (k === sortCfg.preset) opt.selected = true;
+      sel.appendChild(opt);
+    });
+    sel.onchange = () => {
+      const p = SORT_PRESETS[sel.value];
+      sortCfg.preset = sel.value;
+      sortCfg.trigger = p.trigger;
+      sortCfg.keyword = p.keyword;
+      sortCfg.offset  = p.offset;
+      triggerEl.textContent = p.trigger;
+      keywordEl.textContent = p.keyword || '(direto)';
+      saveCfg();
+      dsk.localMsg(`Sort: item → ${sel.value}`, '#0ff');
+    };
+    presetRow.appendChild(sel);
+    body.appendChild(presetRow);
+
+    // Mostra trigger e keyword ativos
+    const triggerEl = document.createElement('div');
+    triggerEl.textContent = sortCfg.trigger;
+    Object.assign(triggerEl.style, {
+      background: '#12121e', borderRadius: '5px', padding: '4px 8px',
+      color: '#888', fontSize: '9px', wordBreak: 'break-all',
+    });
+    body.appendChild(triggerEl);
+
+    const keywordEl = document.createElement('div');
+    keywordEl.textContent = `keyword: ${sortCfg.keyword || '(direto)'}`;
+    Object.assign(keywordEl.style, {
+      background: '#12121e', borderRadius: '5px', padding: '3px 8px',
+      color: '#666', fontSize: '9px',
+    });
+    body.appendChild(keywordEl);
+
+    // ── Seção: Área de coleta ─────────────────────────────────
+    body.appendChild(section('── Área de Coleta ──'));
+    body.appendChild(row([lbl('X min'), numInput(sortCfg.pickXMin, 0, 999, v => { sortCfg.pickXMin = v; saveCfg(); }),
+                          lbl('X max'), numInput(sortCfg.pickXMax, 0, 999, v => { sortCfg.pickXMax = v; saveCfg(); })]));
+    body.appendChild(row([lbl('Y min'), numInput(sortCfg.pickYMin, 0, 999, v => { sortCfg.pickYMin = v; saveCfg(); }),
+                          lbl('Y max'), numInput(sortCfg.pickYMax, 0, 999, v => { sortCfg.pickYMax = v; saveCfg(); })]));
+
+    // Capturar canto superior esquerdo / inferior direito
+    const capAreaRow = document.createElement('div');
+    Object.assign(capAreaRow.style, { display: 'flex', gap: '6px' });
+
+    const capTL = captureBtn('📍 Capturar canto NW', () => {
+      if (!myself) return;
+      sortCfg.pickXMin = myself.x; sortCfg.pickYMin = myself.y;
+      saveCfg(); scRemove(); scCreate();
+      dsk.localMsg(`Sort: NW → (${myself.x},${myself.y})`, '#0ff');
+    });
+    const capBR = captureBtn('📍 Capturar canto SE', () => {
+      if (!myself) return;
+      sortCfg.pickXMax = myself.x; sortCfg.pickYMax = myself.y;
+      saveCfg(); scRemove(); scCreate();
+      dsk.localMsg(`Sort: SE → (${myself.x},${myself.y})`, '#0ff');
+    });
+    capAreaRow.appendChild(capTL); capAreaRow.appendChild(capBR);
+    body.appendChild(capAreaRow);
+
+    // ── Seção: Lixo ──────────────────────────────────────────
+    body.appendChild(section('── Lixo ──'));
+    const trashRow = document.createElement('div');
+    Object.assign(trashRow.style, {
+      background: '#2a2a3e', borderRadius: '7px', padding: '6px 10px',
+      display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+    });
+    const trashXLbl = document.createElement('span');
+    trashXLbl.textContent = `Lixo: (${sortCfg.trashX}, ${sortCfg.trashY})`;
+    Object.assign(trashXLbl.style, { color: '#FFD700', fontSize: '11px', flex: '1' });
+    const capTrash = captureBtn('📍 Capturar posição', () => {
+      if (!myself) return;
+      sortCfg.trashX = myself.x; sortCfg.trashY = myself.y;
+      trashXLbl.textContent = `Lixo: (${myself.x}, ${myself.y})`;
+      saveCfg();
+      dsk.localMsg(`Sort: Lixo → (${myself.x},${myself.y})`, '#f55');
+    });
+    trashRow.appendChild(trashXLbl); trashRow.appendChild(capTrash);
+    body.appendChild(trashRow);
+
+    // ── Seção: Runas ─────────────────────────────────────────
+    body.appendChild(section('── Destinos das Runas (clique para capturar) ──'));
+
+    const runaGrid = document.createElement('div');
+    Object.assign(runaGrid.style, { display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px' });
+
+    Object.entries(sortCfg.runeMap).forEach(([combo, pos]) => {
+      const btn = document.createElement('button');
+      btn.dataset.rune = combo;
+      btn.textContent = `${combo}: (${pos.x},${pos.y})`;
+      Object.assign(btn.style, {
+        padding: '4px 6px', borderRadius: '6px', border: '1px solid #444',
+        background: '#2a2a3e', color: '#ddd', cursor: 'pointer',
+        fontSize: '9px', textAlign: 'left',
+      });
+      btn.onmouseenter = () => btn.style.background = '#3a3a5e';
+      btn.onmouseleave = () => btn.style.background = '#2a2a3e';
+      btn.onclick = () => {
+        if (!myself) return;
+        sortCfg.runeMap[combo] = { x: myself.x, y: myself.y };
+        btn.textContent = `${combo}: (${myself.x},${myself.y})`;
+        saveCfg();
+        dsk.localMsg(`Sort: ${combo} → (${myself.x},${myself.y})`, '#0ff');
+      };
+      runaGrid.appendChild(btn);
+    });
+    body.appendChild(runaGrid);
+
+    // Reset runas
+    const btnReset = document.createElement('button');
+    btnReset.textContent = '↺ Resetar tudo';
+    Object.assign(btnReset.style, {
+      width: '100%', padding: '7px 0', borderRadius: '7px',
+      border: '1px solid #f80', background: '#1a1200',
+      color: '#f80', cursor: 'pointer', fontSize: '11px',
+    });
+    btnReset.onmouseenter = () => btnReset.style.background = '#2a2200';
+    btnReset.onmouseleave = () => btnReset.style.background = '#1a1200';
+    btnReset.onclick = () => {
+      try { localStorage.removeItem('dsk_sort_cfg'); } catch(e) {}
+      scRemove(); scCreate();
+      dsk.localMsg('Sort: config resetada', '#f80');
+    };
+    body.appendChild(btnReset);
+
+    scPanel.appendChild(header);
+    scPanel.appendChild(body);
+    document.body.appendChild(scPanel);
+    if (typeof dsk.addResize === 'function') dsk.addResize(scPanel, 220, 300);
+  }
+
+  dsk.setCmd('/sortconfig', () => {
+    if (scPanel) { scRemove(); dsk.localMsg('Sort Config: Fechado', '#f55'); }
+    else          { scCreate(); dsk.localMsg('Sort Config: Aberto', '#5f5'); }
+  });
+
+  dsk.localMsg('Sort Config: /sortconfig', '#aaf');
 }
-
-
-// ── Objeto e comandos ──────────────────────────────────────────
-
-
-dsk.sort = { enabled: false };
-
-
-dsk.setCmd('/sort', () => {
-  dsk.sort.enabled = !dsk.sort.enabled;
-
-
-  if (dsk.sort.enabled) {
-    sortDoTrash = true;
-    dsk.localMsg('Sort Fooders: Ativado', '#5f5');
-    SortFooders();
-  } else {
-    dsk.localMsg('Sort Fooders: Desativado', '#f55');
-  }
-});
-
 
 
 
@@ -18835,11 +19248,7 @@ dsk.checkBotActive = () => {
   return dsk.craft?.enabled       ||
          dsk.repair?.enabled      ||
          dsk.armas?.enabled       ||
-         dsk.sword?.enabled       ||
-         dsk.hammer?.enabled      ||
          dsk.destruction?.enabled ||
-         dsk.cooking?.enabled     ||
-         dsk.smelting?.enabled    ||
          dsk.fish?.enabled        ||
          dsk.farm?.enabled        ||
          dsk.knit?.enabled        ||
@@ -18850,14 +19259,228 @@ dsk.checkBotActive = () => {
 };
 
 
-dsk.on('postLoop', () => {
+{ let _t = 0; dsk.on('postLoop', () => {
+  if (++_t % 60 !== 0) return; // 1x por segundo
   dsk.botActive = dsk.checkBotActive();
-});
+}); }
 
+// ══════════════════════════════════════════════════════════════
+// ⚙️  BOT CONFIG — gerencia quais módulos entram no checkBotActive
+// Comando: /botconfig
+// ══════════════════════════════════════════════════════════════
 
+{
+  const BOT_MODULES = [
+    { key: 'craft',       label: 'Craft'       },
+    { key: 'repair',      label: 'Repair'      },
+    { key: 'armas',       label: 'Armas'       },
+    { key: 'sword',       label: 'Sword'       },
+    { key: 'hammer',      label: 'Hammer'      },
+    { key: 'destruction', label: 'Destruction' },
+    { key: 'cooking',     label: 'Cooking'     },
+    { key: 'smelting',    label: 'Smelting'    },
+    { key: 'fish',        label: 'Fish'        },
+    { key: 'farm',        label: 'Farm'        },
+    { key: 'knit',        label: 'Knit'        },
+    { key: 'clay',        label: 'Clay'        },
+    { key: 'healbot',     label: 'HealBot'     },
+    { key: 'rotation',    label: 'Rotation'    },
+  ];
 
+  const botCfg = {};
+  BOT_MODULES.forEach(m => { botCfg[m.key] = true; });
 
+  function rebuildCheck() {
+    dsk.checkBotActive = () =>
+      BOT_MODULES.some(m => botCfg[m.key] && dsk[m.key]?.enabled);
+  }
+  rebuildCheck();
 
+  let bcPanel = null;
+
+  function removePanel() {
+    if (bcPanel) { bcPanel.remove(); bcPanel = null; }
+  }
+
+  function createPanel() {
+    if (bcPanel) { removePanel(); return; }
+
+    bcPanel = document.createElement('div');
+    Object.assign(bcPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '240px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
+    });
+
+    // ── Header ──────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '⚙️ Bot Config';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '13px' });
+
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const xy = _getXY(e);
+      ox = xy.x - bcPanel.getBoundingClientRect().left;
+      oy = xy.y - bcPanel.getBoundingClientRect().top;
+      bcPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  _dragMove);
+    window.addEventListener('touchmove',  _dragMove, { passive: false });
+    window.addEventListener('mouseup',    _dragEnd);
+    window.addEventListener('touchend',   _dragEnd);
+    function _dragMove(e) { if (!dragging) return; const xy = _getXY(e); bcPanel.style.left = (xy.x - ox) + 'px'; bcPanel.style.top = (xy.y - oy) + 'px'; }
+    function _dragEnd() { dragging = false; }
+
+    // ── Body ────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, {
+      padding: '10px 12px', display: 'flex',
+      flexDirection: 'column', gap: '6px',
+      maxHeight: '420px', overflowY: 'auto',
+    });
+
+    function makeToggleRow(m) {
+      const row = document.createElement('div');
+      Object.assign(row.style, {
+        background: '#2a2a3e', borderRadius: '7px',
+        padding: '6px 10px', display: 'flex',
+        alignItems: 'center', justifyContent: 'space-between',
+      });
+
+      const lbl = document.createElement('span');
+      lbl.textContent = m.label;
+      Object.assign(lbl.style, { color: '#ccc', fontSize: '11px' });
+
+      const pill = document.createElement('button');
+      Object.assign(pill.style, {
+        padding: '3px 10px', borderRadius: '5px', border: '1px solid #555',
+        cursor: 'pointer', fontSize: '11px', fontWeight: 'bold',
+        minWidth: '42px', transition: 'background 0.1s',
+      });
+
+      function syncPill() {
+        const on = botCfg[m.key];
+        pill.textContent = on ? 'ON' : 'OFF';
+        pill.style.background = on ? '#1a4a1a' : '#3a1a1a';
+        pill.style.color       = on ? '#5f5'    : '#f55';
+        pill.style.borderColor = on ? '#3a7a3a' : '#7a3a3a';
+      }
+
+      pill.onclick = () => {
+        botCfg[m.key] = !botCfg[m.key];
+        rebuildCheck();
+        syncPill();
+        updateActiveCount();
+      };
+
+      pill.onmouseenter = () => pill.style.filter = 'brightness(1.3)';
+      pill.onmouseleave = () => pill.style.filter = '';
+
+      syncPill();
+      row.appendChild(lbl);
+      row.appendChild(pill);
+      row._syncPill = syncPill;
+      return row;
+    }
+
+    const rows = BOT_MODULES.map(m => {
+      const row = makeToggleRow(m);
+      body.appendChild(row);
+      return row;
+    });
+
+    // ── Footer ──────────────────────────────────────────────
+    const footer = document.createElement('div');
+    Object.assign(footer.style, {
+      display: 'flex', gap: '6px', padding: '8px 12px',
+      borderTop: '1px solid #444', background: '#2a2a3e',
+    });
+
+    function makeFooterBtn(txt, onclick) {
+      const b = document.createElement('button');
+      b.textContent = txt;
+      Object.assign(b.style, {
+        flex: '1', padding: '4px 0', borderRadius: '5px',
+        border: '1px solid #555', background: '#1a1a2e',
+        color: '#fff', cursor: 'pointer', fontSize: '11px',
+      });
+      b.onmouseenter = () => b.style.background = '#3a3a5e';
+      b.onmouseleave = () => b.style.background = '#1a1a2e';
+      b.onclick = onclick;
+      return b;
+    }
+
+    const countLabel = document.createElement('span');
+    Object.assign(countLabel.style, {
+      fontSize: '10px', color: '#888',
+      display: 'block', textAlign: 'center',
+      padding: '0 12px 6px',
+    });
+
+    function updateActiveCount() {
+      const n = BOT_MODULES.filter(m => botCfg[m.key]).length;
+      countLabel.textContent = `${n} de ${BOT_MODULES.length} módulos ativos`;
+    }
+    updateActiveCount();
+
+    footer.appendChild(makeFooterBtn('Todos ON', () => {
+      BOT_MODULES.forEach(m => { botCfg[m.key] = true; });
+      rebuildCheck();
+      rows.forEach(r => r._syncPill());
+      updateActiveCount();
+    }));
+    footer.appendChild(makeFooterBtn('Todos OFF', () => {
+      BOT_MODULES.forEach(m => { botCfg[m.key] = false; });
+      rebuildCheck();
+      rows.forEach(r => r._syncPill());
+      updateActiveCount();
+    }));
+
+    bcPanel.appendChild(header);
+    bcPanel.appendChild(body);
+    bcPanel.appendChild(countLabel);
+    bcPanel.appendChild(footer);
+    document.body.appendChild(bcPanel);
+  }
+
+  dsk.setCmd('/botconfig', () => {
+    if (bcPanel) {
+      removePanel();
+      dsk.localMsg('Bot Config: Fechado', '#f55');
+    } else {
+      createPanel();
+      dsk.localMsg('Bot Config: Aberto', '#5f5');
+    }
+  });
+
+  dsk.localMsg('Bot Config: /botconfig', '#aaf');
+}
 
 // ══════════════════════════════════════════════════════════════
 // 🗡️  SSD HUNT BOT  ─  by Pablo Mod
