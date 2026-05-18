@@ -6076,6 +6076,8 @@ dsk.menu.toggleBtn.on_click = () => {
 	  { label: 'Smith Config',       state: () => !!dsk.smithManager?.visible,   toggle: () => dsk.commands['/smithconfig']() },
 	  { label: 'Repair Bot',         state: () => !!dsk.repair?.enabled,         toggle: () => dsk.commands['/repair']() },
 	  { label: 'Auto Resear',        state: () => !!dsk.resear?.enabled,         toggle: () => dsk.commands['/resear']() },
+	  { label: 'Assassin Winner',    state: () => !!dsk.assassin?.enabled,       toggle: () => dsk.commands['/assassinconfig']() },
+	  { label: 'Assassin Loser',     state: () => !!dsk.loser?.enabled,          toggle: () => dsk.commands['/loserconfig']()   },
       { label: 'Top Skill Calc',     state: () => !!(typeof tscD !== 'undefined' && tscD?.visible), toggle: () => dsk.commands['/topskill']() },
     ]},
     { label: '🗡️  Hunt', items: [
@@ -6095,6 +6097,7 @@ dsk.menu.toggleBtn.on_click = () => {
       { label: 'WC Mining',          state: () => !!dsk.wcmining?.enabled,       toggle: () => dsk.commands['/wcmining']() },
       { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
       { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
+	  { label: 'Forest Bot',         state: () => !!dsk.forest?.enabled,         toggle: () => dsk.commands['/forestconfig']() },
       { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
       { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
       { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
@@ -16043,7 +16046,550 @@ dsk.tsc = {
 })();
 
 
+// ══════════════════════════════════════════════════════════════
+// 🌲  FOREST BOT  ─  by Pablo Mod
+// Config: /forestconfig  |  Toggle: /forest
+// ══════════════════════════════════════════════════════════════
 
+
+// ── Estado ───────────────────────────────────────────────────
+dsk.forest = { enabled: false };
+
+window.forestWpX    = [];
+window.forestWpY    = [];
+window.forestWpIdx  = 0;
+
+// ── Persistência de waypoints ─────────────────────────────────
+function xForestSaveWps() {
+  try {
+    localStorage.setItem('dsk_forest_waypoints', JSON.stringify({
+      x: forestWpX,
+      y: forestWpY,
+    }));
+  } catch(_) {}
+}
+
+// Carrega waypoints salvos ao inicializar
+try {
+  const _fw = JSON.parse(localStorage.getItem('dsk_forest_waypoints') || 'null');
+  if (_fw && Array.isArray(_fw.x) && Array.isArray(_fw.y) && _fw.x.length > 0) {
+    window.forestWpX = _fw.x;
+    window.forestWpY = _fw.y;
+    dsk.localMsg(`[FB] ${forestWpX.length} waypoint(s) carregado(s)`, '#4ade80');
+  }
+} catch(_) {}
+
+
+// ── Mobs agressivos a priorizar ───────────────────────────────
+const FOREST_AGRO_MOBS  = ['Hornet', 'Snake'];
+const FOREST_AGRO_RANGE = 2;  // sqm (Manhattan)
+
+
+// ── Recursos a coletar (dinâmico — editável pelo painel) ──────
+const FOREST_ALL_TARGETS = ['Fir Tree', 'Plain Rock'];
+// Carrega seleção salva, ou usa só Fir Tree como padrão
+try {
+  const _ft = JSON.parse(localStorage.getItem('dsk_forest_targets') || 'null');
+  dsk.forest.targets = Array.isArray(_ft) && _ft.length > 0 ? _ft : ['Fir Tree'];
+} catch(_) { dsk.forest.targets = ['Fir Tree']; }
+const FOREST_RADIUS  = 10;
+
+
+// ── Busca mob agressivo no range ──────────────────────────────
+function xForestGetAgroMob() {
+  let best = null;
+  let bestDist = Infinity;
+
+  for (const i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob === myself) continue;
+    if (xPlyrTest(mob)) continue;
+
+    const name = mob.name;
+    if (!FOREST_AGRO_MOBS.some(n => name.includes(n))) continue;
+
+    const dist = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
+    if (dist <= FOREST_AGRO_RANGE && dist < bestDist) {
+      bestDist = dist;
+      best = mob;
+    }
+  }
+
+  return best;
+}
+
+
+// ── Ataca mob e espera morrer (ou sair do range) ──────────────
+async function xForestKillMob(mob) {
+  if (!mob) return;
+
+  target.id = mob.id;
+  send({ type: 't', t: mob.id });
+
+  const timeout = Date.now() + 6000;
+  while (Date.now() < timeout && dsk.forest.enabled && !dskPaused) {
+    if (!mobs.items[mob.id]) break;
+    await xDelay(150);
+  }
+
+  target.id = me;
+}
+
+
+// ── Delay adaptativo (reduz quando /speed está ativo) ─────────
+function xForestDelay(ms) {
+  // Com speed ativo, reduz delays proporcionalmente ao valor configurado,
+  // mas mantém mínimo de 120ms pra não buggar o servidor
+  if (dsk.speed?.enabled) {
+    const factor = Math.min(1, dsk.speed.value / 250);
+    return xDelay(Math.max(120, Math.round(ms * factor)));
+  }
+  return xDelay(ms);
+}
+
+// ── Coleta Pinecone se perto ──────────────────────────────────
+async function xForestPickPinecone() {
+  const pinecone = objects.items.find(el => el?.name === 'Pinecone');
+  if (!pinecone) return;
+  const dist = Math.abs(pinecone.x - myself.x) + Math.abs(pinecone.y - myself.y);
+  if (dist <= 6) {
+    await xDoMove(pinecone.x, pinecone.y);
+    await xForestDelay(700);
+    await xDoPickUp();
+    await xForestDelay(500);
+  }
+}
+
+
+// ── Avança waypoint ───────────────────────────────────────────
+function xForestNextWp() {
+  if (forestWpX.length === 0) return;
+  forestWpIdx = (forestWpIdx >= forestWpX.length - 1) ? 0 : forestWpIdx + 1;
+}
+
+
+// ── Loop principal ────────────────────────────────────────────
+async function xForest() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[150] === true) return;
+  xGoing[150] = true;
+
+  // ── 1. Prioridade: mob agressivo em range ─────────────────
+  const agroMob = xForestGetAgroMob();
+  if (agroMob) {
+    xChangeStatus('[FB] Mob agressivo! Atacando...');
+    await xForestKillMob(agroMob);
+    xGoing[150] = false;
+    return;
+  }
+
+  // ── 2. Coleta Pinecone se perto ───────────────────────────
+  await xForestPickPinecone();
+
+  // ── 3. Busca Fir Tree no raio ─────────────────────────────
+  const recursos = objects.items.filter(el => el && dsk.forest.targets.includes(el.name));
+
+  if (recursos.length > 0) {
+    // Ordena por distância Manhattan
+    recursos.sort((a, b) =>
+      (Math.abs(a.x - myself.x) + Math.abs(a.y - myself.y)) -
+      (Math.abs(b.x - myself.x) + Math.abs(b.y - myself.y))
+    );
+
+    const alvo = recursos[0];
+    const dist = Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y);
+
+    if (dist <= FOREST_RADIUS) {
+      // ── Acha melhor tile adjacente ──────────────────────
+      const sides = [
+        { x: alvo.x + 1, y: alvo.y },
+        { x: alvo.x - 1, y: alvo.y },
+        { x: alvo.x,     y: alvo.y + 1 },
+        { x: alvo.x,     y: alvo.y - 1 },
+      ];
+
+      let bestSide = null, bestDist = Infinity;
+      for (const side of sides) {
+        if (xGetSolidByID(side.x, side.y)) continue;
+        const d = Math.abs(side.x - myself.x) + Math.abs(side.y - myself.y);
+        if (d < bestDist) { bestDist = d; bestSide = side; }
+      }
+
+      if (bestSide) {
+        // ── Move até o tile adjacente ───────────────────
+        if (myself.x !== bestSide.x || myself.y !== bestSide.y) {
+          xMovingNow = false;
+          await xDoMove(bestSide.x, bestSide.y);
+          const start = Date.now();
+          while (
+            (myself.x !== bestSide.x || myself.y !== bestSide.y) &&
+            Date.now() - start < 5000
+          ) {
+            // Checa mob durante o caminhar
+            if (xForestGetAgroMob()) { xGoing[150] = false; return; }
+            await xDelay(100);
+          }
+        }
+
+        // ── Confirma adjacência ─────────────────────────
+        const distFinal = Math.abs(alvo.x - myself.x) + Math.abs(alvo.y - myself.y);
+        if (distFinal === 1) {
+          // Calcula e envia direção real
+          const dxR = alvo.x - myself.x;
+          const dyR = alvo.y - myself.y;
+          let dirR;
+          if      (dxR ===  1) dirR = 1;
+          else if (dxR === -1) dirR = 3;
+          else if (dyR ===  1) dirR = 2;
+          else                 dirR = 0;
+
+          send({ type: 'm', x: myself.x, y: myself.y, d: dirR });
+          await xForestDelay(400);
+
+          if (myself.dir !== dirR) {
+            send({ type: 'm', x: myself.x, y: myself.y, d: dirR });
+            await xForestDelay(400);
+          }
+
+          // ── Ataca segurando tecla ────────────────────
+          const tx = alvo.x, ty = alvo.y, tn = alvo.name;
+          const aindaExiste = () => objects.items.find(el =>
+            el && el.name === tn && el.x === tx && el.y === ty
+          );
+          const aindaAdjacente = () =>
+            Math.abs(myself.x - tx) + Math.abs(myself.y - ty) === 1;
+          const aindaVirado = () => {
+            const dxR = tx - myself.x, dyR = ty - myself.y;
+            let dirEsp;
+            if      (dxR ===  1) dirEsp = 1;
+            else if (dxR === -1) dirEsp = 3;
+            else if (dyR ===  1) dirEsp = 2;
+            else                 dirEsp = 0;
+            return myself.dir === dirEsp;
+          };
+
+          xChangeStatus('[FB] Coletando ' + tn + '...');
+          if (aindaExiste()) {
+            await xDoKeyDown(6);
+            while (aindaExiste() && dsk.forest.enabled && !dskPaused) {
+              // Interrompe se mob aparecer
+              if (xForestGetAgroMob()) break;
+              // Interrompe se foi empurrado (não adjacente ou não virado)
+              if (!aindaAdjacente() || !aindaVirado()) {
+                xChangeStatus('[FB] Fui empurrado! Reposicionando...');
+                break;
+              }
+              await xDelay(150);
+            }
+            await xDoKeyUp(6);
+            await xDelay(150);
+          }
+        }
+
+        xGoing[150] = false;
+        return;
+      }
+    }
+  }
+
+  // ── 4. Sem recurso no raio → segue waypoint ───────────────
+  if (forestWpX.length === 0) {
+    xChangeStatus('[FB] Nenhum waypoint configurado!');
+    xGoing[150] = false;
+    return;
+  }
+
+  const wpX = forestWpX[forestWpIdx];
+  const wpY = forestWpY[forestWpIdx];
+  const distToWp = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+
+  xChangeStatus(`[FB] Waypoint ${forestWpIdx + 1}/${forestWpX.length}...`);
+
+  if (distToWp <= 3) {
+    xForestNextWp();
+  } else {
+    xMovingNow = false;
+    xDoMove(wpX, wpY, 3);
+
+    // Aguarda chegar ao WP antes de liberar o lock — evita vai-e-vem com /speed
+    const wpStart = Date.now();
+    while (Date.now() - wpStart < 8000 && dsk.forest.enabled && !dskPaused) {
+      const d = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+      if (d <= 3) break;
+      if (xForestGetAgroMob()) break;
+      await xDelay(80);
+    }
+  }
+
+  xGoing[150] = false;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  FOREST CONFIG PANEL
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let fbPanel = null;
+
+  const fb = {
+    get visible() { return !!fbPanel; },
+    set visible(v) { if (!v && fbPanel) removePanel(); else if (v && !fbPanel) createPanel(); },
+  };
+  dsk.forestManager = fb;
+
+  // Atualiza botão play em tempo real
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!fbPanel || ++_t % 10 !== 0) return;
+    const btn = fbPanel.querySelector('[data-fb="playbtn"]');
+    if (!btn) return;
+    const on = !!dsk.forest?.enabled;
+    btn.textContent       = on ? '⏹ Stop' : '▶ Play';
+    btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+    btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+    btn.style.color       = on ? '#e74c3c' : '#2ecc71';
+
+    // Atualiza info de waypoints
+    const wpInfo = fbPanel.querySelector('[data-fb="wpinfo"]');
+    if (wpInfo) wpInfo.textContent = `WP atual: ${forestWpIdx + 1} / ${forestWpX.length}`;
+  }); }
+
+  function removePanel() {
+    if (fbPanel) { fbPanel.remove(); fbPanel = null; }
+  }
+
+  function createPanel() {
+    if (fbPanel) { removePanel(); return; }
+
+    fbPanel = document.createElement('div');
+    Object.assign(fbPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '250px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // ── Header ──────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🌲 Forest Bot';
+    Object.assign(titleEl.style, { color: '#4ade80', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', _startDrag);
+    header.addEventListener('touchstart', _startDrag, { passive: false });
+    function _startDrag(e) {
+      if (e.target === closeBtn) return;
+      e.preventDefault();
+      dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - fbPanel.getBoundingClientRect().left;
+      oy = _xy.y - fbPanel.getBoundingClientRect().top;
+      fbPanel.style.transform = 'none';
+    }
+    window.addEventListener('mousemove',  e => { if (!dragging) return; const _xy = _getXY(e); fbPanel.style.left = (_xy.x - ox) + 'px'; fbPanel.style.top = (_xy.y - oy) + 'px'; });
+    window.addEventListener('touchmove',  e => { if (!dragging) return; const _xy = _getXY(e); fbPanel.style.left = (_xy.x - ox) + 'px'; fbPanel.style.top = (_xy.y - oy) + 'px'; }, { passive: false });
+    window.addEventListener('mouseup',  () => { dragging = false; });
+    window.addEventListener('touchend', () => { dragging = false; });
+
+    // ── Body ────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+    // ── Info waypoint atual ──────────────────────────────────
+    const wpInfo = document.createElement('div');
+    wpInfo.setAttribute('data-fb', 'wpinfo');
+    wpInfo.textContent = `WP atual: ${forestWpIdx + 1} / ${forestWpX.length}`;
+    Object.assign(wpInfo.style, { color: '#aaa', fontSize: '10px', textAlign: 'center' });
+    body.appendChild(wpInfo);
+
+    // ── Seção recursos ───────────────────────────────────────
+    const resLabel = document.createElement('div');
+    resLabel.textContent = '── Recursos ──';
+    Object.assign(resLabel.style, { color: '#777', fontSize: '10px', textAlign: 'center' });
+    body.appendChild(resLabel);
+
+    const resRow = document.createElement('div');
+    Object.assign(resRow.style, { display: 'flex', gap: '6px' });
+
+    FOREST_ALL_TARGETS.forEach(name => {
+      const btn = document.createElement('button');
+      const isActive = () => dsk.forest.targets.includes(name);
+      const refresh = () => {
+        btn.style.background  = isActive() ? '#1a3a2a' : '#2a2a3e';
+        btn.style.borderColor = isActive() ? '#2ecc71' : '#555';
+        btn.style.color       = isActive() ? '#2ecc71' : '#888';
+      };
+      btn.textContent = name === 'Fir Tree' ? '🌲 Fir Tree' : '🪨 Plain Rock';
+      Object.assign(btn.style, {
+        flex: '1', padding: '6px 4px', borderRadius: '6px',
+        border: '1px solid #555', background: '#2a2a3e',
+        color: '#888', cursor: 'pointer', fontSize: '10px',
+        transition: 'all 0.15s',
+      });
+      refresh();
+      btn.onclick = () => {
+        if (isActive()) {
+          // Não deixa desativar o último
+          if (dsk.forest.targets.length <= 1) return;
+          dsk.forest.targets = dsk.forest.targets.filter(t => t !== name);
+        } else {
+          dsk.forest.targets = [...dsk.forest.targets, name];
+        }
+        try { localStorage.setItem('dsk_forest_targets', JSON.stringify(dsk.forest.targets)); } catch(_) {}
+        // Atualiza todos os botões do row
+        resRow.querySelectorAll('button').forEach(b => {
+          const n = b.dataset.resName;
+          const on = dsk.forest.targets.includes(n);
+          b.style.background  = on ? '#1a3a2a' : '#2a2a3e';
+          b.style.borderColor = on ? '#2ecc71' : '#555';
+          b.style.color       = on ? '#2ecc71' : '#888';
+        });
+        dsk.localMsg(`[FB] Recursos: ${dsk.forest.targets.join(', ')}`, '#4ade80');
+      };
+      btn.dataset.resName = name;
+      resRow.appendChild(btn);
+    });
+    body.appendChild(resRow);
+
+    // ── Seção waypoints ──────────────────────────────────────
+    const wpLabel = document.createElement('div');
+    wpLabel.textContent = '── Waypoints ──';
+    Object.assign(wpLabel.style, { color: '#777', fontSize: '10px', textAlign: 'center' });
+    body.appendChild(wpLabel);
+
+    // Lista de waypoints
+    const wpList = document.createElement('div');
+    Object.assign(wpList.style, { display: 'flex', flexDirection: 'column', gap: '3px', maxHeight: '150px', overflowY: 'auto' });
+
+    function refreshWpList() {
+      wpList.innerHTML = '';
+      for (let i = 0; i < forestWpX.length; i++) {
+        const row = document.createElement('div');
+        Object.assign(row.style, {
+          display: 'flex', alignItems: 'center', gap: '4px',
+          background: '#2a2a3e', borderRadius: '5px', padding: '4px 6px',
+        });
+        const lbl = document.createElement('span');
+        lbl.textContent = `${i + 1}. X:${forestWpX[i]}  Y:${forestWpY[i]}`;
+        Object.assign(lbl.style, { color: '#ccc', fontSize: '10px', flex: '1' });
+        const del = document.createElement('button');
+        del.textContent = '✕';
+        Object.assign(del.style, {
+          background: 'none', border: 'none', color: '#e74c3c',
+          cursor: 'pointer', fontSize: '11px', padding: '0 2px',
+        });
+        del.onclick = () => {
+          forestWpX.splice(i, 1);
+          forestWpY.splice(i, 1);
+          if (forestWpIdx >= forestWpX.length) forestWpIdx = 0;
+          xForestSaveWps();
+          refreshWpList();
+        };
+        row.appendChild(lbl);
+        row.appendChild(del);
+        wpList.appendChild(row);
+      }
+    }
+    refreshWpList();
+    body.appendChild(wpList);
+
+    // Botão: Adicionar posição atual
+    const addWpBtn = document.createElement('button');
+    addWpBtn.textContent = '📍 Adicionar posição atual';
+    Object.assign(addWpBtn.style, {
+      width: '100%', padding: '7px', borderRadius: '6px',
+      border: '1px solid #555', background: '#2a2a3e',
+      color: '#ccc', cursor: 'pointer', fontSize: '11px',
+    });
+    addWpBtn.onclick = () => {
+      if (!myself) return;
+      forestWpX.push(myself.x);
+      forestWpY.push(myself.y);
+      xForestSaveWps();
+      refreshWpList();
+      dsk.localMsg(`[FB] WP ${forestWpX.length} adicionado: ${myself.x}, ${myself.y}`, '#5f5');
+    };
+    body.appendChild(addWpBtn);
+
+    // Botão: Limpar waypoints
+    const clearWpBtn = document.createElement('button');
+    clearWpBtn.textContent = '🗑 Limpar waypoints';
+    Object.assign(clearWpBtn.style, {
+      width: '100%', padding: '7px', borderRadius: '6px',
+      border: '1px solid #555', background: '#2a2a3e',
+      color: '#e74c3c', cursor: 'pointer', fontSize: '11px',
+    });
+    clearWpBtn.onclick = () => {
+      forestWpX.length = 0;
+      forestWpY.length = 0;
+      forestWpIdx = 0;
+      try { localStorage.removeItem('dsk_forest_waypoints'); } catch(_) {}
+      refreshWpList();
+      dsk.localMsg('[FB] Waypoints limpos', '#f55');
+    };
+    body.appendChild(clearWpBtn);
+
+    // ── Play/Stop ────────────────────────────────────────────
+    const sep = document.createElement('div');
+    Object.assign(sep.style, { borderTop: '1px solid #444', margin: '2px 0' });
+    body.appendChild(sep);
+
+    const playBtn = document.createElement('button');
+    playBtn.setAttribute('data-fb', 'playbtn');
+    playBtn.textContent = '▶ Play';
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '9px', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+    });
+    playBtn.onclick = () => {
+      dsk.forest.enabled = !dsk.forest.enabled;
+      dsk.localMsg(dsk.forest.enabled ? '[FB] Forest Bot ativado 🌲' : '[FB] Forest Bot pausado', dsk.forest.enabled ? '#5f5' : '#f55');
+    };
+    body.appendChild(playBtn);
+
+    fbPanel.appendChild(header);
+    fbPanel.appendChild(body);
+    document.body.appendChild(fbPanel);
+  }
+
+  // ── Comandos ─────────────────────────────────────────────
+  dsk.setCmd('/forest', () => {
+    dsk.forest.enabled = !dsk.forest.enabled;
+    dsk.localMsg(dsk.forest.enabled ? '[FB] Forest Bot ativado 🌲' : '[FB] Forest Bot pausado', dsk.forest.enabled ? '#5f5' : '#f55');
+  });
+
+  dsk.setCmd('/forestconfig', () => {
+    fb.visible = !fb.visible;
+  });
+
+})();
+
+
+// ── Tick ─────────────────────────────────────────────────────
+dsk.on('postLoop', () => {
+  if (!dsk.forest?.enabled) return;
+  xForest();
+});
 
 // ══════════════════════════════════════════════════════════════
 // 🌲  RECURSOS BOT  ─  by Pablo Mod
@@ -17377,7 +17923,7 @@ async function SheepRun() {
   // Fim: anda 1 para a direita
   await xDoMove(myself.x + 1, myself.y);
   await xDelay(500);
-  await xDoMove(151, 289);
+  await xDoMove(myself.x - 2, myself.y + 3);
   await xDelay(3000);
   for (let j = 0; j < 19; j++) {
     if (!dsk.sheep.enabled) return;
@@ -17392,7 +17938,7 @@ async function SheepRun() {
   await xDelay(500);
   await xDoKeyPress(6, 180);
   await xDelay(800);
-  await xDoMove(132, 283);
+  await xDoMove(myself.x, myself.y - 6);
   await xDelay(5000);
   for (let j = 0; j < 19; j++) {
     if (!dsk.sheep.enabled) return;
@@ -17407,9 +17953,9 @@ async function SheepRun() {
   await xDelay(500);
   await xDoKeyPress(6, 180);
   await xDelay(800);
-  await xDoMove(141, 283);
+  await xDoMove(myself.x - 10, myself.y);
   await xDelay(5000);
-  await xDoMove(130, 286);
+  await xDoMove(myself.x - 11, myself.y + 3);
   await xDelay(5000);
   await xDoDropByID(0, 984);
   await xDelay(400);
@@ -17421,7 +17967,7 @@ async function SheepRun() {
   await xDelay(400);
   await xDoChangeDir(0);
   await xDelay(400);
-  for (let j = 0; j < 9; j++) {
+  for (let j = 0; j < 19; j++) {
     if (!dsk.sheep.enabled) return;
     await xDoKeyPress(6, 180);
     await xDelay(800);
@@ -17876,6 +18422,7 @@ function sortGeneratePermutationsLetters(str) {
     trigger:  'You wear the Noble Jacket',
     keyword:  'def',
     offset:   4,
+	trashLevel1: false, // se true, runas únicas nível 1 vão pro lixo
     pickXMin: 114, pickXMax: 124,
     pickYMin: 290, pickYMax: 291,
     trashX:   110, trashY: 299,
@@ -17924,9 +18471,12 @@ function sortGeneratePermutationsLetters(str) {
 
       // Runas simples: posição base + nível
       if (['A','S','H','G','R'].includes(combo)) {
-        const base = sortCfg.runeMap[combo];
-        return { x: base.x, y: base.y + n - 1 };
-      }
+	    if (sortCfg.trashLevel1 && n === 1) {
+		  return { x: sortCfg.trashX, y: sortCfg.trashY };
+	    }
+	    const base = sortCfg.runeMap[combo];
+	    return { x: base.x, y: base.y + n - 1 };
+	  }
 
       // Combinações com condição rn<=0 / sem "1"
       const needsClean = !hasOne && rn <= 0;
@@ -18197,6 +18747,37 @@ function sortGeneratePermutationsLetters(str) {
       color: '#666', fontSize: '9px',
     });
     body.appendChild(keywordEl);
+	
+	// ── Seção: Opções ─────────────────────────────────────────
+	body.appendChild(section('── Opções ──'));
+
+	const l1Row = document.createElement('div');
+	Object.assign(l1Row.style, {
+	  background: '#2a2a3e', borderRadius: '7px', padding: '6px 10px',
+	  display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+	});
+	l1Row.appendChild(lbl('Runa única nível 1 → lixo'));
+
+	const l1Btn = document.createElement('button');
+	function syncL1() {
+	  const on = sortCfg.trashLevel1;
+	  l1Btn.textContent = on ? 'ON' : 'OFF';
+	  l1Btn.style.background   = on ? '#1a4a1a' : '#3a1a1a';
+	  l1Btn.style.color        = on ? '#5f5'    : '#f55';
+	  l1Btn.style.borderColor  = on ? '#3a7a3a' : '#7a3a3a';
+	}
+	Object.assign(l1Btn.style, {
+	  padding: '3px 10px', borderRadius: '5px', border: '1px solid #555',
+	  cursor: 'pointer', fontSize: '11px', fontWeight: 'bold', minWidth: '42px',
+	});
+	l1Btn.onclick = () => {
+	  sortCfg.trashLevel1 = !sortCfg.trashLevel1;
+	  syncL1();
+	  saveCfg();
+	};
+	syncL1();
+	l1Row.appendChild(l1Btn);
+	body.appendChild(l1Row);
 
     // ── Seção: Área de coleta ─────────────────────────────────
     body.appendChild(section('── Área de Coleta ──'));
@@ -23720,6 +24301,381 @@ dsk.setCmd('/hotbar2', () => {
     dsk.compactHotbar2.enabled = false;
     dsk.localMsg('Hotbar2: Original restaurado', '#f55');
   }
+});
+
+// ══════════════════════════════════════════════════════════════
+// ⚔️  ASSASSIN WINNER BOT  ─  by Pablo Mod
+// Conta que GANHA o duelo (upando Assassin)
+// Config: /assassinconfig  |  Toggle: /assassin
+// ══════════════════════════════════════════════════════════════
+
+dsk.assassin = { enabled: false };
+
+
+
+
+// ── Espera mensagem no chat ───────────────────────────────────
+async function xAssassinWaitChat(msg, timeoutMs = 15000) {
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    if (!dsk.assassin.enabled || dskPaused) return false;
+    if (xIfChatHas(msg)) {
+      xDoClearChat(msg);
+      return true;
+    }
+    await xDelay(300);
+  }
+  return false;
+}
+
+
+// ── Loop principal ────────────────────────────────────────────
+// Posições: winner em (X,Y), estátua em (X+1,Y), loser em (X+1,Y+1)
+async function xAssassinLoop() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[160] === true) return;
+  xGoing[160] = true;
+
+  // Limpa mensagens antigas
+  if (xIfChatHas('Battle cancelled'))   xDoClearChat('Battle cancelled');
+  if (xIfChatHas('FIGHT!!'))            xDoClearChat('FIGHT!!');
+  if (xIfChatHas('The battle is over')) xDoClearChat('The battle is over');
+
+  // ── 1. Vira para a estátua (dir 1 = direita) e ataca 1x ─
+  xChangeStatus('[AW] Atacando estátua para iniciar...');
+  await xDoChangeDir(1);
+  await xDelay(500);
+  await xDoKeyUp(6); // 1 ataque
+  await xDelay(500);
+
+  // ── 2. Espera FIGHT!! no chat ────────────────────────────
+  xChangeStatus('[AW] Aguardando FIGHT!!...');
+  const fightStarted = await xAssassinWaitChat('FIGHT!!', 30000);
+  if (!fightStarted) {
+    xChangeStatus('[AW] Timeout esperando FIGHT!!. Tentando novamente...');
+    if (xIfChatHas('Battle cancelled')) xDoClearChat('Battle cancelled');
+    xGoing[160] = false;
+    return;
+  }
+
+  // ── 3. Espera 1 minuto ───────────────────────────────────
+  xChangeStatus('[AW] Aguardando 1 minuto...');
+  await xDelay(60000);
+
+  // ── 4. Move para Y+1, vira dir 1, segura tecla atacando ─
+  xChangeStatus('[AW] Atacando loser...');
+  xMovingNow = false;
+  await xDoMove(myself.x, myself.y + 1);
+  await xDelay(500);
+  await xDoChangeDir(1);
+  await xDelay(500);
+  await xDoKeyDown(6);
+
+  // Aguarda fim da batalha
+  const timeout = Date.now() + 60000;
+  while (Date.now() < timeout && dsk.assassin.enabled && !dskPaused) {
+    if (xIfChatHas('The battle is over')) {
+      xDoClearChat('The battle is over');
+      break;
+    }
+    if (xIfChatHas('Battle cancelled')) {
+      xDoClearChat('Battle cancelled');
+      break;
+    }
+    await xDelay(200);
+  }
+
+  await xDoKeyUp(6);
+  await xDelay(300);
+
+  // ── 5. Volta para Y-1 e repete ───────────────────────────
+  xChangeStatus('[AW] Voltando posição...');
+  xMovingNow = false;
+  await xDoMove(myself.x, myself.y - 1);
+  await xDelay(500);
+  await xDoChangeDir(1);
+  await xDelay(500);
+
+  xGoing[160] = false;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  PAINEL DE CONFIG
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let awPanel = null;
+
+  const aw = {
+    get visible() { return !!awPanel; },
+    set visible(v) { if (!v && awPanel) removePanel(); else if (v && !awPanel) createPanel(); },
+  };
+  dsk.assassinManager = aw;
+
+  // Atualiza botão play em tempo real
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!awPanel || ++_t % 10 !== 0) return;
+    const btn = awPanel.querySelector('[data-aw="playbtn"]');
+    if (!btn) return;
+    const on = !!dsk.assassin?.enabled;
+    btn.textContent       = on ? '⏹ Stop' : '▶ Play';
+    btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+    btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+    btn.style.color       = on ? '#e74c3c' : '#2ecc71';
+  }); }
+
+  function removePanel() {
+    if (awPanel) { awPanel.remove(); awPanel = null; }
+  }
+
+  function createPanel() {
+    if (awPanel) { removePanel(); return; }
+
+    awPanel = document.createElement('div');
+    Object.assign(awPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '240px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '⚔️ Assassin Winner';
+    Object.assign(titleEl.style, { color: '#f87171', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', e => {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - awPanel.getBoundingClientRect().left;
+      oy = _xy.y - awPanel.getBoundingClientRect().top;
+      awPanel.style.transform = 'none';
+    });
+    header.addEventListener('touchstart', e => {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - awPanel.getBoundingClientRect().left;
+      oy = _xy.y - awPanel.getBoundingClientRect().top;
+      awPanel.style.transform = 'none';
+    }, { passive: false });
+    window.addEventListener('mousemove',  e => { if (!dragging) return; const p = _getXY(e); awPanel.style.left = (p.x - ox) + 'px'; awPanel.style.top = (p.y - oy) + 'px'; });
+    window.addEventListener('touchmove',  e => { if (!dragging) return; const p = _getXY(e); awPanel.style.left = (p.x - ox) + 'px'; awPanel.style.top = (p.y - oy) + 'px'; }, { passive: false });
+    window.addEventListener('mouseup',  () => dragging = false);
+    window.addEventListener('touchend', () => dragging = false);
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+    // Separador
+    const sep = document.createElement('div');
+    Object.assign(sep.style, { borderTop: '1px solid #444', margin: '2px 0' });
+    body.appendChild(sep);
+
+    // Play/Stop
+    const playBtn = document.createElement('button');
+    playBtn.setAttribute('data-aw', 'playbtn');
+    playBtn.textContent = '▶ Play';
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '9px', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+    });
+    playBtn.onclick = () => {
+      dsk.assassin.enabled = !dsk.assassin.enabled;
+      dsk.localMsg(dsk.assassin.enabled ? '[AW] Winner Bot ativado ⚔️' : '[AW] Winner Bot pausado', dsk.assassin.enabled ? '#5f5' : '#f55');
+    };
+    body.appendChild(playBtn);
+
+    awPanel.appendChild(header);
+    awPanel.appendChild(body);
+    document.body.appendChild(awPanel);
+  }
+
+  dsk.setCmd('/assassin',       () => { dsk.assassin.enabled = !dsk.assassin.enabled; dsk.localMsg(dsk.assassin.enabled ? '[AW] Winner Bot ativado ⚔️' : '[AW] Winner Bot pausado', dsk.assassin.enabled ? '#5f5' : '#f55'); });
+  dsk.setCmd('/assassinconfig', () => { aw.visible = !aw.visible; });
+})();
+
+
+// ── Tick ─────────────────────────────────────────────────────
+dsk.on('postLoop', () => {
+  if (!dsk.assassin?.enabled) return;
+  xAssassinLoop();
+});
+
+// ══════════════════════════════════════════════════════════════
+// 🛡️  ASSASSIN LOSER BOT  ─  by Pablo Mod
+// Conta que PERDE o duelo (alt que reativa a estátua)
+// Config: /loserconfig  |  Toggle: /loser
+// ══════════════════════════════════════════════════════════════
+
+dsk.loser = { enabled: false };
+
+
+// ── Loop principal ────────────────────────────────────────────
+async function xLoserLoop() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (xGoing[161] === true) return;
+  xGoing[161] = true;
+
+  // Limpa mensagens antigas
+  if (xIfChatHas('Battle cancelled'))   xDoClearChat('Battle cancelled');
+  if (xIfChatHas('The battle is over')) xDoClearChat('The battle is over');
+
+  // ── 1. Ataca 1x pra iniciar ──────────────────────────────
+  xChangeStatus('[AL] Atacando estátua...');
+  await xDelay(550);
+  await xDoKeyUp(6);
+  await xDelay(700);
+
+  // ── 2. Aguarda fim do duelo ──────────────────────────────
+  xChangeStatus('[AL] Aguardando fim do duelo...');
+  const timeout = Date.now() + 120000;
+  while (Date.now() < timeout && dsk.loser.enabled && !dskPaused) {
+    if (xIfChatHas('The battle is over')) { xDoClearChat('The battle is over'); break; }
+    if (xIfChatHas('Battle cancelled'))   { xDoClearChat('Battle cancelled');   break; }
+    await xDelay(300);
+  }
+
+  await xDelay(500);
+  xGoing[161] = false;
+}
+
+
+// ══════════════════════════════════════════════════════════════
+// ⚙️  PAINEL DE CONFIG
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+  let alPanel = null;
+
+  const al = {
+    get visible() { return !!alPanel; },
+    set visible(v) { if (!v && alPanel) removePanel(); else if (v && !alPanel) createPanel(); },
+  };
+  dsk.loserManager = al;
+
+  { let _t = 0; dsk.on('postLoop', () => {
+    if (!alPanel || ++_t % 10 !== 0) return;
+    const btn = alPanel.querySelector('[data-al="playbtn"]');
+    if (!btn) return;
+    const on = !!dsk.loser?.enabled;
+    btn.textContent       = on ? '⏹ Stop' : '▶ Play';
+    btn.style.background  = on ? '#3a1a1a' : '#1a3a2a';
+    btn.style.borderColor = on ? '#e74c3c' : '#2ecc71';
+    btn.style.color       = on ? '#e74c3c' : '#2ecc71';
+  }); }
+
+  function removePanel() {
+    if (alPanel) { alPanel.remove(); alPanel = null; }
+  }
+
+  function createPanel() {
+    if (alPanel) { removePanel(); return; }
+
+    alPanel = document.createElement('div');
+    Object.assign(alPanel.style, {
+      position: 'fixed', top: '60px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '240px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // Header
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const titleEl = document.createElement('span');
+    titleEl.textContent = '🛡️ Assassin Loser';
+    Object.assign(titleEl.style, { color: '#60a5fa', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, { background: 'none', border: 'none', color: '#aaa', cursor: 'pointer', fontSize: '15px', padding: '0 2px' });
+    closeBtn.onclick = () => removePanel();
+    header.appendChild(titleEl);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    const startDrag = (e) => {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const p = _getXY(e);
+      ox = p.x - alPanel.getBoundingClientRect().left;
+      oy = p.y - alPanel.getBoundingClientRect().top;
+      alPanel.style.transform = 'none';
+    };
+    header.addEventListener('mousedown', startDrag);
+    header.addEventListener('touchstart', startDrag, { passive: false });
+    window.addEventListener('mousemove',  e => { if (!dragging) return; const p = _getXY(e); alPanel.style.left = (p.x - ox) + 'px'; alPanel.style.top = (p.y - oy) + 'px'; });
+    window.addEventListener('touchmove',  e => { if (!dragging) return; const p = _getXY(e); alPanel.style.left = (p.x - ox) + 'px'; alPanel.style.top = (p.y - oy) + 'px'; }, { passive: false });
+    window.addEventListener('mouseup',  () => dragging = false);
+    window.addEventListener('touchend', () => dragging = false);
+
+    // Body
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+    // Separador
+    const sep = document.createElement('div');
+    Object.assign(sep.style, { borderTop: '1px solid #444', margin: '2px 0' });
+    body.appendChild(sep);
+
+    // Play/Stop
+    const playBtn = document.createElement('button');
+    playBtn.setAttribute('data-al', 'playbtn');
+    playBtn.textContent = '▶ Play';
+    Object.assign(playBtn.style, {
+      width: '100%', padding: '9px', borderRadius: '6px',
+      border: '1px solid #2ecc71', background: '#1a3a2a',
+      color: '#2ecc71', cursor: 'pointer', fontSize: '12px', fontWeight: 'bold',
+    });
+    playBtn.onclick = () => {
+      dsk.loser.enabled = !dsk.loser.enabled;
+      dsk.localMsg(dsk.loser.enabled ? '[AL] Loser Bot ativado 🛡️' : '[AL] Loser Bot pausado', dsk.loser.enabled ? '#5f5' : '#f55');
+    };
+    body.appendChild(playBtn);
+
+    alPanel.appendChild(header);
+    alPanel.appendChild(body);
+    document.body.appendChild(alPanel);
+  }
+
+  dsk.setCmd('/loser',       () => { dsk.loser.enabled = !dsk.loser.enabled; dsk.localMsg(dsk.loser.enabled ? '[AL] Loser Bot ativado 🛡️' : '[AL] Loser Bot pausado', dsk.loser.enabled ? '#5f5' : '#f55'); });
+  dsk.setCmd('/loserconfig', () => { al.visible = !al.visible; });
+})();
+
+
+// ── Tick ─────────────────────────────────────────────────────
+dsk.on('postLoop', () => {
+  if (!dsk.loser?.enabled) return;
+  xLoserLoop();
 });
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
