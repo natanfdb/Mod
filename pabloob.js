@@ -17967,7 +17967,7 @@ async function SheepRun() {
   await xDelay(400);
   await xDoChangeDir(0);
   await xDelay(400);
-  for (let j = 0; j < 19; j++) {
+  for (let j = 0; j < 25; j++) {
     if (!dsk.sheep.enabled) return;
     await xDoKeyPress(6, 180);
     await xDelay(800);
