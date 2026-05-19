@@ -7606,16 +7606,14 @@ window.wcStat = window.wcStat ?? {
 })();
 
 
-
-
 // ══════════════════════════════════════════════════════════════
-// 🐍  SNAKE PIT BOT  ─  by Pablo Mod
+// 🐍  SNAKE Hazard BOT  ─  by Pablo Mod
 // Mobs: Snake, Serpent, Nether Leech
 // Reparo: WP 6 (40,38) → move 43,41 dropa → move 43,40 vira baixo repara → move 43,41 pega
 // ══════════════════════════════════════════════════════════════
 
 
-// ── Variáveis globais Snake Pit ───────────────────────────────
+// ── Variáveis globais Snake Hazard ───────────────────────────────
 window.xSPID1            = 0;
 window.xSPID2            = 0;
 window.xSPID3            = 0;
@@ -7629,7 +7627,7 @@ window.xSPCombatEndTimer  = null;
 window.xSPRecentCombat    = false;
 
 
-// ── Estado de stats Snake Pit (persiste ao pausar) ────────────
+// ── Estado de stats Snake Hazard (persiste ao pausar) ────────────
 window.spStat = window.spStat ?? {
   startMyst:    0,
   totalMyst:    0,
@@ -7741,33 +7739,32 @@ async function xSnakePit() {
       }
     }
 
-
     // ── Fluxo de reparo ──────────────────────────────────────
-    // Passo 1: tem itens equipados → vai para 43,41 e dropa
+    // Passo 1: tem itens equipados → vai para (6,14) e dropa
     if (inv[0]?.sprite !== undefined) {
-      if (myself.x === 43 && myself.y === 41) {
+      if (myself.x === 6 && myself.y === 14) {
         xChangeStatus('[SP] Dropando itens para reparar...');
         if      (inv[2]?.sprite !== undefined) { await xDelay(300); xDoDropSlot(0, 3); }
         else if (inv[1]?.sprite !== undefined) { xDoDropSlot(0, 2); }
         else                                   { xDoDropSlot(0, 1); }
       } else {
-        xChangeStatus('[SP] Indo para posição de drop (43,41)...');
-        await xDoMove(43, 41);
+        xChangeStatus('[SP] Indo para posição de drop (6,14)...');
+        await xDoMove(6, 14);
         await xDelay(300);
       }
     } else {
-      // Passo 2: slots vazios → vai para 43,40, vira baixo (dir 2) e repara
-      if (myself.x === 43 && myself.y === 40 && myself.dir === 2 && inv[xGetSlotByID(719)]?.equip !== 0) {
+      // Passo 2: slots vazios → vai para (7,14), vira esquerda (dir 3) e repara
+      if (myself.x === 7 && myself.y === 14 && myself.dir === 3 && inv[xGetSlotByID(719)]?.equip !== 0) {
         if (xIfChatHas('The ' + spRepItem + ' is in perfect condition.')) {
           xDoClearChat('The ' + spRepItem + ' is in perfect condition.');
           xDoKeyUp(6);
-          // Passo 3: reparo OK → vai buscar itens em 43,41
+          // Passo 3: reparo OK → volta para (6,14) e pega tudo
           if (xGetItemByID(xSPID3) !== undefined) {
             xChangeStatus('[SP] Coletando itens reparados...');
             await xDoMove(xGetItemByID(xSPID3).x, xGetItemByID(xSPID3).y);
             for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
           } else {
-            await xDoMove(43, 41);
+            await xDoMove(6, 14);
             for (let p = 0; p < 6; p++) { await xDelay(300); xDoPickUp(); }
           }
           if (inv[0]?.equip === 0) { xDoUseSlot(0); await xDelay(300); }
@@ -7776,14 +7773,14 @@ async function xSnakePit() {
           xSPNeedsRep  = false;
           SPRepTimer   = 0;
           spStat.repairoTotal++;
-          dsk.localMsg(`Snake Pit: reparo ${spStat.repairoTotal} completo ✅`, '#5f5');
+          dsk.localMsg(`Snake Hazard: reparo ${spStat.repairoTotal} completo ✅`, '#5f5');
         } else {
           xDoKeyDown(6);
         }
       } else {
-        xChangeStatus('[SP] Indo para posição de reparo (43,40)...');
-        await xDoMove(43, 40);
-        await xDoChangeDir(2);
+        xChangeStatus('[SP] Indo para posição de reparo (7,14)...');
+        await xDoMove(7, 14);
+        await xDoChangeDir(3);
         await xDoUseSlot(xGetSlotByID(719));
         await xDelay(500);
       }
@@ -7794,9 +7791,7 @@ async function xSnakePit() {
     return;
   }
 
-
   // ── MODO NORMAL ───────────────────────────────────────────────
-
 
   // Comida
   const foodId = xGetSlotFood();
@@ -7865,14 +7860,14 @@ async function xSnakePit() {
   if (inv[5]?.sprite === undefined) { xChangeStatus('[SP] Slot 6 vazio, desconectando...'); xDoLogOff(); }
 
 
-  // ── Waypoints Snake Pit ───────────────────────────────────────
-  // 43 waypoints, WP índice 5 = (40,38) → trigger de reparo
+  // ── Waypoints Snake Hazard ───────────────────────────────────────
+  // 26 waypoints (índices 0..25), WP 12 = (9,15) → trigger de reparo
   if (xTemp[90] === undefined) {
     xTemp[90] = 0;
-        xTemp[91] = 45;  // ← era 42, correto é 45
-        const posX = [26,41,41,25,25,40,24, 7,13,12,10, 9, 8, 9,18,18,21,30,30,31,39,38,37,18,18, 9,19,20,37,37,39,30,30,29,24,18,18,16, 9, 9, 8,12,12,25,41,41];
-        const posY = [10,10,24,25,37,38,38,38,38,25,10,23,23,40,38,30,38,38,32,39,39,24,12,10,16,15,15, 9, 9,24,39,39,32,39,39,39,31,38,40,23,23,38,25,38,25,10];
-        for (let i = 0; i < 46; i++) {  // ← era 43, correto é 46
+    xTemp[91] = 25;
+    const posX = [9,18,18,20,30,30,30,39,38,37,18,18, 9,19,20,37,37,39,30,30,29,24,18,18,16,10];
+    const posY = [39,38,30,38,38,32,39,39,24,12,10,16,15,15, 9, 9,24,39,39,32,39,39,39,31,38,38];
+    for (let i = 0; i < 26; i++) {
       SPPosListX[i] = posX[i];
       SPPosListY[i] = posY[i];
     }
@@ -7909,32 +7904,16 @@ async function xSnakePit() {
     const wpX = SPPosListX[xTemp[90]];
     const wpY = SPPosListY[xTemp[90]];
 
-
-    // WPs 12 e 40 = escada (8,23): espera estar NO tile exato antes de avançar
-    if (xTemp[90] === 12 || xTemp[90] === 40) {
-      if (myself.x === wpX && myself.y === wpY) {
-        // chegou na escada → avança índice normalmente
-        if (xTemp[90] >= xTemp[91]) { xTemp[90] = 0; SPRepTimer++; }
-        else { xTemp[90]++; }
-      } else {
-        // ainda não chegou → move direto sem A*
-        xChangeStatus('[SP] Indo para escada...');
-        xMovingNow = false;
-        myself.move(wpX, wpY);
-        await xDelay(700);
+    const distToWP = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
+    if (distToWP <= 2) {
+      if (xTemp[90] >= xTemp[91]) { xTemp[90] = 0; SPRepTimer++; }
+      else { xTemp[90]++; }
+      if (SPRepTimer >= spRepVoltas && xTemp[90] === 12) {
+        xChangeStatus('[SP] Hora de reparar!');
+        xSPNeedsRep = true;
       }
     } else {
-      const distToWP = Math.abs(myself.x - wpX) + Math.abs(myself.y - wpY);
-      if (distToWP <= 2) {
-        if (xTemp[90] >= xTemp[91]) { xTemp[90] = 0; SPRepTimer++; }
-        else { xTemp[90]++; }
-        if (SPRepTimer >= spRepVoltas && xTemp[90] === 5) {
-          xChangeStatus('[SP] Hora de reparar!');
-          xSPNeedsRep = true;
-        }
-      } else {
-        xDoMove(wpX, wpY, 3);
-      }
+      xDoMove(wpX, wpY, 3);
     }
   }
 
@@ -7944,7 +7923,7 @@ async function xSnakePit() {
 
 
 // ══════════════════════════════════════════════════════════════
-// ⚙️  SNAKE PIT CONFIG PANEL
+// ⚙️  SNAKE Hazard CONFIG PANEL
 // ══════════════════════════════════════════════════════════════
 
 
@@ -8009,7 +7988,7 @@ dsk.snakepit = { enabled: false };
       borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
     });
     const title = document.createElement('span');
-    title.textContent = '🐍 Snake Pit Config';
+    title.textContent = '🐍 Snake Hazard Config';
     Object.assign(title.style, { color: '#4ade80', fontWeight: 'bold', fontSize: '13px' });
     const closeBtn = document.createElement('button');
     closeBtn.textContent = '✕';
@@ -8109,18 +8088,18 @@ dsk.snakepit = { enabled: false };
     actRow.appendChild(makeActionBtn('↺ Reset Stats', '#ff0', () => {
       window.spStat = { startMyst: jv.upgrade_number??0, totalMyst:0, mystPerHour:0, timerStart: Date.now(), totalTime:0, timerRunning: !!dsk.snakepit?.enabled, repairoTotal:0 };
       window.SPRepTimer = 0; window.xSPNeedsRep = false;
-      dsk.localMsg('Snake Pit: stats resetados!', '#ff0');
+      dsk.localMsg('Snake Hazard: stats resetados!', '#ff0');
     }));
     actRow.appendChild(makeActionBtn('🗺️ Reset WP', '#888', () => {
       xTemp[90] = undefined;
       window.SPPosListX = new Array(50).fill(0);
       window.SPPosListY = new Array(50).fill(0);
       window.SPRepTimer = 0; window.xSPNeedsRep = false;
-      dsk.localMsg('Snake Pit: waypoints resetados!', '#fa5');
+      dsk.localMsg('Snake Hazard: waypoints resetados!', '#fa5');
     }));
     actRow.appendChild(makeActionBtn('🔧 Forçar Reparo', '#0cf', () => {
       window.xSPNeedsRep = true;
-      dsk.localMsg('Snake Pit: reparo forçado!', '#ff0');
+      dsk.localMsg('Snake Hazard: reparo forçado!', '#ff0');
     }));
     body.appendChild(actRow);
 
@@ -8175,8 +8154,8 @@ dsk.snakepit = { enabled: false };
 
 
   dsk.setCmd('/snakepitconfig', () => {
-    if (spPanel) { removePanel(); dsk.localMsg('Snake Pit Config: Fechado', '#f55'); }
-    else         { createPanel(); dsk.localMsg('Snake Pit Config: Aberto', '#5f5'); }
+    if (spPanel) { removePanel(); dsk.localMsg('Snake Hazard Config: Fechado', '#f55'); }
+    else         { createPanel(); dsk.localMsg('Snake Hazard Config: Aberto', '#5f5'); }
   });
 })();
 
@@ -8196,7 +8175,7 @@ dsk.setCmd('/snakepit', () => {
 
 
     if (!xSPID1 || !xSPID2 || !xSPID3) {
-      dsk.localMsg('Snake Pit: coloque itens nos slots 1, 2 e 3 primeiro!', '#f55');
+      dsk.localMsg('Snake Hazard: coloque itens nos slots 1, 2 e 3 primeiro!', '#f55');
       dsk.snakepit.enabled = false;
       return;
     }
@@ -8216,7 +8195,7 @@ dsk.setCmd('/snakepit', () => {
     }
 
 
-    dsk.localMsg(`Snake Pit: Ativado | ID1=${xSPID1} ID2=${xSPID2} ID3=${xSPID3}`, '#5f5');
+    dsk.localMsg(`Snake Hazard: Ativado | ID1=${xSPID1} ID2=${xSPID2} ID3=${xSPID3}`, '#5f5');
 
 
     (async function loop() {
@@ -8237,7 +8216,7 @@ dsk.setCmd('/snakepit', () => {
     xGoing[130]    = false;
     target.id      = me;
     xSPNeedsRep    = false;
-    dsk.localMsg('Snake Pit: Desativado', '#f55');
+    dsk.localMsg('Snake Hazard: Desativado', '#f55');
   }
 });
 
@@ -15110,6 +15089,8 @@ dsk.setCmd('/dropar', async (context) => {
     
     dsk.localMsg(`Dropar: ${amount} item(s) concluido!`, '#5f5');
 });
+
+
 //zoom
 
 
@@ -15121,7 +15102,6 @@ dsk.setCmd('/zoom', () => {
     
     const xZoom = dsk.zoom.enabled ? 1.5 : 1.0;
 
-
     // Pega o sprite correto independente da conta
     const rootSprite = myself.body_sprite ?? myself.spr;
     const world = rootSprite.parent.parent.parent;
@@ -15132,31 +15112,20 @@ dsk.setCmd('/zoom', () => {
     world.position.x = 380 * (1 - (1 / xZoom));
     world.position.y = 230 * (1 - (1 / xZoom));
 
-
     // Escala o UI
     ui_container.scale.x = 1 / (1 / xZoom);
     ui_container.scale.y = 1 / (1 / xZoom);
     ui_container.position.x = (xZoom - 1) * -380;
     ui_container.position.y = (xZoom - 1) * -230;
 
-
-    // Contra-escala da skill bar (dinâmico)
-    const skillBar = jv.stage.children.find(c =>
-        c !== ui_container &&
-        c.children?.length >= 5 &&
-        c.children?.some(child => child.y >= 350 && child.y <= 400)
-    );
-    if (skillBar) {
-        skillBar.scale.x = xZoom;
-        skillBar.scale.y = xZoom;
-        skillBar.x = -380 * (xZoom - 1);
-        skillBar.y = -230 * (xZoom - 1);
-    }
+    // Contra-escala do static_container (onde vivem as spells)
+    static_container.scale.x = xZoom;
+    static_container.scale.y = xZoom;
+    static_container.position.x = -380 * (xZoom - 1);
+    static_container.position.y = -230 * (xZoom - 1);
     
     dsk.localMsg(`Zoom: ${dsk.zoom.enabled ? '1.5x (ativado)' : '1.0x (desativado)'}`, dsk.zoom.enabled ? '#5f5' : '#f55');
 });
-
-
 
 
 //heal bot //
@@ -19697,7 +19666,7 @@ dsk.setCmd('/menu', () => {
         const div3 = document.createElement('div');
         Object.assign(div3.style, { width: '1px', background: '#444', margin: '0 2px' });
         const colSp = makeCol(
-          '🐍 Snake Pit',
+          '🐍 Snake Hazard',
           () => dsk.commands['/snakepitconfig'](),
           () => dsk.commands['/snakepit'](),
           () => !!dsk.snakepit?.enabled,
