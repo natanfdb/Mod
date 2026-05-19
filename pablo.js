@@ -6046,6 +6046,90 @@ dsk.menu.toggleBtn.on_click = () => {
 };
 
 
+// ── COUNTER-ATTACK ────────────────────────────────────────────
+window._caActive    = false;
+window._caLastFx    = null;
+window._caTargetId  = null;
+window._caLastHp    = 100;  // ← guarda HP anterior
+window._caFxHandler = null;
+window._caHpHandler = null;
+
+const _CA_DIR_OFFSET = [
+  { dx:  0, dy: -1 },
+  { dx:  1, dy:  0 },
+  { dx:  0, dy:  1 },
+  { dx: -1, dy:  0 },
+];
+
+setInterval(() => {
+  if (!window._caActive || !window._caTargetId) return;
+  const still = mobs.items.some(m => m && m.id === window._caTargetId);
+  if (!still) {
+    window._caTargetId = null;
+    target.id = me;
+    send({ type: 't', t: me });
+  }
+}, 500);
+
+dsk.setCmd('/counterattack', () => {
+  if (window._caActive) {
+    dsk.off('postPacket:fx', window._caFxHandler);
+    dsk.off('postPacket:s',  window._caHpHandler);
+    window._caActive   = false;
+    window._caTargetId = null;
+    target.id = me;
+    send({ type: 't', t: me });
+    dsk.localMsg('⚔ Counter-Attack: DESATIVADO', '#f55');
+    return;
+  }
+
+  window._caFxHandler = (packet) => {
+    if (!myself) return;
+    if (packet.x === myself.x && packet.y === myself.y)
+      window._caLastFx = { d: packet.d, time: Date.now() };
+  };
+
+  window._caHpHandler = (packet) => {
+    if (!myself || packet.h === undefined) return;
+
+    const hpAtual  = packet.h;
+    const hpAntes  = window._caLastHp;
+    window._caLastHp = hpAtual;
+
+    // ← Só age se HP realmente caiu
+    if (hpAtual >= hpAntes) return;
+
+    const fx = window._caLastFx;
+    if (!fx || Date.now() - fx.time > 500) return;
+    const offset = _CA_DIR_OFFSET[fx.d] ?? null;
+    if (!offset) return;
+
+    let found = null, bestDist = Infinity;
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself) continue;
+      if (xPlyrTest(mob)) continue;  // ← usa a função do próprio mod
+      const onAxis = (mob.x === myself.x + offset.dx && mob.y === myself.y + offset.dy);
+      const dist   = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
+      if (onAxis) { found = mob; break; }
+      if (dist <= 2 && dist < bestDist) { bestDist = dist; found = mob; }
+    }
+    if (found) {
+      window._caTargetId = found.id;
+      target.id = found.id;
+      send({ type: 't', t: found.id });
+      dsk.localMsg('⚔ Counter: ' + found.name, '#ff5');
+      window._caLastFx = null;
+    }
+  };
+
+  window._caLastHp = hp_status?.val ?? 100;  // ← inicializa com HP atual
+  dsk.on('postPacket:fx', window._caFxHandler);
+  dsk.on('postPacket:s',  window._caHpHandler);
+  window._caActive = true;
+  dsk.localMsg('⚔ Counter-Attack: ATIVADO', '#5f5');
+});
+
 // ── MENU HUB HTML ─────────────────────────────────────────────
 
 
@@ -6083,6 +6167,7 @@ dsk.menu.toggleBtn.on_click = () => {
     { label: '🗡️  Hunt', items: [
       { label: 'Hunt Hub',           state: () => !!document.getElementById('pablo-hunt-hub'), toggle: () => dsk.commands['/hunt']() },
       { label: 'AutoKill',           state: () => !!dsk.autokill?.enabled,       toggle: () => dsk.commands['/autokill']() },
+      { label: 'Counter-Attack',   state: () => !!window._caActive,       toggle: () => dsk.commands['/counterattack']() },
       { label: 'Auto Heal',          state: () => !!dsk.heal?.enabled,           toggle: () => dsk.commands['/heal']() },
       { label: 'Auto Food',          state: () => !!dsk.food?.enabled,           toggle: () => dsk.commands['/food']() },
       { label: 'Auto Caraway',       state: () => !!dsk.effct?.enabled,          toggle: () => dsk.commands['/effct']() },
@@ -11551,7 +11636,8 @@ async function xSSD() {
 
 
   // ── PRIORIDADE 2: CHEST ──────────────────────────────────────
-  await xGetChest();
+  if (dsk.ssdhunt.collectChest) await xGetChest();
+  if (!dsk.ssdhunt.collectChest) xTemp[171] = undefined;
   if (xTemp[171]) {
     const _chest = xTemp[171];
     const _chestK = _chest.x + ',' + _chest.y;
@@ -11626,7 +11712,7 @@ async function xSSD() {
 
 
   // ── PRIORIDADE 3: DROPS ──────────────────────────────────────
-  if (await xPickSpecificDrop()) {
+  if (dsk.ssdhunt.collectLoot && await xPickSpecificDrop()) {
     xGoing[110] = false;
     return;
   }
@@ -13984,6 +14070,8 @@ async function rotRun() {
     await xDelay(400);
     await xDoPickUp(); // pega item 2
     await xDelay(400);
+	await xDoPickUp(); //repairkit
+	await xDelay(400);
     if (inv[0]?.sprite && inv[0].equip === 0) { await xDoUseSlot(0); await xDelay(500); } // equipa martelo
 
 
@@ -16053,7 +16141,10 @@ dsk.tsc = {
 
 
 // ── Estado ───────────────────────────────────────────────────
-dsk.forest = { enabled: false };
+dsk.forest = { enabled: false, autoPickaxe: false };
+try {
+  dsk.forest.autoPickaxe = JSON.parse(localStorage.getItem('dsk_forest_autopickaxe') || 'false');
+} catch(_) {}
 
 window.forestWpX    = [];
 window.forestWpY    = [];
@@ -16147,16 +16238,40 @@ function xForestDelay(ms) {
   return xDelay(ms);
 }
 
-// ── Coleta Pinecone se perto ──────────────────────────────────
-async function xForestPickPinecone() {
-  const pinecone = objects.items.find(el => el?.name === 'Pinecone');
-  if (!pinecone) return;
-  const dist = Math.abs(pinecone.x - myself.x) + Math.abs(pinecone.y - myself.y);
-  if (dist <= 6) {
-    await xDoMove(pinecone.x, pinecone.y);
-    await xForestDelay(700);
-    await xDoPickUp();
-    await xForestDelay(500);
+// ── Coleta itens do chão se perto ────────────────────────────
+const FOREST_GROUND_ITEMS = ['Pinecone', 'Wood', 'Stone', 'Flint'];
+
+async function xForestPickGroundItems() {
+  for (const itemName of FOREST_GROUND_ITEMS) {
+    const item = objects.items.find(el => el?.name === itemName);
+    if (!item) continue;
+    const dist = Math.abs(item.x - myself.x) + Math.abs(item.y - myself.y);
+    if (dist <= 6) {
+      await xDoMove(item.x, item.y);
+      await xForestDelay(700);
+      await xDoPickUp();
+      await xForestDelay(500);
+	  await xDoPickUp();
+      await xForestDelay(500);
+	  await xDoPickUp();
+      await xForestDelay(500);
+	  await xDoPickUp();
+      await xForestDelay(500);
+    }
+  }
+}
+
+// ── Garante Stone Pickaxe no slot 0 (só se Plain Rock ativo) ──
+async function xForestEnsurePickaxe() {
+  if (!dsk.forest.autoPickaxe) return;
+  if (!dsk.forest.targets.includes('Plain Rock')) return;
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+  if (!inv[0] || inv[0].sprite === undefined) {
+    send({ type: 'bld', tpl: 'stone_pickaxe' });
+    await xDelay(331);
+    xDoUseSlot(0);
+    await xDelay(234);
   }
 }
 
@@ -16184,8 +16299,9 @@ async function xForest() {
     return;
   }
 
-  // ── 2. Coleta Pinecone se perto ───────────────────────────
-  await xForestPickPinecone();
+  // ── 2. Garante pickaxe e coleta itens do chão ─────────────
+  await xForestEnsurePickaxe();
+  await xForestPickGroundItems();
 
   // ── 3. Busca Fir Tree no raio ─────────────────────────────
   const recursos = objects.items.filter(el => el && dsk.forest.targets.includes(el.name));
@@ -16469,6 +16585,30 @@ async function xForest() {
       resRow.appendChild(btn);
     });
     body.appendChild(resRow);
+
+    // ── Auto Pickaxe toggle ──────────────────────────────────
+    const pickaxeBtn = document.createElement('button');
+    const _updPickaxeBtn = () => {
+      const on = !!dsk.forest.autoPickaxe;
+      pickaxeBtn.textContent       = on ? '⛏ Auto Pickaxe: ON' : '⛏ Auto Pickaxe: OFF';
+      pickaxeBtn.style.background  = on ? '#1a3a2a' : '#2a2a3e';
+      pickaxeBtn.style.borderColor = on ? '#2ecc71' : '#555';
+      pickaxeBtn.style.color       = on ? '#2ecc71' : '#888';
+    };
+    Object.assign(pickaxeBtn.style, {
+      width: '100%', padding: '6px 4px', borderRadius: '6px',
+      border: '1px solid #555', background: '#2a2a3e',
+      color: '#888', cursor: 'pointer', fontSize: '10px',
+      transition: 'all 0.15s',
+    });
+    _updPickaxeBtn();
+    pickaxeBtn.onclick = () => {
+      dsk.forest.autoPickaxe = !dsk.forest.autoPickaxe;
+      try { localStorage.setItem('dsk_forest_autopickaxe', JSON.stringify(dsk.forest.autoPickaxe)); } catch(_) {}
+      _updPickaxeBtn();
+      dsk.localMsg('[FB] Auto Pickaxe: ' + (dsk.forest.autoPickaxe ? 'ON' : 'OFF'), dsk.forest.autoPickaxe ? '#5f5' : '#f55');
+    };
+    body.appendChild(pickaxeBtn);
 
     // ── Seção waypoints ──────────────────────────────────────
     const wpLabel = document.createElement('div');
@@ -17954,20 +18094,20 @@ async function SheepRun() {
   await xDoKeyPress(6, 180);
   await xDelay(800);
   await xDoMove(myself.x - 10, myself.y);
-  await xDelay(5000);
+  await xDelay(8000);
   await xDoMove(myself.x - 11, myself.y + 3);
-  await xDelay(5000);
+  await xDelay(9000);
   await xDoDropByID(0, 984);
-  await xDelay(400);
+  await xDelay(600);
   await xDoDropByID(0, 984);
-  await xDelay(400);
+  await xDelay(600);
   await xDoUseSlotByID(xGetSlotByID(719));
   await xDelay(400);
   await xDoMove(myself.x, myself.y + 1);
   await xDelay(400);
   await xDoChangeDir(0);
   await xDelay(400);
-  for (let j = 0; j < 25; j++) {
+  for (let j = 0; j < 19; j++) {
     if (!dsk.sheep.enabled) return;
     await xDoKeyPress(6, 180);
     await xDelay(800);
@@ -20084,7 +20224,7 @@ window.ssdhStat = window.ssdhStat ?? {
 };
 
 
-dsk.ssdhunt = { enabled: false };
+dsk.ssdhunt = { enabled: false, collectChest: true, collectLoot: true };
 
 
 dsk.setCmd('/ssdhunt', () => {
@@ -20674,6 +20814,50 @@ async function xSSDHuntRepair() {
     };
     repRow.appendChild(repLbl); repRow.appendChild(repBtn);
     body.appendChild(repRow);
+
+    // Toggle: Coletar Chest
+    const chestRow = document.createElement('div');
+    Object.assign(chestRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const chestLbl = document.createElement('div');
+    chestLbl.textContent = '🎁 Coletar Chest';
+    Object.assign(chestLbl.style, { color: '#aaa', fontSize: '11px' });
+    const chestBtn = document.createElement('button');
+    chestBtn.textContent = dsk.ssdhunt?.collectChest ? 'ativo' : 'inativo';
+    Object.assign(chestBtn.style, { padding: '4px 12px', borderRadius: '5px', border: `1px solid ${dsk.ssdhunt?.collectChest ? '#5f5' : '#f55'}`, background: '#1a1a2e', color: dsk.ssdhunt?.collectChest ? '#5f5' : '#f55', cursor: 'pointer', fontSize: '11px' });
+    chestBtn.onmouseenter = () => chestBtn.style.background = '#3a3a5e';
+    chestBtn.onmouseleave = () => chestBtn.style.background = '#1a1a2e';
+    chestBtn.onclick = () => {
+      if (dsk.ssdhunt) dsk.ssdhunt.collectChest = !dsk.ssdhunt.collectChest;
+      const on = !!dsk.ssdhunt?.collectChest;
+      chestBtn.textContent = on ? 'ativo' : 'inativo';
+      chestBtn.style.color  = on ? '#5f5' : '#f55';
+      chestBtn.style.border = `1px solid ${on ? '#5f5' : '#f55'}`;
+      dsk.localMsg(`SSD Hunt chest: ${chestBtn.textContent}`, '#0ff');
+    };
+    chestRow.appendChild(chestLbl); chestRow.appendChild(chestBtn);
+    body.appendChild(chestRow);
+
+    // Toggle: Coletar Loot
+    const lootRow = document.createElement('div');
+    Object.assign(lootRow.style, { background: '#2a2a3e', borderRadius: '7px', padding: '7px 10px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' });
+    const lootLbl = document.createElement('div');
+    lootLbl.textContent = '💎 Coletar Loot';
+    Object.assign(lootLbl.style, { color: '#aaa', fontSize: '11px' });
+    const lootBtn = document.createElement('button');
+    lootBtn.textContent = dsk.ssdhunt?.collectLoot ? 'ativo' : 'inativo';
+    Object.assign(lootBtn.style, { padding: '4px 12px', borderRadius: '5px', border: `1px solid ${dsk.ssdhunt?.collectLoot ? '#5f5' : '#f55'}`, background: '#1a1a2e', color: dsk.ssdhunt?.collectLoot ? '#5f5' : '#f55', cursor: 'pointer', fontSize: '11px' });
+    lootBtn.onmouseenter = () => lootBtn.style.background = '#3a3a5e';
+    lootBtn.onmouseleave = () => lootBtn.style.background = '#1a1a2e';
+    lootBtn.onclick = () => {
+      if (dsk.ssdhunt) dsk.ssdhunt.collectLoot = !dsk.ssdhunt.collectLoot;
+      const on = !!dsk.ssdhunt?.collectLoot;
+      lootBtn.textContent = on ? 'ativo' : 'inativo';
+      lootBtn.style.color  = on ? '#5f5' : '#f55';
+      lootBtn.style.border = `1px solid ${on ? '#5f5' : '#f55'}`;
+      dsk.localMsg(`SSD Hunt loot: ${lootBtn.textContent}`, '#0ff');
+    };
+    lootRow.appendChild(lootLbl); lootRow.appendChild(lootBtn);
+    body.appendChild(lootRow);
 
     // Botões de ação
     const actRow = document.createElement('div');
