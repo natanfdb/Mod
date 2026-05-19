@@ -7864,10 +7864,10 @@ async function xSnakePit() {
   // 26 waypoints (índices 0..25), WP 12 = (9,15) → trigger de reparo
   if (xTemp[90] === undefined) {
     xTemp[90] = 0;
-    xTemp[91] = 25;
-    const posX = [9,18,18,20,30,30,30,39,38,37,18,18, 9,19,20,37,37,39,30,30,29,24,18,18,16,10];
-    const posY = [39,38,30,38,38,32,39,39,24,12,10,16,15,15, 9, 9,24,39,39,32,39,39,39,31,38,38];
-    for (let i = 0; i < 26; i++) {
+    xTemp[91] = 26;
+    const posX = [9,18,18,20,25,30,30,30,39,38,37,18,18, 9,19,20,37,37,39,30,30,29,24,18,18,16,10];
+    const posY = [39,38,30,38,38,38,32,39,39,24,12,10,16,15,15, 9, 9,24,39,39,32,39,39,39,31,38,38];
+    for (let i = 0; i < 27; i++) {
       SPPosListX[i] = posX[i];
       SPPosListY[i] = posY[i];
     }
@@ -7890,11 +7890,12 @@ async function xSnakePit() {
       xDelay(200);
       xDoMove(xTemp[13].x, xTemp[13].y + 1);
       xDelay(200);
-    } else if (dist <= 4) {
+    } else if (dist <= 5) {
       await xDoMove(xTemp[13].x, xTemp[13].y);
       await xDelay(800);
     } else {
       target.id = me;
+	  xTemp[13] = undefined;
     }
   }
 
@@ -7908,7 +7909,7 @@ async function xSnakePit() {
     if (distToWP <= 2) {
       if (xTemp[90] >= xTemp[91]) { xTemp[90] = 0; SPRepTimer++; }
       else { xTemp[90]++; }
-      if (SPRepTimer >= spRepVoltas && xTemp[90] === 12) {
+      if (SPRepTimer >= spRepVoltas && xTemp[90] === 13) {
         xChangeStatus('[SP] Hora de reparar!');
         xSPNeedsRep = true;
       }
