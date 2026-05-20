@@ -16992,6 +16992,7 @@ dsk.recursos = { enabled: false, autokill: false };
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',  // ← MUDANÇA 1
     });
 
     // Header
@@ -17036,7 +17037,7 @@ dsk.recursos = { enabled: false, autokill: false };
 
     // Body
     const body = document.createElement('div');
-    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px' });
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '6px', overflowY: 'auto', flex: '1' });  // ← MUDANÇA 2
 
     const secLabel = document.createElement('div');
     secLabel.textContent = '── Alvos de Coleta ──';
@@ -17158,6 +17159,7 @@ dsk.recursos = { enabled: false, autokill: false };
     rcPanel.appendChild(header);
     rcPanel.appendChild(body);
     document.body.appendChild(rcPanel);
+    dsk.addResize(rcPanel, 200, 200);  // ← MUDANÇA 3
   }
 
   dsk.setCmd('/recursosconfig', () => { rc.visible = !rc.visible; });
@@ -19422,7 +19424,8 @@ var speedHackInterval2 = null;
 var botaoSpeedVisible = false;
 
 
-jv.botaoMenu2 = jv.Button.create(713, 360, 20, 'SP', ui_container, 20);
+jv.botaoMenu2 = jv.Button.create(718, 360, 20, 'SP', ui_container, 20);
+jv.botaoMenu2.title.style.fill = 0xff4444;
 jv.botaoMenu2.visible = false; // ← começa escondido
 
 
@@ -19438,6 +19441,7 @@ jv.botaoMenu2.on_click = function () {
         clearInterval(speedHackInterval2);
         speedHackInterval2 = null;
     }
+    jv.botaoMenu2.title.style.fill = autoSpeedHack ? 0x00ff88 : 0xff4444;
 };
 
 
@@ -19447,8 +19451,42 @@ dsk.setCmd('/sp', () => {
     dsk.localMsg(`Speed Button: ${botaoSpeedVisible ? 'Visível' : 'Escondido'}`, botaoSpeedVisible ? '#5f5' : '#f55');
 });
 
+var botaoFollowVisible = false;
 
+jv.botaoFollow = jv.Button.create(713, 382, 20, 'FL', ui_container, 20);
+jv.botaoFollow.title.style.fill = 0xff4444;
+jv.botaoFollow.visible = false;
 
+jv.botaoFollow.on_click = function () {
+    dsk.commands['/follow']();
+    const on = !!dsk.follow?.enabled;
+    jv.botaoFollow.title.style.fill = on ? 0x00ff88 : 0xff4444;
+};
+
+dsk.setCmd('/fl', () => {
+    botaoFollowVisible = !botaoFollowVisible;
+    jv.botaoFollow.visible = botaoFollowVisible;
+    dsk.localMsg(`Follow Button: ${botaoFollowVisible ? 'Visível' : 'Escondido'}`, botaoFollowVisible ? '#5f5' : '#f55');
+});
+
+var botaoSpeedBtnVisible = false;
+
+jv.botaoSpeed = jv.Button.create(688, 360, 25, 'On', ui_container, 20);
+jv.botaoSpeed.title.style.fill = 0xff4444;
+jv.botaoSpeed.visible = false;
+
+jv.botaoSpeed.on_click = function () {
+    dsk.commands['/speed']();
+    const on = !!dsk.speed?.enabled;
+	jv.botaoSpeed.title.text = on ? 'On' : 'Of';
+    jv.botaoSpeed.title.style.fill = on ? 0x00ff88 : 0xff4444;
+};
+
+dsk.setCmd('/spd', () => {
+    botaoSpeedBtnVisible = !botaoSpeedBtnVisible;
+    jv.botaoSpeed.visible = botaoSpeedBtnVisible;
+    dsk.localMsg(`Speed Button: ${botaoSpeedBtnVisible ? 'Visível' : 'Escondido'}`, botaoSpeedBtnVisible ? '#5f5' : '#f55');
+});
 
 // ── BOTÃO FLUTUANTE HUB ───────────────────────────────────────
 
