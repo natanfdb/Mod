@@ -22849,12 +22849,17 @@ dsk.on('postPacket:pkg', packet => {
     const arr = JSON.parse(packet.data);
     arr.forEach(raw => {
       const item = JSON.parse(raw);
-      if (item.type !== 'fx' && item.tpl !== 'notice') return;
-      if (item.type === 'fx' && item.tpl === 'notice' && item.d) {
-        const pct = parseInt(item.d);
-        if (!isNaN(pct)) {
-          dsk.smith.progress = pct;
-        }
+      if (item.type !== 'fx' || item.tpl !== 'notice') return;
+      if (!item.d) return;
+
+      // Só aceita notice na tile exata do Anvil
+      if (dsk.smith.anvil) {
+        if (item.x !== dsk.smith.anvil.x || item.y !== dsk.smith.anvil.y) return;
+      }
+
+      const pct = parseInt(item.d);
+      if (!isNaN(pct)) {
+        dsk.smith.progress = pct;
       }
     });
   } catch(e) {}
