@@ -6184,7 +6184,7 @@ dsk.setCmd('/counterattack', () => {
       { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
 	  { label: 'Forest Bot',         state: () => !!dsk.forest?.enabled,         toggle: () => dsk.commands['/forestconfig']() },
       { label: 'Sheep Bot',          state: () => !!dsk.sheep?.enabled,          toggle: () => dsk.commands['/sheep']() },
-      { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/clay']() },
+      { label: 'Clay Bot',           state: () => !!dsk.clay?.enabled,           toggle: () => dsk.commands['/claypanel']() },
       { label: 'Aloe Bot',           state: () => !!dsk.aloe?.enabled,           toggle: () => dsk.commands['/aloe']() },
 	  { label: 'Galinha Bot',        state: () => !!dsk.gal?.enabled,            toggle: () => dsk.commands['/galconfig']() },
 	  { label: 'Tinta',              state: () => !!dsk.tinta?.enabled,          toggle: () => dsk.commands['/tinta']() },
@@ -15191,7 +15191,7 @@ async function HealBot() {
 
 // ── CLAY BOT ─────────────────────────────────────────────────
 
-dsk.clay = { enabled: false, repairing: false };
+dsk.clay = { enabled: false, repairing: false, autokill: false };
 
 async function repairItemClay() {
   if (dskPaused) return;
@@ -15255,6 +15255,70 @@ async function repairItemClay() {
   }
 }
 
+// ── CLAY AUTOKILL ─────────────────────────────────────────────
+async function clayKillMob() {
+  // Ignora players
+  const mob = [
+    { x: myself.x,     y: myself.y - 1, dir: 0 },
+    { x: myself.x,     y: myself.y + 1, dir: 2 },
+    { x: myself.x + 1, y: myself.y,     dir: 1 },
+    { x: myself.x - 1, y: myself.y,     dir: 3 },
+  ].map(p => ({ ...p, mob: xGetMobByPos(p.x, p.y) }))
+   .find(p => p.mob && p.mob !== myself && !xPlyrTest(p.mob));
+
+  if (!mob) return;
+
+  // Para a escavação
+  await xDoKeyUp(6);
+  await xDelay(250);
+
+  // Desequipa a pá (slot 0)
+  if (inv[0]?.equip === 1) {
+    await xDoUseSlot(0);
+    await xDelay(300);
+  }
+
+  // Equipa a arma (slot 1)
+  if (inv[1]?.equip === 0) {
+    await xDoUseSlot(1);
+    await xDelay(300);
+  }
+
+  await xDelay(300);
+
+  if (target.id !== mob.mob.id) {
+    target.id = mob.mob.id;
+    send({ type: 't', t: mob.mob.id });
+  }
+
+  const timeout = Date.now() + 6000;
+  while (Date.now() < timeout && dsk.clay.enabled && !dskPaused) {
+    if (!mobs.items.find(m => m?.id === mob.mob.id)) break;
+    await xDelay(150);
+  }
+  await xDoKeyUp(6);
+  await xDelay(200);
+
+  // Volta o target
+  target.id = me;
+
+  // Desequipa a arma (slot 1)
+  if (inv[1]?.equip === 1) {
+    await xDoUseSlot(1);
+    await xDelay(300);
+  }
+
+  // Reequipa a pá (slot 0)
+  if (inv[0]?.equip === 0) {
+    await xDoUseSlot(0);
+    await xDelay(300);
+  }
+
+  // Volta a virar pra cima para o clay bot retomar
+  await xDoChangeDir(0);
+  await xDelay(250);
+}
+
 async function ClayBot() {
   if (dskPaused) return;
   if (!myself || game_state !== 2) return;
@@ -15270,6 +15334,12 @@ async function ClayBot() {
 
   if (xGoing[114] === true) return;
   xGoing[114] = true;
+
+  // ── Autokill ─────────────────────────────────────────────
+  if (dsk.clay.autokill) {
+    await clayKillMob();
+  }
+  // ─────────────────────────────────────────────────────────
 
   if (xIfChatHas("Disconnected (Packet Spamming)")) {
     await xDelay(300);
@@ -15364,6 +15434,122 @@ dsk.setCmd('/clay', () => {
     dsk.localMsg('Clay Bot: Desativado', '#f55');
   }
 });
+
+dsk.setCmd('/clayautokill', () => {
+  dsk.clay.autokill = !dsk.clay.autokill;
+  dsk.localMsg(`Clay AutoKill: ${dsk.clay.autokill ? 'Ativado' : 'Desativado'}`, dsk.clay.autokill ? '#5f5' : '#f55');
+});
+
+// ── CLAY BOT PANEL ────────────────────────────────────────────
+(function () {
+  let clayPanel = null;
+
+  dsk.setCmd('/claypanel', () => {
+    if (clayPanel) { clayPanel.remove(); clayPanel = null; return; }
+
+    clayPanel = document.createElement('div');
+    Object.assign(clayPanel.style, {
+      position: 'fixed', top: '80px', left: '50%',
+      transform: 'translateX(-50%)',
+      width: '220px',
+      background: '#1e1e2e', border: '1px solid #555',
+      borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
+      zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
+    });
+
+    // ── Header ────────────────────────────────────────────────
+    const header = document.createElement('div');
+    Object.assign(header.style, {
+      display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+      padding: '8px 10px', background: '#2a2a3e',
+      borderRadius: '10px 10px 0 0', cursor: 'move', borderBottom: '1px solid #444',
+    });
+    const title = document.createElement('span');
+    title.textContent = '⛏️ Clay Bot';
+    Object.assign(title.style, { color: '#FFD700', fontWeight: 'bold', fontSize: '12px' });
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = '✕';
+    Object.assign(closeBtn.style, {
+      background: 'none', border: 'none', color: '#aaa',
+      cursor: 'pointer', fontSize: '15px', padding: '0 2px',
+    });
+    closeBtn.onclick = () => { clayPanel.remove(); clayPanel = null; };
+    header.appendChild(title);
+    header.appendChild(closeBtn);
+
+    // Drag
+    let dragging = false, ox = 0, oy = 0;
+    header.addEventListener('mousedown', e => {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - clayPanel.getBoundingClientRect().left;
+      oy = _xy.y - clayPanel.getBoundingClientRect().top;
+      clayPanel.style.transform = 'none';
+    });
+    header.addEventListener('touchstart', e => {
+      if (e.target === closeBtn) return;
+      e.preventDefault(); dragging = true;
+      const _xy = _getXY(e);
+      ox = _xy.x - clayPanel.getBoundingClientRect().left;
+      oy = _xy.y - clayPanel.getBoundingClientRect().top;
+      clayPanel.style.transform = 'none';
+    }, { passive: false });
+    window.addEventListener('mousemove',  e => { if (!dragging) return; const _xy = _getXY(e); clayPanel.style.left = (_xy.x - ox) + 'px'; clayPanel.style.top = (_xy.y - oy) + 'px'; });
+    window.addEventListener('touchmove',  e => { if (!dragging) return; const _xy = _getXY(e); clayPanel.style.left = (_xy.x - ox) + 'px'; clayPanel.style.top = (_xy.y - oy) + 'px'; }, { passive: false });
+    window.addEventListener('mouseup',  () => { dragging = false; });
+    window.addEventListener('touchend', () => { dragging = false; });
+
+    // ── Body ──────────────────────────────────────────────────
+    const body = document.createElement('div');
+    Object.assign(body.style, { padding: '10px 12px', display: 'flex', flexDirection: 'column', gap: '8px' });
+
+    function makeToggleBtn(getLabelFn, getStateFn, onClick) {
+      const btn = document.createElement('button');
+      function refresh() {
+        const on = getStateFn();
+        btn.textContent       = getLabelFn(on);
+        btn.style.background  = on ? '#1a3a2a' : '#2a2a3e';
+        btn.style.borderColor = on ? '#2ecc71' : '#555';
+        btn.style.color       = on ? '#2ecc71' : '#888';
+      }
+      Object.assign(btn.style, {
+        width: '100%', padding: '7px 0', borderRadius: '6px',
+        border: '1px solid #555', background: '#2a2a3e',
+        color: '#888', cursor: 'pointer', fontSize: '11px',
+        fontFamily: 'Verdana', transition: 'all 0.15s',
+      });
+      btn.onclick = () => { onClick(); refresh(); };
+      refresh();
+      return btn;
+    }
+
+    // Botão Clay Bot ON/OFF
+    body.appendChild(makeToggleBtn(
+      on => on ? '⏹ Stop Clay Bot' : '▶ Play Clay Bot',
+      () => !!dsk.clay.enabled,
+      () => dsk.commands['/clay']()
+    ));
+
+    // Botão AutoKill ON/OFF
+    body.appendChild(makeToggleBtn(
+      on => on ? '🗡️ AutoKill: ON' : '🗡️ AutoKill: OFF',
+      () => !!dsk.clay.autokill,
+      () => dsk.commands['/clayautokill']()
+    ));
+
+    clayPanel.appendChild(header);
+    clayPanel.appendChild(body);
+    document.body.appendChild(clayPanel);
+
+    // Atualiza botões em tempo real
+    let _t = 0;
+    dsk.on('postLoop', () => {
+      if (!clayPanel || ++_t % 10 !== 0) return;
+      clayPanel.querySelectorAll('button[data-refresh]').forEach(b => b.click && b._refresh?.());
+    });
+  });
+})();
 
 
 dsk.baseRepair = {
@@ -16120,6 +16306,23 @@ window.forestWpX    = [];
 window.forestWpY    = [];
 window.forestWpIdx  = 0;
 
+// ── Rotas pré-definidas ───────────────────────────────────────
+const FOREST_ROUTES = [
+  {
+    label: '🌲 Rota Newbi',
+    x: [26, 25, 25, 35, 45, 45, 45, 45, 45, 45, 45, 55, 65, 66, 66, 62, 62, 62, 62, 61, 51, 41, 32, 25, 25, 25, 25, 25],
+    y: [45, 51, 42, 42, 42, 48, 55, 60, 54, 48, 42, 42, 42, 48, 40, 39, 32, 25, 19, 14, 15, 15, 15, 15, 21, 27, 35, 41],
+  },
+];
+
+function xForestLoadRoute(route) {
+  window.forestWpX   = [...route.x];
+  window.forestWpY   = [...route.y];
+  window.forestWpIdx = 0;
+  xForestSaveWps();
+  dsk.localMsg(`[FB] Rota carregada: ${route.label} (${route.x.length} WPs)`, '#4ade80');
+}
+
 // ── Persistência de waypoints ─────────────────────────────────
 function xForestSaveWps() {
   try {
@@ -16580,6 +16783,30 @@ async function xForest() {
     };
     body.appendChild(pickaxeBtn);
 
+    // ── Rotas pré-definidas ──────────────────────────────────
+    const routeLabel = document.createElement('div');
+    routeLabel.textContent = '── Rotas ──';
+    Object.assign(routeLabel.style, { color: '#777', fontSize: '10px', textAlign: 'center' });
+    body.appendChild(routeLabel);
+
+    FOREST_ROUTES.forEach(route => {
+      const btn = document.createElement('button');
+      btn.textContent = route.label;
+      Object.assign(btn.style, {
+        width: '100%', padding: '6px 4px', borderRadius: '6px',
+        border: '1px solid #555', background: '#2a2a3e',
+        color: '#ccc', cursor: 'pointer', fontSize: '10px',
+        transition: 'all 0.15s',
+      });
+      btn.onmouseenter = () => { btn.style.background = '#1a3a2a'; btn.style.borderColor = '#4ade80'; btn.style.color = '#4ade80'; };
+      btn.onmouseleave = () => { btn.style.background = '#2a2a3e'; btn.style.borderColor = '#555'; btn.style.color = '#ccc'; };
+      btn.onclick = () => {
+        xForestLoadRoute(route);
+        refreshWpList();
+      };
+      body.appendChild(btn);
+    });
+
     // ── Seção waypoints ──────────────────────────────────────
     const wpLabel = document.createElement('div');
     wpLabel.textContent = '── Waypoints ──';
@@ -16939,9 +17166,48 @@ async function xRecursos() {
     el && el.name === tn && el.x === tx && el.y === ty
   );
 
+  // ── Checks de adjacência (usados no loop) ────────────────────
+  const aindaAdjacente = () =>
+    Math.abs(myself.x - alvo.x) + Math.abs(myself.y - alvo.y) === 1;
+  const aindaVirado = () => {
+    const dxR = alvo.x - myself.x, dyR = alvo.y - myself.y;
+    let dirEsp;
+    if      (dxR ===  1) dirEsp = 1;
+    else if (dxR === -1) dirEsp = 3;
+    else if (dyR ===  1) dirEsp = 2;
+    else                 dirEsp = 0;
+    return myself.dir === dirEsp;
+  };
+
   if (aindaExiste()) {
     await xDoKeyDown(6);
     while (aindaExiste() && dsk.recursos.enabled && !dskPaused) {
+      // ── Checa mob adjacente durante coleta ──────────────────
+      const mobAdj = [
+        { x: myself.x,     y: myself.y - 1 },
+        { x: myself.x,     y: myself.y + 1 },
+        { x: myself.x + 1, y: myself.y     },
+        { x: myself.x - 1, y: myself.y     },
+      ].map(p => xGetMobByPos(p.x, p.y))
+       .find(m => m && m !== myself && !xPlyrTest(m));
+
+      if (mobAdj && dsk.recursos.autokill) {
+        await xDoKeyUp(6);
+        await xDelay(200);
+        await xRecursosKill();
+        await xDelay(300);
+        if (aindaExiste()) {
+          send({ type: 'm', x: myself.x, y: myself.y, d: dirReal });
+          await xDelay(300);
+          await xDoKeyDown(6);
+        }
+      }
+      // ── Checa se foi empurrado ───────────────────────────────
+      if (!aindaAdjacente() || !aindaVirado()) {
+        xChangeStatus('[RB] Fui empurrado! Reposicionando...');
+        break;
+      }
+      // ────────────────────────────────────────────────────────
       await xDelay(150);
     }
     await xDoKeyUp(6);
@@ -16985,14 +17251,17 @@ dsk.recursos = { enabled: false, autokill: false };
     if (rcPanel) { removePanel(); return; }
 
     rcPanel = document.createElement('div');
+    const _vw = window.innerWidth;
+    const _vh = window.innerHeight;
     Object.assign(rcPanel.style, {
-      position: 'fixed', top: '60px', left: '50%',
+      position: 'fixed', top: '40px', left: '50%',
       transform: 'translateX(-50%)',
-      width: '240px',
+      width: Math.min(240, _vw - 16) + 'px',
+      maxHeight: (_vh - 60) + 'px',
       background: '#1e1e2e', border: '1px solid #555',
       borderRadius: '10px', boxShadow: '0 8px 24px rgba(0,0,0,0.7)',
       zIndex: '99997', fontFamily: 'Verdana, sans-serif', userSelect: 'none',
-      overflow: 'hidden', display: 'flex', flexDirection: 'column',  // ← MUDANÇA 1
+      overflow: 'hidden', display: 'flex', flexDirection: 'column',
     });
 
     // Header
