@@ -6180,6 +6180,7 @@ dsk.setCmd('/counterattack', () => {
     { label: '⛏️  Recursos', items: [
       { label: '⛏️ Mine Hub',        state: () => !!(window.minm?.visible),      toggle: () => dsk.commands['/minehub']() },
       { label: 'WC Mining',          state: () => !!dsk.wcmining?.enabled,       toggle: () => dsk.commands['/wcmining']() },
+	  { label: 'Crystal Rock',       state: () => !!dsk.crystal?.enabled,        toggle: () => dsk.commands['/crystal']() },
       { label: 'Recursos Bot',       state: () => !!dsk.recursos?.enabled,       toggle: () => dsk.commands['/recursosconfig']() },
       { label: 'Wood Farm',          state: () => !!dsk.wood?.enabled,           toggle: () => dsk.commands['/wood']() },
 	  { label: 'Forest Bot',         state: () => !!dsk.forest?.enabled,         toggle: () => dsk.commands['/forestconfig']() },
@@ -6991,7 +6992,9 @@ async function xGetMobByName(...names) {
 
 
 function xPlyrTest(mob) {
-  return mob?.type === 'player' || mob?.is_player === true;
+  if (!mob) return false;
+  if (mob.id === me) return false;
+  return player_dict[mob.id] !== undefined;
 }
 
 
@@ -10446,7 +10449,7 @@ dsk.setCmd('/heal', () => {
     dsk.localMsg('Auto Heal: Ativado', '#5f5');
     (async function loop() {
       while (dsk.heal.enabled) {
-        if (game_state === 2) await xHeal();
+        if (!dskPaused && game_state === 2) await xHeal();
         await xDelay(551);
       }
     })();
@@ -10495,13 +10498,11 @@ dsk.setCmd('/food', () => {
   if (dsk.food.enabled) {
     dsk.localMsg('Auto Food: Ativado', '#5f5');
     (async function loop() {
-      while (dsk.food.enabled) {
-                if (dskPaused) return; // ← adiciona isso
-                if (!myself || game_state !== 2) return;
-        if (game_state === 2) await xFood();
-        await xDelay(591);
-      }
-    })();
+	  while (dsk.food.enabled) {
+		if (!dskPaused && game_state === 2) await xFood();
+		await xDelay(591);
+	  }
+	})();
   } else {
     xGoing[107] = false;
     dsk.localMsg('Auto Food: Desativado', '#f55');
@@ -25142,6 +25143,956 @@ async function xLoserLoop() {
 dsk.on('postLoop', () => {
   if (!dsk.loser?.enabled) return;
   xLoserLoop();
+});
+
+// ══════════════════════════════════════════════════════════════
+//  CRYSTAL ROCK BOT  –  baseado no modpablo
+//  Slots: 0=arma  1=shield  2=armor  3=pickareta
+//  Crystal Rock ID: 772
+// ══════════════════════════════════════════════════════════════
+
+(function () {
+
+  // ── CONFIGURAÇÃO ─────────────────────────────────────────────
+  const CRYSTAL_ID  = -507;   // sprite ID da Crystal Rock na parede
+  const REPAIR_KIT  = 719;   // ID do Repair Kit
+  const SLOT_AXE    = 0;     // arma
+  const SLOT_SHIELD = 1;     // shield
+  const SLOT_ARMOR  = 2;     // armor
+  const SLOT_PICK   = 3;     // pickareta
+
+  // Waypoint onde o bot vai logo ao iniciar (próximo às pedras)
+  const START_WP  = { x: 80, y: 69 };   // ← PREENCHA aqui
+
+  // Waypoint onde o bot vai ao não encontrar mais pedras, para deslogar
+  const LOGOUT_WP = { x: 79, y: 60 };   // ← PREENCHA aqui
+
+  const LOGOUT_WAIT_MS = 12 * 60 * 1000; // 12 minutos
+
+  // ── ESTADO ───────────────────────────────────────────────────
+  dsk.crystal = { enabled: false };
+
+  window._crGoing       = false;
+  window._crMoving      = false;
+  window._crNeedsRep    = false;
+  window._crTarget      = undefined;
+  window._crBlacklist   = {};
+  window._crAtStart     = false;   // já andou até o START_WP nessa sessão?
+  window._crRepDropX    = undefined;
+  window._crRepDropY    = undefined;
+  window._crRepAdjX     = undefined;
+  window._crRepAdjY     = undefined;
+  window._crRepItemName = undefined;
+
+  // ── COMANDO ──────────────────────────────────────────────────
+  dsk.setCmd('/crystal', () => {
+    dsk.crystal.enabled = !dsk.crystal.enabled;
+
+    if (dsk.crystal.enabled) {
+      if (!inv[SLOT_AXE]?.sprite || !inv[SLOT_PICK]?.sprite) {
+        dsk.localMsg('Crystal Bot: coloque arma no slot 0 e pickareta no slot 3!', '#f55');
+        dsk.crystal.enabled = false;
+        return;
+      }
+
+      crResetState(true); // true = reseta o _crAtStart também
+      dsk.localMsg('Crystal Bot: Ativado  (arma=s0 shield=s1 armor=s2 pick=s3)', '#5f5');
+
+      (async function loop() {
+        while (dsk.crystal.enabled) {
+          try { await xCrystal(); }
+          catch (e) {
+            console.error('[Crystal] erro:', e);
+            window._crGoing  = false;
+            window._crMoving = false;
+          }
+          await xDelay(500);
+        }
+      })();
+
+    } else {
+      crResetState(false);
+      crStopMining();
+      dsk.localMsg('Crystal Bot: Desativado', '#f55');
+    }
+  });
+
+
+  // ════════════════════════════════════════════════════════════
+  //  HELPERS
+  // ════════════════════════════════════════════════════════════
+
+  function crResetState(resetStart) {
+    window._crGoing       = false;
+    window._crMoving      = false;
+    window._crNeedsRep    = false;
+    window._crTarget      = undefined;
+    window._crBlacklist   = {};
+    window._crRepDropX    = undefined;
+    window._crRepDropY    = undefined;
+    window._crRepAdjX     = undefined;
+    window._crRepAdjY     = undefined;
+    window._crRepItemName = undefined;
+    if (resetStart) window._crAtStart = false;
+  }
+
+  function crStopMining() {
+    if (keySpace.isDown) {
+      jv.key_array[6].isDown = false;
+      jv.key_array[6].isUP   = true;
+      send({ type: 'a' });
+    }
+  }
+
+  async function crEquipPick() {
+    if (inv[SLOT_PICK]?.equip === 0) {
+      xDoUseSlot(SLOT_PICK);
+      await xDelay(400);
+    }
+  }
+
+  async function crEquipCombat() {
+    if (inv[SLOT_AXE]?.equip === 0)    { xDoUseSlot(SLOT_AXE);    await xDelay(200); }
+    if (inv[SLOT_SHIELD]?.equip === 0)  { xDoUseSlot(SLOT_SHIELD);  await xDelay(200); }
+    if (inv[SLOT_ARMOR]?.equip === 0)   { xDoUseSlot(SLOT_ARMOR);   await xDelay(200); }
+  }
+
+  // Direção de myself para tile (tx,ty): 0=up 1=right 2=down 3=left
+  function crDirTo(tx, ty) {
+    const dx = tx - myself.x;
+    const dy = ty - myself.y;
+    if (dx === 1)  return 1;
+    if (dx === -1) return 3;
+    if (dy === 1)  return 2;
+    return 0;
+  }
+
+
+  // ════════════════════════════════════════════════════════════
+  //  REPARO IN-PLACE  (fiel ao xSSDRepairInPlace do modpablo)
+  //
+  //  FASE 1 – dropa o item quebrado, salva posição e nome
+  //  FASE 2 – checa kit de reparo no inventário
+  //  FASE 3 – move para tile adjacente livre ao item dropado
+  //  FASE 4 – equipa o repair kit via xDoUseSlot
+  //  FASE 5 – vira para o item usando xDoChangeDir
+  //  FASE 6 – ataca em pulsos (xDoKeyPress) até "perfect condition"
+  //           checando player a cada batida
+  //  FASE 7 – volta ao tile do drop, pickupa 8x, re-equipa todos slots
+  // ════════════════════════════════════════════════════════════
+  async function crRepairInPlace() {
+
+    // ── Mob próximo durante reparo → aborta e luta ────────────
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself || xPlyrTest(mob)) continue;
+      if (xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 3) {
+        crStopMining();
+        await crEquipCombat();
+        target.id = mob.id;
+        send({ type: 't', t: mob.id });
+        window._crNeedsRep = false;
+        return;
+      }
+    }
+
+    // ── Player próximo durante reparo → recolhe e aborta ──────
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself || !xPlyrTest(mob)) continue;
+      if (xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 4) {
+        dsk.localMsg('Crystal: player perto durante reparo! Recolhendo...', '#f55');
+        crStopMining();
+        await xDelay(400);
+        window._crMoving = false;
+        await xDoPickUp(); await xDelay(200);
+        if (window._crRepDropX !== undefined) {
+          await xDoMove(window._crRepDropX, window._crRepDropY);
+          await xDelay(500);
+          for (let p = 0; p < 6; p++) { await xDoPickUp(); await xDelay(180); }
+        }
+        if (inv[SLOT_AXE]?.equip === 0)    { xDoUseSlot(SLOT_AXE);    await xDelay(200); }
+        if (inv[SLOT_SHIELD]?.equip === 0)  { xDoUseSlot(SLOT_SHIELD);  await xDelay(200); }
+        if (inv[SLOT_ARMOR]?.equip === 0)   { xDoUseSlot(SLOT_ARMOR);   await xDelay(200); }
+        if (inv[SLOT_PICK]?.equip === 0)    { xDoUseSlot(SLOT_PICK);    await xDelay(200); }
+        window._crNeedsRep    = false;
+        window._crRepDropX    = undefined;
+        window._crRepDropY    = undefined;
+        window._crRepAdjX     = undefined;
+        window._crRepAdjY     = undefined;
+        window._crRepItemName = undefined;
+        window._crTarget      = undefined;
+        return;
+      }
+    }
+
+    // ── FASE 1: dropa o item quebrado ─────────────────────────
+    const brokenSlot = [SLOT_AXE, SLOT_SHIELD, SLOT_ARMOR, SLOT_PICK]
+      .find(s => inv[s]?.equip === 2 && inv[s]?.sprite);
+
+    if (brokenSlot !== undefined) {
+      const playerNear = Object.values(mobs.items).find(mob =>
+        mob && mob !== myself && xPlyrTest(mob) &&
+        xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 4
+      );
+      if (playerNear) {
+        dsk.localMsg('Crystal: player perto, adiando reparo...', '#fa5');
+        window._crNeedsRep = false;
+        return;
+      }
+      window._crMoving      = false;
+      crStopMining();
+      await xDelay(900);
+      window._crRepDropX    = myself.x;
+      window._crRepDropY    = myself.y;
+      window._crRepAdjX     = undefined;
+      window._crRepAdjY     = undefined;
+      window._crRepItemName = xGetItemNameBySlot(brokenSlot) ?? 'item';
+      dsk.localMsg(`Crystal: dropando slot ${brokenSlot} (${window._crRepItemName}) para reparo...`, '#fa0');
+      xDoDropSlot(0, brokenSlot + 1);
+      await xDelay(400);
+      return;
+    }
+
+    // ── FASE 2: checa kit de reparo ───────────────────────────
+    const kitSlot = xGetSlotByID(REPAIR_KIT);
+    if (kitSlot === undefined) {
+      dsk.localMsg('Crystal: sem Repair Kit! Desativando...', '#f55');
+      window._crNeedsRep = false;
+      dsk.crystal.enabled = false;
+      return;
+    }
+
+    const dropX = window._crRepDropX ?? myself.x;
+    const dropY = window._crRepDropY ?? myself.y;
+
+    // ── FASE 3: move para tile adjacente livre ao item dropado ─
+    if (window._crRepAdjX === undefined || window._crRepAdjY === undefined) {
+      const adjFree = [
+        { x: dropX + 1, y: dropY },
+        { x: dropX - 1, y: dropY },
+        { x: dropX,     y: dropY + 1 },
+        { x: dropX,     y: dropY - 1 },
+      ].find(t => !xGetSolidByID(t.x, t.y));
+
+      if (!adjFree) {
+        dsk.localMsg('Crystal: sem tile livre adjacente para reparar!', '#f55');
+        window._crNeedsRep = false;
+        return;
+      }
+      window._crRepAdjX = adjFree.x;
+      window._crRepAdjY = adjFree.y;
+    }
+
+    if (myself.x !== window._crRepAdjX || myself.y !== window._crRepAdjY) {
+      if (!window._crMoving) await xDoMove(window._crRepAdjX, window._crRepAdjY);
+      return;
+    }
+
+    // ── FASE 4: equipa o repair kit ───────────────────────────
+    if (inv[kitSlot]?.equip === 0) {
+      await xDoUseSlot(kitSlot);
+      await xDelay(400);
+      return;
+    }
+
+    // ── FASE 5: vira para o tile do item dropado ──────────────
+    const facingDir = crDirTo(dropX, dropY);
+    if (myself.dir !== facingDir) {
+      await xDoChangeDir(facingDir);
+      await xDelay(300);
+      return;
+    }
+
+    // ── FASE 6: ataca em pulsos até "perfect condition" ────────
+    const perfectMsg = 'The ' + (window._crRepItemName ?? 'item') + ' is in perfect condition.';
+    let repairSafe = true;
+
+    while (repairSafe) {
+      for (let i in mobs.items) {
+        const mob = mobs.items[i];
+        if (!mob || mob === myself || !xPlyrTest(mob)) continue;
+        if (xGetDistance(myself.x, myself.y, mob.x, mob.y) <= 4) {
+          repairSafe = false;
+          break;
+        }
+      }
+      if (!repairSafe) break;
+
+      await xDoKeyPress(6, 200);
+      await xDelay(300);
+
+      if (xIfChatHas(perfectMsg)) {
+        xDoClearChat(perfectMsg);
+        crStopMining();
+        await xDelay(400);
+
+        // ── FASE 7: volta ao drop e pickupa ───────────────────
+        window._crMoving = false;
+        await xDoMove(dropX, dropY);
+        await xDelay(500);
+        for (let p = 0; p < 8; p++) { await xDoPickUp(); await xDelay(180); }
+
+        if (inv[SLOT_AXE]?.equip === 0)    { xDoUseSlot(SLOT_AXE);    await xDelay(200); }
+        if (inv[SLOT_SHIELD]?.equip === 0)  { xDoUseSlot(SLOT_SHIELD);  await xDelay(200); }
+        if (inv[SLOT_ARMOR]?.equip === 0)   { xDoUseSlot(SLOT_ARMOR);   await xDelay(200); }
+        if (inv[SLOT_PICK]?.equip === 0)    { xDoUseSlot(SLOT_PICK);    await xDelay(200); }
+
+        window._crNeedsRep    = false;
+        window._crRepDropX    = undefined;
+        window._crRepDropY    = undefined;
+        window._crRepAdjX     = undefined;
+        window._crRepAdjY     = undefined;
+        window._crRepItemName = undefined;
+        window._crTarget      = undefined;
+        dsk.localMsg('Crystal: reparo in-place concluído!', '#5f5');
+        return;
+      }
+    }
+
+    // Saiu do while por player detectado
+    crStopMining();
+    await xDelay(400);
+    window._crMoving = false;
+    await xDoPickUp(); await xDelay(200);
+    await xDoMove(dropX, dropY);
+    await xDelay(500);
+    for (let p = 0; p < 6; p++) { await xDoPickUp(); await xDelay(180); }
+    if (inv[SLOT_AXE]?.equip === 0)    { xDoUseSlot(SLOT_AXE);    await xDelay(200); }
+    if (inv[SLOT_SHIELD]?.equip === 0)  { xDoUseSlot(SLOT_SHIELD);  await xDelay(200); }
+    if (inv[SLOT_ARMOR]?.equip === 0)   { xDoUseSlot(SLOT_ARMOR);   await xDelay(200); }
+    if (inv[SLOT_PICK]?.equip === 0)    { xDoUseSlot(SLOT_PICK);    await xDelay(200); }
+    window._crNeedsRep    = false;
+    window._crRepDropX    = undefined;
+    window._crRepDropY    = undefined;
+    window._crRepAdjX     = undefined;
+    window._crRepAdjY     = undefined;
+    window._crRepItemName = undefined;
+    window._crTarget      = undefined;
+    dsk.localMsg('Crystal: player detectado, abortando reparo!', '#f55');
+  }
+
+
+  // ════════════════════════════════════════════════════════════
+  //  BUSCA Crystal Rock (name === 'Crystal Rock') mais próxima
+  // ════════════════════════════════════════════════════════════
+  function crFindTarget() {
+    if (window._crTarget) {
+      const ct = window._crTarget;
+      const still = Object.values(objects.items).some(o =>
+        o && o.x === ct.x && o.y === ct.y && o.can_pickup === 0 && o.name === 'Crystal Rock'
+      );
+      if (still) return;
+      window._crTarget = undefined;
+    }
+
+    const now = Date.now();
+    let best = undefined;
+    let bestDist = Infinity;
+
+    for (let i in objects.items) {
+      const obj = objects.items[i];
+      if (!obj || obj.can_pickup !== 0) continue;
+      if (obj.name !== 'Crystal Rock') continue;
+
+      const k = obj.x + ',' + obj.y;
+      if (window._crBlacklist[k] && now < window._crBlacklist[k]) continue;
+
+      const dist = Math.abs(obj.x - myself.x) + Math.abs(obj.y - myself.y);
+      if (dist > 25) continue;
+
+      const hasFreeSide = [
+        { dx: 0, dy: -1 }, { dx: 1, dy: 0 }, { dx: 0, dy: 1 }, { dx: -1, dy: 0 }
+      ].some(c =>
+        !xGetSolidByID(obj.x + c.dx, obj.y + c.dy) &&
+        xGetTileByPos(obj.x + c.dx, obj.y + c.dy) !== 325
+      );
+      if (!hasFreeSide) continue;
+
+      if (dist < bestDist) { bestDist = dist; best = obj; }
+    }
+
+    window._crTarget = best;
+    if (best) dsk.localMsg(`Crystal: alvo em (${best.x},${best.y}) dist=${bestDist}`, '#0af');
+  }
+
+
+  // ════════════════════════════════════════════════════════════
+  //  FUNÇÃO PRINCIPAL
+  // ════════════════════════════════════════════════════════════
+  async function xCrystal() {
+    if (!dsk.crystal.enabled) return;
+    if (!myself || game_state !== 2) return;
+    if (connection?.readyState === 3) { window._crMoving = false; return; }
+
+    // Anti-travamento
+    if (window._crGoing) {
+      if (!window._crGoTime) window._crGoTime = Date.now();
+      if (Date.now() - window._crGoTime > 12000) {
+        window._crGoing  = false;
+        window._crGoTime = undefined;
+        window._crMoving = false;
+      }
+      return;
+    }
+    window._crGoing  = true;
+    window._crGoTime = undefined;
+
+    // ── 0. ANDAR ATÉ O START_WP ao iniciar / reconectar ──────
+    if (!window._crAtStart) {
+      if (myself.x !== START_WP.x || myself.y !== START_WP.y) {
+        dsk.localMsg(`Crystal Bot: indo para área de mineração (${START_WP.x},${START_WP.y})...`, '#0ff');
+        if (!window._crMoving) await xDoMove(START_WP.x, START_WP.y);
+        window._crGoing = false;
+        return;
+      }
+      window._crAtStart = true;
+      dsk.localMsg('Crystal Bot: chegou na área, iniciando mineração!', '#5f5');
+    }
+
+    // ── 1. MODO REPARO ────────────────────────────────────────
+    if (window._crNeedsRep) {
+      await crRepairInPlace();
+      window._crGoing = false;
+      return;
+    }
+
+    // ── 2. GEAR QUEBRADO → aciona reparo ─────────────────────
+    const brokenAny = [SLOT_AXE, SLOT_SHIELD, SLOT_ARMOR, SLOT_PICK]
+      .some(s => inv[s]?.equip === 2 && inv[s]?.sprite);
+    if (brokenAny) {
+      window._crNeedsRep = true;
+      window._crMoving   = false;
+      crStopMining();
+      await xDelay(700);
+      window._crGoing = false;
+      return;
+    }
+
+    // ── 3. MOB A ≤1 SQM → para e mata ────────────────────────
+    let mobNear = undefined;
+    for (let i in mobs.items) {
+      const mob = mobs.items[i];
+      if (!mob || mob === myself || xPlyrTest(mob)) continue;
+      if (Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y) <= 1) {
+        mobNear = mob;
+        break;
+      }
+    }
+
+    if (mobNear) {
+      crStopMining();
+      window._crTarget = undefined;
+      await crEquipCombat();
+      target.id = mobNear.id;
+      send({ type: 't', t: mobNear.id });
+      window._crGoing = false;
+      return;
+    }
+
+    if (target.id !== me) target.id = me;
+
+    // ── 4. BUSCA CRYSTAL ROCK ─────────────────────────────────
+    crFindTarget();
+
+    // ── 5. SEM CRYSTAL → vai para LOGOUT_WP e desconecta ─────
+    if (!window._crTarget) {
+      dsk.localMsg('Crystal Bot: sem Crystal Rock próxima, indo deslogar...', '#fa0');
+      crStopMining();
+
+      if (myself.x !== LOGOUT_WP.x || myself.y !== LOGOUT_WP.y) {
+        if (!window._crMoving) await xDoMove(LOGOUT_WP.x, LOGOUT_WP.y);
+        window._crGoing = false;
+        return;
+      }
+
+      // Chegou no LOGOUT_WP → desconecta
+      dsk.localMsg('Crystal Bot: desconectando, voltando em 12 min...', '#f55');
+      dsk.crystal.enabled = false;
+      dsk.fquit();
+
+      await xDelay(LOGOUT_WAIT_MS);
+
+      if (connection?.readyState === 3 && jv.selected_ip) {
+        do_connect();
+        await xDelay(8000);
+      }
+      if (connection?.readyState === 1) {
+        send({
+          type: 'login',
+          user: jv.base64_encode(jv.login_dialog.username.chars.trim()),
+          pass: jv.base64_encode(jv.login_dialog.password.chars.trim()),
+        });
+        await xDelay(5000);
+      }
+
+      // Reativa bot — _crAtStart = false para ele andar até START_WP de novo
+      crResetState(true);
+      dsk.crystal.enabled = true;
+      dsk.localMsg('Crystal Bot: reativado após pausa!', '#5f5');
+      (async function loop() {
+        while (dsk.crystal.enabled) {
+          try { await xCrystal(); }
+          catch (e) { console.error('[Crystal] erro:', e); window._crGoing = false; window._crMoving = false; }
+          await xDelay(500);
+        }
+      })();
+      return;
+    }
+
+    // ── 6. NAVEGA ATÉ A CRYSTAL E MINERA ─────────────────────
+    const rock   = window._crTarget;
+    const sides4 = [
+      { dx: 0, dy: -1, dir: 0 }, { dx: 1, dy:  0, dir: 1 },
+      { dx: 0, dy:  1, dir: 2 }, { dx: -1, dy: 0, dir: 3 }
+    ];
+
+    const stillExists = Object.values(objects.items).some(o =>
+      o && o.x === rock.x && o.y === rock.y && o.can_pickup === 0 && o.name === 'Crystal Rock'
+    );
+    if (!stillExists) {
+      window._crTarget = undefined;
+      window._crMoving = false;
+      crStopMining();
+      window._crGoing = false;
+      return;
+    }
+
+    const adjSide = sides4.find(c =>
+      myself.x === rock.x + c.dx && myself.y === rock.y + c.dy
+    );
+
+    if (adjSide) {
+      // Adjacente: equipa pick, vira com xDoChangeDir, minera
+      await crEquipPick();
+      const faceDir = crDirTo(rock.x, rock.y);
+      if (myself.dir !== faceDir) {
+        crStopMining();
+        await xDoChangeDir(faceDir);
+        await xDelay(80);
+      }
+      if (!keySpace.isDown) {
+        send({ type: 'A' });
+        jv.key_array[6].isDown = true;
+        jv.key_array[6].isUP   = false;
+      }
+
+    } else {
+      // Não adjacente: para de minerar e navega
+      crStopMining();
+      const freeSides = sides4
+        .map(c => ({
+          x: rock.x + c.dx,
+          y: rock.y + c.dy,
+          dist: Math.abs(myself.x - (rock.x + c.dx)) + Math.abs(myself.y - (rock.y + c.dy))
+        }))
+        .filter(t =>
+          !xGetSolidByID(t.x, t.y) &&
+          xGetTileByPos(t.x, t.y) !== 325 &&
+          xGetPlayerByPosList([t.x], [t.y]) === undefined
+        )
+        .sort((a, b) => a.dist - b.dist);
+
+      if (freeSides.length === 0) {
+        dsk.localMsg('Crystal: pedra sem lado livre, blacklistando...', '#ff0');
+        window._crBlacklist[rock.x + ',' + rock.y] = Date.now() + 120000;
+        window._crTarget = undefined;
+        window._crMoving = false;
+        window._crGoing  = false;
+        return;
+      }
+
+      if (!window._crMoving) xDoMove(freeSides[0].x, freeSides[0].y);
+    }
+
+    window._crGoing = false;
+  }
+
+})();
+
+// ── USO ──────────────────────────────────────────────────────
+// 1. Preencha START_WP  com as coordenadas da área das pedras
+// 2. Preencha LOGOUT_WP com as coordenadas do ponto de logout
+// 3. Coloque: arma slot 0, shield slot 1, armor slot 2, pickareta slot 3
+// 4. Tenha Repair Kit(s) (ID 719) em algum slot do inventário
+// 5. Digite /crystal no chat para ativar/desativar
+
+// ══════════════════════════════════════════════════════════════
+//  EGG BOT  –  integrado ao modpablo  (Personal Gate)
+//  /egg  → ativa/desativa o bot
+//  /egb  → mostra/esconde o botão na tela
+//  corredorX capturado automaticamente ao ligar
+// ══════════════════════════════════════════════════════════════
+
+
+// ── ESTADO ───────────────────────────────────────────────────
+dsk.egg = {
+  enabled:           false,
+  corredorX:         undefined,
+  corredorY:         undefined,
+  pegando:           0,
+  itemX:             undefined,
+  itemY:             undefined,
+  itemDir:           undefined,
+  chickenTarget:     null,
+  waitingInfo:       false,
+  checandoFood:      false,
+  feedDrops:         0,
+  _dirRetry:         0,
+  _moveStart:        undefined,
+  _chickenWaitStart: undefined,
+  _going:            false,
+  _goTime:           undefined,
+};
+
+
+// ── BOTÃO ────────────────────────────────────────────────────
+var botaoEggVisible = false;
+
+jv.botaoEgg = jv.Button.create(685, 382, 20, 'EG', ui_container, 20);
+jv.botaoEgg.title.style.fill = 0xff4444;
+jv.botaoEgg.visible = false;
+
+jv.botaoEgg.on_click = function() {
+  dsk.commands['/egg']();
+  jv.botaoEgg.title.style.fill = dsk.egg.enabled ? 0x00ff88 : 0xff4444;
+};
+
+dsk.setCmd('/egb', () => {
+  botaoEggVisible = !botaoEggVisible;
+  jv.botaoEgg.visible = botaoEggVisible;
+  dsk.localMsg(`Egg Button: ${botaoEggVisible ? 'Visível' : 'Escondido'}`, botaoEggVisible ? '#5f5' : '#f55');
+});
+
+
+// ── WS LISTENER (food da galinha) ────────────────────────────
+function _egbInstallListener() {
+  if (window._egbWsListener) return;
+  window._egbWsListener = function(event) {
+    if (!dsk.egg.waitingInfo) return;
+    try {
+      const packet = JSON.parse(event.data);
+      if (packet.type !== 'pkg') return;
+      const entries = JSON.parse(packet.data);
+      for (const raw of entries) {
+        if (typeof raw !== 'string') continue;
+        const data = JSON.parse(raw);
+        if (data.type !== 'fx' || data.tpl !== 'player_info') continue;
+        if (!data.d?.food) continue;
+        const m = data.d.food.match(/(\d+)%/);
+        if (!m) continue;
+        const pct = parseInt(m[1]);
+        dsk.egg.feedDrops   = pct <= 50 ? 2 : pct <= 70 ? 1 : 0;
+        dsk.egg.waitingInfo = false;
+        dsk.egg.checandoFood = false;
+        console.log(`[EggBot] Food: ${pct}% → dropar ${dsk.egg.feedDrops}`);
+        _egbFecharDialog();
+      }
+    } catch {}
+  };
+  connection.addEventListener('message', window._egbWsListener);
+}
+
+function _egbFecharDialog() {
+  let t = 0;
+  const tentar = () => {
+    t++;
+    for (const e in jv.Dialog.list) {
+      const d = jv.Dialog.list[e];
+      if (!d || !d.visible) continue;
+      if (d.children?.some(c => c.text === 'Chicken')) { d.visible = false; return; }
+    }
+    if (t < 10) setTimeout(tentar, 100);
+  };
+  tentar();
+}
+
+function _egbCheckFood() {
+  const st = dsk.egg;
+  if (!mobs?.items) { st.checandoFood = false; return; }
+  st.chickenTarget = null;
+  let minDist = 999;
+  for (const i in mobs.items) {
+    const mob = mobs.items[i];
+    if (!mob || mob.name !== 'Chicken') continue;
+    const dist = Math.abs(mob.x - myself.x) + Math.abs(mob.y - myself.y);
+    if (dist <= 3 && dist < minDist) { st.chickenTarget = mob; minDist = dist; }
+  }
+  if (!st.chickenTarget) { st.checandoFood = false; return; }
+  st.waitingInfo = true;
+  send({ type: 't', t: st.chickenTarget.id });
+  setTimeout(() => {
+    send({ type: 'c', r: 'rp', id: st.chickenTarget.id });
+    setTimeout(() => {
+      if (st.waitingInfo) { st.waitingInfo = false; st.checandoFood = false; }
+    }, 5000);
+  }, 200);
+}
+
+function _egbFindEgg() {
+  const cx = dsk.egg.corredorX;
+  const cy = dsk.egg.corredorY;
+  return Object.values(objects.items).find(obj =>
+    obj && obj.name?.includes('Egg') &&
+    Math.abs(obj.y - cy) <= 15 &&
+    (
+      (obj.x === cx + 2 && occupied(obj.x + 1, obj.y) === 0) ||
+      (obj.x === cx - 2 && occupied(obj.x - 1, obj.y) === 0)
+    )
+  );
+}
+
+
+// ── LOOP PRINCIPAL ────────────────────────────────────────────
+async function EggBot() {
+  if (dskPaused) return;
+  if (!myself || game_state !== 2) return;
+
+  const st = dsk.egg;
+
+  // Anti-travamento
+  if (st._going) {
+    if (!st._goTime) st._goTime = Date.now();
+    if (Date.now() - st._goTime > 10000) {
+      st._going    = false;
+      st._goTime   = undefined;
+      st.pegando   = 0;
+      st.itemX     = undefined; st.itemY  = undefined; st.itemDir = undefined;
+      st._dirRetry = 0; st._moveStart = undefined;
+      st.waitingInfo = false; st.checandoFood = false;
+      dsk.localMsg('Egg Bot: timeout, resetando...', '#fa0');
+    }
+    return;
+  }
+  st._going  = true;
+  st._goTime = undefined;
+
+  // Aguarda servidor responder sobre food
+  if (st.waitingInfo || st.checandoFood) { st._going = false; return; }
+
+  const cx = st.corredorX;
+  const cy = st.corredorY;
+
+  // ── FASE 6: voltando ao corredor após porta de saída ────────
+  if (st.pegando === 6) {
+    if (myself.x !== cx) {
+      xMovingNow = false;
+      await xDoMove(cx, myself.y);
+      await xDelay(500);
+      st._going = false; return;
+    }
+    // Espera galinha sair da porta (até 10s)
+    const portaX = st.itemDir === 1 ? cx + 1 : cx - 1;
+    const chickenNaPorta = Object.values(mobs.items).find(mob =>
+      mob && mob.name === 'Chicken' && mob.x === portaX && mob.y === st.itemY
+    );
+    if (chickenNaPorta) {
+      if (!st._chickenWaitStart) st._chickenWaitStart = Date.now();
+      if (Date.now() - st._chickenWaitStart < 10000) { st._going = false; return; }
+      dsk.localMsg('Egg Bot: galinha não saiu da porta, prosseguindo...', '#fa0');
+    }
+    st._chickenWaitStart = undefined;
+    _egbFecharDialog();
+    st.pegando = 0; st.itemX = undefined; st.itemY = undefined;
+    st.itemDir = undefined; st.chickenTarget = null;
+    st._going = false; return;
+  }
+
+  // ── FASE 5: abrindo porta de saída ──────────────────────────
+  if (st.pegando === 5) {
+    const dirSaida   = st.itemDir === 1 ? 3 : 1;
+    const gateXSaida = st.itemDir === 1 ? cx + 1 : cx - 1;
+    const gateSaida  = Object.values(objects.items).find(el =>
+      el?.name === 'Personal Gate' && el.x === gateXSaida && el.y === st.itemY
+    );
+    _egbFecharDialog();
+    await xDelay(300);
+    await xDoChangeDir(dirSaida);
+    await xDelay(300);
+    if (gateSaida) {
+      await xDoKeyPress(6, 180);  // abre a porta
+      await xDelay(1500);          // aguarda fechar automaticamente
+    }
+    st.pegando = 6;
+    st._going = false; return;
+  }
+
+  // ── FASE 4: verifica food da galinha e dropa worms ──────────
+  if (st.pegando === 4) {
+    st.checandoFood = true;
+    _egbCheckFood();
+    // Espera resolução do food check numa microtask separada
+    const waitFood = setInterval(async () => {
+      if (!dsk.egg.checandoFood && !dsk.egg.waitingInfo) {
+        clearInterval(waitFood);
+        for (let d = 0; d < dsk.egg.feedDrops; d++) {
+          send({ type: 'd', slot: 0, amt: 1 });
+          dsk.localMsg(`Egg Bot: drop worm ${d + 1}/${dsk.egg.feedDrops}`, '#fa0');
+          await xDelay(400);
+        }
+        dsk.egg.feedDrops = 0;
+        dsk.egg.pegando   = 5;
+      }
+    }, 300);
+    st._going = false; return;
+  }
+
+  // ── FASE 3: pegando o ovo ───────────────────────────────────
+  if (st.pegando === 3) {
+    if (myself.x === st.itemX && myself.y === st.itemY) {
+      await xDoPickUp();
+      await xDelay(300);
+      st.pegando = 4;
+    } else {
+      if (!st._moveStart) st._moveStart = Date.now();
+      if (Date.now() - st._moveStart > 15000) {
+        dsk.localMsg('Egg Bot: não chegou ao ovo, resetando...', '#fa0');
+        st.pegando = 0; st.itemX = undefined; st.itemY = undefined;
+        st.itemDir = undefined; st._moveStart = undefined;
+        xMovingNow = false; st._going = false; return;
+      }
+      xMovingNow = false;
+      await xDoMove(st.itemX, st.itemY);
+      await xDelay(500);
+    }
+    if (myself.x === st.itemX && myself.y === st.itemY) st._moveStart = undefined;
+    st._going = false; return;
+  }
+
+  // ── FASE 2: abrindo porta de entrada ────────────────────────
+  if (st.pegando === 2) {
+    const gateXEntrada = st.itemDir === 1 ? cx + 1 : cx - 1;
+    const gateEntrada  = Object.values(objects.items).find(el =>
+      el?.name === 'Personal Gate' && el.x === gateXEntrada && el.y === st.itemY
+    );
+
+    // Vira para a direção da porta
+    if (myself.dir !== st.itemDir) {
+      if (!st._dirRetry) st._dirRetry = 0;
+      st._dirRetry++;
+      if (st._dirRetry > 5) {
+        dsk.localMsg('Egg Bot: falha ao virar, resetando...', '#fa0');
+        st.pegando = 0; st.itemX = undefined; st.itemY = undefined;
+        st.itemDir = undefined; st._dirRetry = 0;
+        xMovingNow = false; st._going = false; return;
+      }
+      xMovingNow = false;
+      await xDelay(400);
+      await xDoChangeDir(st.itemDir);
+      await xDelay(400);
+      st._going = false; return;
+    }
+    st._dirRetry = 0;
+
+    // Abre a Personal Gate e aguarda fechar antes de entrar
+    if (gateEntrada) {
+      await xDoKeyPress(6, 180);  // abre
+      await xDelay(1500);          // aguarda fechar automaticamente
+    }
+
+    xMovingNow = false;
+    await xDoMove(st.itemX, st.itemY);
+    await xDelay(500);
+    st.pegando = 3;
+    st._going = false; return;
+  }
+
+  // ── FASE 1: movendo no corredor até o Y do ovo ──────────────
+  if (st.pegando === 1) {
+    if (myself.x !== cx) {
+      xMovingNow = false;
+      await xDoMove(cx, myself.y);
+      await xDelay(400);
+      st._going = false; return;
+    }
+    if (myself.y !== st.itemY) {
+      xMovingNow = false;
+      await xDoMove(cx, st.itemY);
+      await xDelay(400);
+      st._going = false; return;
+    }
+    st.pegando = 2;
+    st._going = false; return;
+  }
+
+  // ── FASE 0: procurando ovo ───────────────────────────────────
+  if (st.pegando === 0) {
+    const item = _egbFindEgg();
+    if (item) {
+      st.itemX   = item.x;
+      st.itemY   = item.y;
+      st.itemDir = item.x > cx ? 1 : 3;
+      st.pegando = 1;
+      dsk.localMsg(`Egg Bot: ovo em (${item.x},${item.y})`, '#0af');
+      st._going = false; return;
+    }
+
+    // Sem ovo → vai para posição de espera
+    if (myself.y !== cy && myself.x === cx) {
+      xMovingNow = false;
+      await xDoMove(cx, cy);
+      await xDelay(400);
+      st._going = false; return;
+    }
+
+    // Na posição de espera → olha para o lado dos quartos
+    const blockL = map_index?.[getkey(cx - 1, myself.y)]?.block === 0;
+    const blockR = map_index?.[getkey(cx + 1, myself.y)]?.block === 0;
+    if (blockL && myself.dir !== 3) await xDoChangeDir(3);
+    else if (blockR && myself.dir !== 1) await xDoChangeDir(1);
+  }
+
+  st._going = false;
+}
+
+
+// ── COMANDO /egg ──────────────────────────────────────────────
+dsk.setCmd('/egg', () => {
+  dsk.egg.enabled = !dsk.egg.enabled;
+
+  if (dsk.egg.enabled) {
+    // Captura corredorX e corredorY da posição atual do char
+    dsk.egg.corredorX        = myself.x;
+    dsk.egg.corredorY        = myself.y;
+    dsk.egg.pegando          = 0;
+    dsk.egg.itemX            = undefined;
+    dsk.egg.itemY            = undefined;
+    dsk.egg.itemDir          = undefined;
+    dsk.egg.chickenTarget    = null;
+    dsk.egg.waitingInfo      = false;
+    dsk.egg.checandoFood     = false;
+    dsk.egg.feedDrops        = 0;
+    dsk.egg._dirRetry        = 0;
+    dsk.egg._going           = false;
+
+    _egbInstallListener();
+
+    dsk.localMsg(`Egg Bot: Ativado @ corredor X=${dsk.egg.corredorX} Y=${dsk.egg.corredorY}`, '#5f5');
+
+    (async function loop() {
+      while (dsk.egg.enabled) {
+        await EggBot();
+        await xDelay(360);
+      }
+    })();
+
+  } else {
+    dsk.egg.pegando      = 0;
+    dsk.egg.itemX        = undefined;
+    dsk.egg.itemY        = undefined;
+    dsk.egg.itemDir      = undefined;
+    dsk.egg.chickenTarget = null;
+    dsk.egg.waitingInfo  = false;
+    dsk.egg.checandoFood = false;
+    dsk.egg.feedDrops    = 0;
+    dsk.egg._going       = false;
+    dsk.localMsg('Egg Bot: Desativado', '#f55');
+  }
+
+  // Atualiza cor do botão
+  if (jv.botaoEgg) {
+    jv.botaoEgg.title.style.fill = dsk.egg.enabled ? 0x00ff88 : 0xff4444;
+  }
 });
 
 // ── INICIALIZAÇÃO ────────────────────────────────────────────
